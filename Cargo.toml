@@ -1,0 +1,11 @@
+[package]
+name = "fang"
+version = "0.1.0"
+authors = ["Ayrat Badykov <ayratin555@gmail.com>"]
+edition = "2018"
+description = "fang is in active development. it's published to take the name on crates.io"
+license = "MIT"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
