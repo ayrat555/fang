@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate diesel;
+
 // pub trait JobQueue {
 //     type Job;
 //     type Error;
@@ -11,6 +14,10 @@
 // pub trait Storage {
 //     fn save() ->
 // }
+
+pub mod postgres;
+mod schema;
+
 #[cfg(test)]
 mod tests {
     #[test]

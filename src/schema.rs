@@ -1,7 +1,7 @@
 table! {
     fang_tasks (id) {
-        id -> Int8,
-        metadata -> Nullable<Jsonb>,
+        id -> Uuid,
+        metadata -> Jsonb,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
     }
