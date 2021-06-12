@@ -10,6 +10,7 @@ license = "MIT"
 
 [dependencies]
 diesel = { version = "1.4.6", features = ["postgres", "serde_json", "chrono", "uuidv07"] }
+diesel-derive-enum = { version = "1", features = ["postgres"] }
 dotenv = "0.15.0"
 uuid = { version = "0.8", features = ["v4"] }
 chrono = "0.4"
