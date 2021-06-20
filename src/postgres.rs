@@ -70,6 +70,39 @@ impl Postgres {
             _ => None,
         }
     }
+
+    pub fn find_task_by_id(&self, id: Uuid) -> Option<Task> {
+        match fang_tasks::table
+            .filter(fang_tasks::id.eq(id))
+            .first::<Task>(&self.connection)
+        {
+            Ok(record) => Some(record),
+            _ => None,
+        }
+    }
+
+    pub fn finish_task(&self, task: &Task) -> Result<Task, Error> {
+        diesel::update(task)
+            .set((
+                fang_tasks::state.eq(FangTaskState::Finished),
+                fang_tasks::updated_at.eq(Self::current_time()),
+            ))
+            .get_result::<Task>(&self.connection)
+    }
+
+    pub fn fail_task(&self, task: &Task, error: String) -> Result<Task, Error> {
+        diesel::update(task)
+            .set((
+                fang_tasks::state.eq(FangTaskState::Failed),
+                fang_tasks::error_message.eq(error),
+                fang_tasks::updated_at.eq(Self::current_time()),
+            ))
+            .get_result::<Task>(&self.connection)
+    }
+
+    pub fn current_time() -> DateTime<Utc> {
+        Utc::now()
+    }
 }
 
 #[cfg(test)]
@@ -121,7 +154,39 @@ mod postgres_tests {
         });
     }
 
-    // this test ignored because it commits data to the db
+    #[test]
+    fn finish_task_updates_state_field() {
+        let postgres = Postgres::new(None);
+
+        postgres.connection.test_transaction::<(), Error, _>(|| {
+            let task = insert_new_job(&postgres.connection);
+
+            let updated_task = postgres.finish_task(&task).unwrap();
+
+            assert_eq!(FangTaskState::Finished, updated_task.state);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn fail_task_updates_state_field_and_sets_error_message() {
+        let postgres = Postgres::new(None);
+
+        postgres.connection.test_transaction::<(), Error, _>(|| {
+            let task = insert_new_job(&postgres.connection);
+            let error = "Failed".to_string();
+
+            let updated_task = postgres.fail_task(&task, error.clone()).unwrap();
+
+            assert_eq!(FangTaskState::Failed, updated_task.state);
+            assert_eq!(error, updated_task.error_message.unwrap());
+
+            Ok(())
+        });
+    }
+
+    // this test is ignored because it commits data to the db
     #[test]
     #[ignore]
     fn fetch_task_locks_the_record() {
@@ -175,6 +240,13 @@ mod postgres_tests {
                 fang_tasks::metadata.eq(metadata),
                 fang_tasks::created_at.eq(timestamp),
             )])
+            .get_result::<Task>(connection)
+            .unwrap()
+    }
+
+    fn insert_new_job(connection: &PgConnection) -> Task {
+        diesel::insert_into(fang_tasks::table)
+            .values(&vec![(fang_tasks::metadata.eq(serde_json::json!(true)),)])
             .get_result::<Task>(connection)
             .unwrap()
     }

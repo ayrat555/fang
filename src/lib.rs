@@ -15,6 +15,7 @@ extern crate diesel;
 //     fn save() ->
 // }
 
+pub mod executor;
 pub mod postgres;
 mod schema;
 
