@@ -17,6 +17,7 @@ extern crate diesel;
 
 pub mod executor;
 pub mod postgres;
+pub mod scheduler;
 mod schema;
 
 #[cfg(test)]

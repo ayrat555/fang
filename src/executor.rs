@@ -1,11 +1,13 @@
 use crate::postgres::Postgres;
 use crate::postgres::Task;
 
-struct Executor {}
+pub struct Executor {
+    pub storage: Postgres,
+}
 
 #[derive(Debug)]
 pub struct Error {
-    description: String,
+    pub description: String,
 }
 
 #[typetag::serde(tag = "type")]
@@ -14,13 +16,23 @@ pub trait Runnable {
 }
 
 impl Executor {
-    pub fn run(storage: &Postgres, task: &Task) {
+    pub fn new(storage: Postgres) -> Self {
+        Self { storage }
+    }
+
+    pub fn run(&self, task: &Task) {
         let actual_task: Box<dyn Runnable> = serde_json::from_value(task.metadata.clone()).unwrap();
 
         match actual_task.run() {
-            Ok(()) => storage.finish_task(task).unwrap(),
-            Err(error) => storage.fail_task(task, error.description).unwrap(),
+            Ok(()) => self.storage.finish_task(task).unwrap(),
+            Err(error) => self.storage.fail_task(task, error.description).unwrap(),
         };
+    }
+
+    pub fn run_tasks(&self) {
+        while let Ok(Some(task)) = self.storage.fetch_and_touch() {
+            self.run(&task)
+        }
     }
 }
 
@@ -73,53 +85,59 @@ mod executor_tests {
     fn executes_and_finishes_task() {
         let job = Job { number: 10 };
 
-        let postgres = Postgres::new(None);
-
         let new_task = NewTask {
             metadata: serialize(&job),
         };
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
-            let task = postgres.insert(&new_task).unwrap();
+        let executor = Executor::new(Postgres::new(None));
 
-            assert_eq!(FangTaskState::New, task.state);
+        executor
+            .storage
+            .connection
+            .test_transaction::<(), Error, _>(|| {
+                let task = executor.storage.insert(&new_task).unwrap();
 
-            Executor::run(&postgres, &task);
+                assert_eq!(FangTaskState::New, task.state);
 
-            let found_task = postgres.find_task_by_id(task.id).unwrap();
+                executor.run(&task);
 
-            assert_eq!(FangTaskState::Finished, found_task.state);
+                let found_task = executor.storage.find_task_by_id(task.id).unwrap();
 
-            Ok(())
-        });
+                assert_eq!(FangTaskState::Finished, found_task.state);
+
+                Ok(())
+            });
     }
 
     #[test]
     fn saves_error_for_failed_task() {
         let job = FailedJob { number: 10 };
 
-        let postgres = Postgres::new(None);
-
         let new_task = NewTask {
             metadata: serialize(&job),
         };
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
-            let task = postgres.insert(&new_task).unwrap();
+        let executor = Executor::new(Postgres::new(None));
 
-            assert_eq!(FangTaskState::New, task.state);
+        executor
+            .storage
+            .connection
+            .test_transaction::<(), Error, _>(|| {
+                let task = executor.storage.insert(&new_task).unwrap();
 
-            Executor::run(&postgres, &task);
+                assert_eq!(FangTaskState::New, task.state);
 
-            let found_task = postgres.find_task_by_id(task.id).unwrap();
+                executor.run(&task);
 
-            assert_eq!(FangTaskState::Failed, found_task.state);
-            assert_eq!(
-                "the number is 10".to_string(),
-                found_task.error_message.unwrap()
-            );
+                let found_task = executor.storage.find_task_by_id(task.id).unwrap();
 
-            Ok(())
-        });
+                assert_eq!(FangTaskState::Failed, found_task.state);
+                assert_eq!(
+                    "the number is 10".to_string(),
+                    found_task.error_message.unwrap()
+                );
+
+                Ok(())
+            });
     }
 }

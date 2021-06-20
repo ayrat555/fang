@@ -71,6 +71,21 @@ impl Postgres {
         }
     }
 
+    pub fn fetch_and_touch(&self) -> Result<Option<Task>, Error> {
+        self.connection.transaction::<Option<Task>, Error, _>(|| {
+            let found_task = self.fetch_task();
+
+            if let None = found_task {
+                return Ok(None);
+            }
+
+            match self.start_processing_task(&found_task.unwrap()) {
+                Ok(updated_task) => Ok(Some(updated_task)),
+                Err(err) => Err(err),
+            }
+        })
+    }
+
     pub fn find_task_by_id(&self, id: Uuid) -> Option<Task> {
         match fang_tasks::table
             .filter(fang_tasks::id.eq(id))
@@ -85,6 +100,15 @@ impl Postgres {
         diesel::update(task)
             .set((
                 fang_tasks::state.eq(FangTaskState::Finished),
+                fang_tasks::updated_at.eq(Self::current_time()),
+            ))
+            .get_result::<Task>(&self.connection)
+    }
+
+    pub fn start_processing_task(&self, task: &Task) -> Result<Task, Error> {
+        diesel::update(task)
+            .set((
+                fang_tasks::state.eq(FangTaskState::InProgress),
                 fang_tasks::updated_at.eq(Self::current_time()),
             ))
             .get_result::<Task>(&self.connection)
@@ -181,6 +205,34 @@ mod postgres_tests {
 
             assert_eq!(FangTaskState::Failed, updated_task.state);
             assert_eq!(error, updated_task.error_message.unwrap());
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn fetch_and_touch_updates_state() {
+        let postgres = Postgres::new(None);
+
+        postgres.connection.test_transaction::<(), Error, _>(|| {
+            let _task = insert_new_job(&postgres.connection);
+
+            let updated_task = postgres.fetch_and_touch().unwrap().unwrap();
+
+            assert_eq!(FangTaskState::InProgress, updated_task.state);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn fetch_and_touch_returns_none() {
+        let postgres = Postgres::new(None);
+
+        postgres.connection.test_transaction::<(), Error, _>(|| {
+            let task = postgres.fetch_and_touch().unwrap();
+
+            assert_eq!(None, task);
 
             Ok(())
         });
