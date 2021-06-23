@@ -1,6 +1,6 @@
 use diesel_derive_enum::DbEnum;
 
-#[derive(DbEnum, Debug, Eq, PartialEq)]
+#[derive(DbEnum, Debug, Eq, PartialEq, Clone)]
 pub enum FangTaskState {
     New,
     InProgress,

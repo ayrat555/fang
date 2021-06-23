@@ -1,3 +1,4 @@
+use crate::executor::Runnable;
 use crate::schema::fang_tasks;
 use crate::schema::FangTaskState;
 use chrono::{DateTime, Utc};
@@ -8,7 +9,7 @@ use dotenv::dotenv;
 use std::env;
 use uuid::Uuid;
 
-#[derive(Queryable, Identifiable, Debug, Eq, PartialEq)]
+#[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone)]
 #[table_name = "fang_tasks"]
 pub struct Task {
     pub id: Uuid,
@@ -52,6 +53,14 @@ impl Postgres {
         }
     }
 
+    pub fn push_task(&self, job: &dyn Runnable) -> Result<Task, Error> {
+        let json_job = serde_json::to_value(job).unwrap();
+
+        let new_task = NewTask { metadata: json_job };
+
+        self.insert(&new_task)
+    }
+
     pub fn insert(&self, params: &NewTask) -> Result<Task, Error> {
         diesel::insert_into(fang_tasks::table)
             .values(params)
@@ -62,6 +71,7 @@ impl Postgres {
         match fang_tasks::table
             .order(fang_tasks::created_at.asc())
             .limit(1)
+            .filter(fang_tasks::state.eq(FangTaskState::New))
             .for_update()
             .skip_locked()
             .get_result::<Task>(&self.connection)
@@ -134,12 +144,15 @@ mod postgres_tests {
     use super::NewTask;
     use super::Postgres;
     use super::Task;
+    use crate::executor::Error as ExecutorError;
+    use crate::executor::Runnable;
     use crate::schema::fang_tasks;
     use crate::schema::FangTaskState;
     use chrono::{DateTime, Duration, Utc};
     use diesel::connection::Connection;
     use diesel::prelude::*;
     use diesel::result::Error;
+    use serde::{Deserialize, Serialize};
 
     #[test]
     fn insert_inserts_task() {
@@ -238,6 +251,30 @@ mod postgres_tests {
         });
     }
 
+    #[test]
+    fn push_task_serializes_and_inserts_task() {
+        let postgres = Postgres::new(None);
+
+        postgres.connection.test_transaction::<(), Error, _>(|| {
+            let job = Job { number: 10 };
+            let task = postgres.push_task(&job).unwrap();
+
+            let mut m = serde_json::value::Map::new();
+            m.insert(
+                "number".to_string(),
+                serde_json::value::Value::Number(10.into()),
+            );
+            m.insert(
+                "type".to_string(),
+                serde_json::value::Value::String("Job".to_string()),
+            );
+
+            assert_eq!(task.metadata, serde_json::value::Value::Object(m));
+
+            Ok(())
+        });
+    }
+
     // this test is ignored because it commits data to the db
     #[test]
     #[ignore]
@@ -280,6 +317,20 @@ mod postgres_tests {
         let found_task = postgres.fetch_task().unwrap();
 
         assert_eq!(found_task.id, task1_id);
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct Job {
+        pub number: u16,
+    }
+
+    #[typetag::serde]
+    impl Runnable for Job {
+        fn run(&self) -> Result<(), ExecutorError> {
+            println!("the number is {}", self.number);
+
+            Ok(())
+        }
     }
 
     fn insert_job(

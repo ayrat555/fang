@@ -42,21 +42,23 @@ impl Executor {
     }
 
     pub fn run_tasks(&mut self) {
-        match self.storage.fetch_and_touch() {
-            Ok(Some(task)) => {
-                self.maybe_reset_sleep_period();
-                self.run(&task);
-            }
-            Ok(None) => {
-                self.sleep();
-            }
+        loop {
+            match self.storage.fetch_and_touch() {
+                Ok(Some(task)) => {
+                    self.maybe_reset_sleep_period();
+                    self.run(&task);
+                }
+                Ok(None) => {
+                    self.sleep();
+                }
 
-            Err(error) => {
-                error!("Failed to fetch a task {:?}", error);
+                Err(error) => {
+                    error!("Failed to fetch a task {:?}", error);
 
-                self.sleep();
-            }
-        };
+                    self.sleep();
+                }
+            };
+        }
     }
 
     pub fn maybe_reset_sleep_period(&mut self) {

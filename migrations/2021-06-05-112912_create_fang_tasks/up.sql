@@ -11,4 +11,5 @@ CREATE TABLE fang_tasks (
      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
+CREATE INDEX fang_tasks_state_index ON fang_tasks(state);
 CREATE INDEX fang_tasks_created_at_index ON fang_tasks(created_at);

@@ -5,6 +5,6 @@ extern crate diesel;
 extern crate log;
 
 pub mod executor;
-pub mod job_pool;
 pub mod postgres;
 mod schema;
+pub mod worker_pool;
