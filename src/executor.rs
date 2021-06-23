@@ -1,8 +1,14 @@
 use crate::postgres::Postgres;
 use crate::postgres::Task;
+use std::thread;
+use std::time::Duration;
 
 pub struct Executor {
     pub storage: Postgres,
+    pub sleep_period: u64,
+    pub max_sleep_period: u64,
+    pub min_sleep_period: u64,
+    pub sleep_step: u64,
 }
 
 #[derive(Debug)]
@@ -17,7 +23,13 @@ pub trait Runnable {
 
 impl Executor {
     pub fn new(storage: Postgres) -> Self {
-        Self { storage }
+        Self {
+            storage,
+            sleep_period: 5,
+            max_sleep_period: 15,
+            min_sleep_period: 5,
+            sleep_step: 5,
+        }
     }
 
     pub fn run(&self, task: &Task) {
@@ -29,10 +41,36 @@ impl Executor {
         };
     }
 
-    pub fn run_tasks(&self) {
-        while let Ok(Some(task)) = self.storage.fetch_and_touch() {
-            self.run(&task)
+    pub fn run_tasks(&mut self) {
+        match self.storage.fetch_and_touch() {
+            Ok(Some(task)) => {
+                self.maybe_reset_sleep_period();
+                self.run(&task);
+            }
+            Ok(None) => {
+                self.sleep();
+            }
+
+            Err(error) => {
+                error!("Failed to fetch a task {:?}", error);
+
+                self.sleep();
+            }
+        };
+    }
+
+    pub fn maybe_reset_sleep_period(&mut self) {
+        if self.sleep_period != self.min_sleep_period {
+            self.sleep_period = self.min_sleep_period;
         }
+    }
+
+    pub fn sleep(&mut self) {
+        if self.sleep_period < self.max_sleep_period {
+            self.sleep_period = self.sleep_period + self.sleep_step;
+        }
+
+        thread::sleep(Duration::from_secs(self.sleep_period));
     }
 }
 
