@@ -36,7 +36,6 @@ impl WorkerThread {
 
     pub fn spawn_in_pool(name: String, restarts: u64) {
         let mut builder = thread::Builder::new().name(name.clone());
-        builder = builder;
 
         info!(
             "starting a worker thread {}, number of restarts {}",

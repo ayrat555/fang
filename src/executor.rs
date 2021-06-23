@@ -85,7 +85,7 @@ impl Executor {
 
     pub fn sleep(&mut self) {
         if self.sleep_period < self.max_sleep_period {
-            self.sleep_period = self.sleep_period + self.sleep_step;
+            self.sleep_period += self.sleep_step;
         }
 
         thread::sleep(Duration::from_secs(self.sleep_period));

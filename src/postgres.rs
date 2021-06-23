@@ -37,15 +37,11 @@ impl Postgres {
 
         let url = match database_url {
             Some(string_url) => string_url,
-            None => {
-                let url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-
-                url
-            }
+            None => env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
         };
 
         let connection =
-            PgConnection::establish(&url).expect(&format!("Error connecting to {}", url));
+            PgConnection::establish(&url).unwrap_or_else(|_| panic!("Error connecting to {}", url));
 
         Self {
             connection,
@@ -85,7 +81,7 @@ impl Postgres {
         self.connection.transaction::<Option<Task>, Error, _>(|| {
             let found_task = self.fetch_task();
 
-            if let None = found_task {
+            if found_task.is_none() {
                 return Ok(None);
             }
 
