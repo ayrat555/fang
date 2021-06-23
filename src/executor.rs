@@ -1,5 +1,7 @@
 use crate::postgres::Postgres;
 use crate::postgres::Task;
+use std::panic;
+use std::panic::RefUnwindSafe;
 use std::thread;
 use std::time::Duration;
 
@@ -17,7 +19,10 @@ pub struct Error {
 }
 
 #[typetag::serde(tag = "type")]
-pub trait Runnable {
+pub trait Runnable
+where
+    Self: RefUnwindSafe,
+{
     fn run(&self) -> Result<(), Error>;
 }
 
@@ -35,10 +40,21 @@ impl Executor {
     pub fn run(&self, task: &Task) {
         let actual_task: Box<dyn Runnable> = serde_json::from_value(task.metadata.clone()).unwrap();
 
-        match actual_task.run() {
-            Ok(()) => self.storage.finish_task(task).unwrap(),
-            Err(error) => self.storage.fail_task(task, error.description).unwrap(),
-        };
+        let task_result = panic::catch_unwind(|| actual_task.run());
+
+        match task_result {
+            Ok(result) => {
+                match result {
+                    Ok(()) => self.storage.finish_task(task).unwrap(),
+                    Err(error) => self.storage.fail_task(task, error.description).unwrap(),
+                };
+            }
+
+            Err(error) => {
+                let message = format!("panicked during tak execution {:?}", error);
+                self.storage.fail_task(task, message).unwrap();
+            }
+        }
     }
 
     pub fn run_tasks(&mut self) {
@@ -88,12 +104,12 @@ mod executor_tests {
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]
-    struct Job {
+    struct ExecutorJobTest {
         pub number: u16,
     }
 
     #[typetag::serde]
-    impl Runnable for Job {
+    impl Runnable for ExecutorJobTest {
         fn run(&self) -> Result<(), Error> {
             println!("the number is {}", self.number);
 
@@ -117,13 +133,27 @@ mod executor_tests {
         }
     }
 
+    #[derive(Serialize, Deserialize)]
+    struct PanicJob {}
+
+    #[typetag::serde]
+    impl Runnable for PanicJob {
+        fn run(&self) -> Result<(), Error> {
+            if true {
+                panic!("panic!");
+            }
+
+            Ok(())
+        }
+    }
+
     pub fn serialize(job: &dyn Runnable) -> serde_json::Value {
         serde_json::to_value(job).unwrap()
     }
 
     #[test]
     fn executes_and_finishes_task() {
-        let job = Job { number: 10 };
+        let job = ExecutorJobTest { number: 10 };
 
         let new_task = NewTask {
             metadata: serialize(&job),
@@ -174,6 +204,38 @@ mod executor_tests {
                 assert_eq!(FangTaskState::Failed, found_task.state);
                 assert_eq!(
                     "the number is 10".to_string(),
+                    found_task.error_message.unwrap()
+                );
+
+                Ok(())
+            });
+    }
+
+    #[test]
+    fn recovers_from_panics() {
+        let job = PanicJob {};
+
+        let new_task = NewTask {
+            metadata: serialize(&job),
+        };
+
+        let executor = Executor::new(Postgres::new(None));
+
+        executor
+            .storage
+            .connection
+            .test_transaction::<(), Error, _>(|| {
+                let task = executor.storage.insert(&new_task).unwrap();
+
+                assert_eq!(FangTaskState::New, task.state);
+
+                executor.run(&task);
+
+                let found_task = executor.storage.find_task_by_id(task.id).unwrap();
+
+                assert_eq!(FangTaskState::Failed, found_task.state);
+                assert_eq!(
+                    "panicked during tak execution Any".to_string(),
                     found_task.error_message.unwrap()
                 );
 
