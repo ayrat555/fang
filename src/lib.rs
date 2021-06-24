@@ -4,7 +4,12 @@ extern crate diesel;
 #[macro_use]
 extern crate log;
 
+mod schema;
+
 pub mod executor;
 pub mod postgres;
-mod schema;
 pub mod worker_pool;
+
+pub use executor::*;
+pub use postgres::*;
+pub use worker_pool::*;
