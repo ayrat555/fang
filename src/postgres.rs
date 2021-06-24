@@ -27,26 +27,14 @@ pub struct NewTask {
 }
 
 pub struct Postgres {
-    pub database_url: String,
     pub connection: PgConnection,
 }
 
 impl Postgres {
     pub fn new(database_url: Option<String>) -> Self {
-        dotenv().ok();
+        let connection = Self::pg_connection(database_url);
 
-        let url = match database_url {
-            Some(string_url) => string_url,
-            None => env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
-        };
-
-        let connection =
-            PgConnection::establish(&url).unwrap_or_else(|_| panic!("Error connecting to {}", url));
-
-        Self {
-            connection,
-            database_url: url,
-        }
+        Self { connection }
     }
 
     pub fn push_task(&self, job: &dyn Runnable) -> Result<Task, Error> {
@@ -55,6 +43,10 @@ impl Postgres {
         let new_task = NewTask { metadata: json_job };
 
         self.insert(&new_task)
+    }
+
+    pub fn enqueue_task(job: &dyn Runnable) -> Result<Task, Error> {
+        Self::new(None).push_task(job)
     }
 
     pub fn insert(&self, params: &NewTask) -> Result<Task, Error> {
@@ -130,8 +122,19 @@ impl Postgres {
             .get_result::<Task>(&self.connection)
     }
 
-    pub fn current_time() -> DateTime<Utc> {
+    fn current_time() -> DateTime<Utc> {
         Utc::now()
+    }
+
+    fn pg_connection(database_url: Option<String>) -> PgConnection {
+        dotenv().ok();
+
+        let url = match database_url {
+            Some(string_url) => string_url,
+            None => env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
+        };
+
+        PgConnection::establish(&url).unwrap_or_else(|_| panic!("Error connecting to {}", url))
     }
 }
 
