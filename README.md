@@ -4,7 +4,7 @@
 
 Background job processing library for Rust.
 
-Currently, it uses postgres to store state. But in the future, more backends will be supported.
+Currently, it uses Postgres to store state. But in the future, more backends will be supported.
 
 ## Installation
 
@@ -13,18 +13,18 @@ Currently, it uses postgres to store state. But in the future, more backends wil
 
 ```toml
 [dependencies]
-fang = "0.1"
+fang = "0.2"
 typetag = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 ```
 
-2. Create `fang_tasks` table in the postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/migrations/2021-06-05-112912_create_fang_tasks/up.sql).
+2. Create `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/migrations/2021-06-05-112912_create_fang_tasks/up.sql).
 
 ## Usage
 
 ### Defining a job
 
-Every job should implement `fang::Runnable` trait which is used by `fang` to execut it.
+Every job should implement `fang::Runnable` trait which is used by `fang` to execute it.
 
 
 ```rust
@@ -48,7 +48,7 @@ Every job should implement `fang::Runnable` trait which is used by `fang` to exe
     }
 ```
 
-As you can see from the example above, trait implementation has `#[typetag::serde]` which is used to deserialize the job.
+As you can see from the example above, the trait implementation has `#[typetag::serde]` attribute which is used to deserialize the job.
 
 ### Enqueuing a job
 
@@ -67,9 +67,9 @@ Postgres::enqueue_task(&Job { number: 10 }).unwrap();
 
 ### Starting workers
 
-Every worker is executed in a separate thread. In case of panic, they are always restarted.
+Every worker runs in a separate thread. In case of panic, they are always restarted.
 
-Use `WorkerPool::new` to start workers. It accepts two parameters - the number of workers and the prefix for worker thread name.
+Use `WorkerPool` to start workers. It accepts two parameters - the number of workers and the prefix for the worker thread name.
 
 
 ```rust
@@ -81,8 +81,10 @@ WorkerPool::new(10, "sync".to_string()).start();
 ## Potential/future features
 
   * Extendable/new backends
-  * Workers for specific types of tasks. Currently, each workers execute all types of tasks
+  * Workers for specific types of tasks. Currently, each worker execute all types of tasks
   * Configurable db records retention. Currently, fang doesn't remove tasks from the db.
+  * Retries
+  * Scheduled tasks
 
 ## Contributing
 
