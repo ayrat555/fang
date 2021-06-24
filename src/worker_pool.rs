@@ -2,12 +2,12 @@ use crate::executor::Executor;
 use crate::postgres::Postgres;
 use std::thread;
 
-struct WorkerPool {
+pub struct WorkerPool {
     pub number_of_workers: u16,
     pub name: String,
 }
 
-struct WorkerThread {
+pub struct WorkerThread {
     pub name: String,
     pub restarts: u64,
 }
