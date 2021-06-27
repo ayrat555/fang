@@ -16,6 +16,7 @@ pub struct Task {
     pub metadata: serde_json::Value,
     pub error_message: Option<String>,
     pub state: FangTaskState,
+    pub task_type: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -24,6 +25,7 @@ pub struct Task {
 #[table_name = "fang_tasks"]
 pub struct NewTask {
     pub metadata: serde_json::Value,
+    pub task_type: String,
 }
 
 pub struct Postgres {
@@ -40,7 +42,10 @@ impl Postgres {
     pub fn push_task(&self, job: &dyn Runnable) -> Result<Task, Error> {
         let json_job = serde_json::to_value(job).unwrap();
 
-        let new_task = NewTask { metadata: json_job };
+        let new_task = NewTask {
+            metadata: json_job,
+            task_type: job.task_type(),
+        };
 
         self.insert(&new_task)
     }
@@ -55,23 +60,16 @@ impl Postgres {
             .get_result::<Task>(&self.connection)
     }
 
-    pub fn fetch_task(&self) -> Option<Task> {
-        match fang_tasks::table
-            .order(fang_tasks::created_at.asc())
-            .limit(1)
-            .filter(fang_tasks::state.eq(FangTaskState::New))
-            .for_update()
-            .skip_locked()
-            .get_result::<Task>(&self.connection)
-        {
-            Ok(record) => Some(record),
-            _ => None,
+    pub fn fetch_task(&self, task_type: Option<String>) -> Option<Task> {
+        match task_type {
+            None => self.fetch_any_task(),
+            Some(task_type_str) => self.fetch_task_of_type(task_type_str),
         }
     }
 
-    pub fn fetch_and_touch(&self) -> Result<Option<Task>, Error> {
+    pub fn fetch_and_touch(&self, task_type: Option<String>) -> Result<Option<Task>, Error> {
         self.connection.transaction::<Option<Task>, Error, _>(|| {
-            let found_task = self.fetch_task();
+            let found_task = self.fetch_task(task_type);
 
             if found_task.is_none() {
                 return Ok(None);
@@ -136,6 +134,35 @@ impl Postgres {
 
         PgConnection::establish(&url).unwrap_or_else(|_| panic!("Error connecting to {}", url))
     }
+
+    fn fetch_any_task(&self) -> Option<Task> {
+        match fang_tasks::table
+            .order(fang_tasks::created_at.asc())
+            .limit(1)
+            .filter(fang_tasks::state.eq(FangTaskState::New))
+            .for_update()
+            .skip_locked()
+            .get_result::<Task>(&self.connection)
+        {
+            Ok(record) => Some(record),
+            _ => None,
+        }
+    }
+
+    fn fetch_task_of_type(&self, task_type: String) -> Option<Task> {
+        match fang_tasks::table
+            .order(fang_tasks::created_at.asc())
+            .limit(1)
+            .filter(fang_tasks::state.eq(FangTaskState::New))
+            .filter(fang_tasks::task_type.eq(task_type))
+            .for_update()
+            .skip_locked()
+            .get_result::<Task>(&self.connection)
+        {
+            Ok(record) => Some(record),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -159,6 +186,7 @@ mod postgres_tests {
 
         let new_task = NewTask {
             metadata: serde_json::json!(true),
+            task_type: "common".to_string(),
         };
 
         let result = postgres
@@ -182,7 +210,7 @@ mod postgres_tests {
 
             insert_job(serde_json::json!(false), timestamp2, &postgres.connection);
 
-            let found_task = postgres.fetch_task().unwrap();
+            let found_task = postgres.fetch_task(None).unwrap();
 
             assert_eq!(found_task.id, task1.id);
 
@@ -229,7 +257,7 @@ mod postgres_tests {
         postgres.connection.test_transaction::<(), Error, _>(|| {
             let _task = insert_new_job(&postgres.connection);
 
-            let updated_task = postgres.fetch_and_touch().unwrap().unwrap();
+            let updated_task = postgres.fetch_and_touch(None).unwrap().unwrap();
 
             assert_eq!(FangTaskState::InProgress, updated_task.state);
 
@@ -242,7 +270,7 @@ mod postgres_tests {
         let postgres = Postgres::new(None);
 
         postgres.connection.test_transaction::<(), Error, _>(|| {
-            let task = postgres.fetch_and_touch().unwrap();
+            let task = postgres.fetch_and_touch(None).unwrap();
 
             assert_eq!(None, task);
 
@@ -293,7 +321,7 @@ mod postgres_tests {
             let postgres = Postgres::new(None);
 
             postgres.connection.transaction::<(), Error, _>(|| {
-                let found_task = postgres.fetch_task().unwrap();
+                let found_task = postgres.fetch_task(None).unwrap();
 
                 assert_eq!(found_task.id, task1.id);
 
@@ -305,7 +333,7 @@ mod postgres_tests {
 
         std::thread::sleep(std::time::Duration::from_millis(1000));
 
-        let found_task = postgres.fetch_task().unwrap();
+        let found_task = postgres.fetch_task(None).unwrap();
 
         assert_eq!(found_task.id, task2.id);
 
@@ -313,7 +341,7 @@ mod postgres_tests {
 
         // returns unlocked record
 
-        let found_task = postgres.fetch_task().unwrap();
+        let found_task = postgres.fetch_task(None).unwrap();
 
         assert_eq!(found_task.id, task1_id);
     }

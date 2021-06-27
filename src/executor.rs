@@ -7,6 +7,7 @@ use std::time::Duration;
 
 pub struct Executor {
     pub storage: Postgres,
+    pub task_type: Option<String>,
     pub sleep_period: u64,
     pub max_sleep_period: u64,
     pub min_sleep_period: u64,
@@ -24,6 +25,10 @@ where
     Self: RefUnwindSafe,
 {
     fn run(&self) -> Result<(), Error>;
+
+    fn task_type(&self) -> String {
+        "common".to_string()
+    }
 }
 
 impl Executor {
@@ -34,7 +39,12 @@ impl Executor {
             max_sleep_period: 15,
             min_sleep_period: 5,
             sleep_step: 5,
+            task_type: None,
         }
+    }
+
+    pub fn set_task_type(&mut self, task_type: String) {
+        self.task_type = Some(task_type);
     }
 
     pub fn run(&self, task: &Task) {
@@ -59,7 +69,7 @@ impl Executor {
 
     pub fn run_tasks(&mut self) {
         loop {
-            match self.storage.fetch_and_touch() {
+            match self.storage.fetch_and_touch(self.task_type.clone()) {
                 Ok(Some(task)) => {
                     self.maybe_reset_sleep_period();
                     self.run(&task);
@@ -157,6 +167,7 @@ mod executor_tests {
 
         let new_task = NewTask {
             metadata: serialize(&job),
+            task_type: "common".to_string(),
         };
 
         let executor = Executor::new(Postgres::new(None));
@@ -185,6 +196,7 @@ mod executor_tests {
 
         let new_task = NewTask {
             metadata: serialize(&job),
+            task_type: "common".to_string(),
         };
 
         let executor = Executor::new(Postgres::new(None));
@@ -217,6 +229,7 @@ mod executor_tests {
 
         let new_task = NewTask {
             metadata: serialize(&job),
+            task_type: "common".to_string(),
         };
 
         let executor = Executor::new(Postgres::new(None));

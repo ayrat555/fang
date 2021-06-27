@@ -4,37 +4,45 @@ use std::thread;
 
 pub struct WorkerPool {
     pub number_of_workers: u16,
-    pub name: String,
+    pub task_type: Option<String>,
 }
 
 pub struct WorkerThread {
     pub name: String,
+    pub task_type: Option<String>,
     pub restarts: u64,
 }
 
 impl WorkerPool {
-    pub fn new(number_of_workers: u16, name: String) -> Self {
+    pub fn new(number_of_workers: u16, task_type: Option<String>) -> Self {
         Self {
             number_of_workers,
-            name,
+            task_type,
         }
     }
 
     pub fn start(&self) {
         for idx in 1..self.number_of_workers + 1 {
-            let name = format!("{}{}", self.name, idx);
-
-            WorkerThread::spawn_in_pool(name, 0)
+            let name = format!(
+                "worker_{}{}",
+                self.task_type.clone().unwrap_or("".to_string()),
+                idx
+            );
+            WorkerThread::spawn_in_pool(self.task_type.clone(), name, 0)
         }
     }
 }
 
 impl WorkerThread {
-    pub fn new(name: String, restarts: u64) -> Self {
-        Self { name, restarts }
+    pub fn new(task_type: Option<String>, name: String, restarts: u64) -> Self {
+        Self {
+            name,
+            task_type,
+            restarts,
+        }
     }
 
-    pub fn spawn_in_pool(name: String, restarts: u64) {
+    pub fn spawn_in_pool(task_type: Option<String>, name: String, restarts: u64) {
         let builder = thread::Builder::new().name(name.clone());
 
         info!(
@@ -45,11 +53,17 @@ impl WorkerThread {
         builder
             .spawn(move || {
                 // when _job is dropped, it will be restarted (see Drop trait impl)
-                let _job = WorkerThread::new(name, restarts);
+                let _job = WorkerThread::new(task_type.clone(), name, restarts);
 
                 let postgres = Postgres::new(None);
 
-                Executor::new(postgres).run_tasks()
+                let mut executor = Executor::new(postgres);
+
+                if let Some(task_type_str) = task_type {
+                    executor.set_task_type(task_type_str);
+                }
+
+                executor.run_tasks();
             })
             .unwrap();
     }
@@ -57,7 +71,7 @@ impl WorkerThread {
 
 impl Drop for WorkerThread {
     fn drop(&mut self) {
-        WorkerThread::spawn_in_pool(self.name.clone(), self.restarts + 1)
+        WorkerThread::spawn_in_pool(self.task_type.clone(), self.name.clone(), self.restarts + 1)
     }
 }
 
@@ -114,12 +128,11 @@ mod job_pool_tests {
 
     // this test is ignored because it commits data to the db
     #[test]
-    #[ignore]
     fn tasks_are_split_between_two_threads() {
         env_logger::init();
 
         let postgres = Postgres::new(None);
-        let job_pool = WorkerPool::new(2, "test_worker".to_string());
+        let job_pool = WorkerPool::new(2, None);
 
         postgres.push_task(&MyJob::new(0)).unwrap();
         postgres.push_task(&MyJob::new(0)).unwrap();
@@ -138,7 +151,7 @@ mod job_pool_tests {
             .filter(|job| {
                 serde_json::to_string(&job.metadata)
                     .unwrap()
-                    .contains("test_worker1")
+                    .contains("worker_1")
             })
             .collect();
 
@@ -147,7 +160,7 @@ mod job_pool_tests {
             .filter(|job| {
                 serde_json::to_string(&job.metadata)
                     .unwrap()
-                    .contains("test_worker2")
+                    .contains("worker_2")
             })
             .collect();
 
