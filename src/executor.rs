@@ -157,6 +157,34 @@ mod executor_tests {
         }
     }
 
+    #[derive(Serialize, Deserialize)]
+    struct JobType1 {}
+
+    #[typetag::serde]
+    impl Runnable for JobType1 {
+        fn run(&self) -> Result<(), Error> {
+            Ok(())
+        }
+
+        fn task_type(&self) -> String {
+            "type1".to_string()
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct JobType2 {}
+
+    #[typetag::serde]
+    impl Runnable for JobType2 {
+        fn run(&self) -> Result<(), Error> {
+            Ok(())
+        }
+
+        fn task_type(&self) -> String {
+            "type2".to_string()
+        }
+    }
+
     pub fn serialize(job: &dyn Runnable) -> serde_json::Value {
         serde_json::to_value(job).unwrap()
     }
@@ -188,6 +216,47 @@ mod executor_tests {
 
                 Ok(())
             });
+    }
+
+    #[test]
+    #[ignore]
+    fn executes_task_only_of_specific_type() {
+        let job1 = JobType1 {};
+        let job2 = JobType2 {};
+
+        let new_task1 = NewTask {
+            metadata: serialize(&job1),
+            task_type: "type1".to_string(),
+        };
+
+        let new_task2 = NewTask {
+            metadata: serialize(&job2),
+            task_type: "type2".to_string(),
+        };
+
+        let executor = Executor::new(Postgres::new(None));
+
+        let task1 = executor.storage.insert(&new_task1).unwrap();
+        let task2 = executor.storage.insert(&new_task2).unwrap();
+
+        assert_eq!(FangTaskState::New, task1.state);
+        assert_eq!(FangTaskState::New, task2.state);
+
+        std::thread::spawn(move || {
+            let postgres = Postgres::new(None);
+            let mut executor = Executor::new(postgres);
+            executor.set_task_type("type1".to_string());
+
+            executor.run_tasks();
+        });
+
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+
+        let found_task1 = executor.storage.find_task_by_id(task1.id).unwrap();
+        assert_eq!(FangTaskState::Finished, found_task1.state);
+
+        let found_task2 = executor.storage.find_task_by_id(task2.id).unwrap();
+        assert_eq!(FangTaskState::New, found_task2.state);
     }
 
     #[test]
