@@ -128,6 +128,7 @@ mod job_pool_tests {
 
     // this test is ignored because it commits data to the db
     #[test]
+    #[ignore]
     fn tasks_are_split_between_two_threads() {
         env_logger::init();
 
