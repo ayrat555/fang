@@ -92,6 +92,12 @@ impl Postgres {
         }
     }
 
+    pub fn remove_task(&self, id: Uuid) -> Result<usize, Error> {
+        let query = fang_tasks::table.filter(fang_tasks::id.eq(id));
+
+        diesel::delete(query).execute(&self.connection)
+    }
+
     pub fn finish_task(&self, task: &Task) -> Result<Task, Error> {
         diesel::update(task)
             .set((
@@ -297,6 +303,38 @@ mod postgres_tests {
             );
 
             assert_eq!(task.metadata, serde_json::value::Value::Object(m));
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn remove_task() {
+        let postgres = Postgres::new(None);
+
+        let new_task1 = NewTask {
+            metadata: serde_json::json!(true),
+            task_type: "common".to_string(),
+        };
+
+        let new_task2 = NewTask {
+            metadata: serde_json::json!(true),
+            task_type: "common".to_string(),
+        };
+
+        postgres.connection.test_transaction::<(), Error, _>(|| {
+            let task1 = postgres.insert(&new_task1).unwrap();
+            assert!(postgres.find_task_by_id(task1.id).is_some());
+
+            let task2 = postgres.insert(&new_task2).unwrap();
+            assert!(postgres.find_task_by_id(task2.id).is_some());
+
+            postgres.remove_task(task1.id).unwrap();
+            assert!(postgres.find_task_by_id(task1.id).is_none());
+            assert!(postgres.find_task_by_id(task2.id).is_some());
+
+            postgres.remove_task(task2.id).unwrap();
+            assert!(postgres.find_task_by_id(task2.id).is_none());
 
             Ok(())
         });

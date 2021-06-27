@@ -55,8 +55,14 @@ impl Executor {
         match task_result {
             Ok(result) => {
                 match result {
-                    Ok(()) => self.storage.finish_task(task).unwrap(),
-                    Err(error) => self.storage.fail_task(task, error.description).unwrap(),
+                    Ok(()) => {
+                        self.storage.remove_task(task.id).unwrap();
+                        ()
+                    }
+                    Err(error) => {
+                        self.storage.fail_task(task, error.description).unwrap();
+                        ()
+                    }
                 };
             }
 
