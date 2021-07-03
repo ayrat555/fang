@@ -15,6 +15,7 @@ table! {
     use diesel::sql_types::Text;
     use diesel::sql_types::Timestamptz;
     use diesel::sql_types::Uuid;
+    use diesel::sql_types::Varchar;
 
 
     fang_tasks (id) {
@@ -22,6 +23,7 @@ table! {
         metadata -> Jsonb,
         error_message -> Nullable<Text>,
         state -> FangTaskStateMapping,
+        task_type -> Varchar,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
     }

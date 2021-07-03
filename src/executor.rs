@@ -7,6 +7,7 @@ use std::time::Duration;
 
 pub struct Executor {
     pub storage: Postgres,
+    pub task_type: Option<String>,
     pub sleep_period: u64,
     pub max_sleep_period: u64,
     pub min_sleep_period: u64,
@@ -24,6 +25,10 @@ where
     Self: RefUnwindSafe,
 {
     fn run(&self) -> Result<(), Error>;
+
+    fn task_type(&self) -> String {
+        "common".to_string()
+    }
 }
 
 impl Executor {
@@ -34,7 +39,12 @@ impl Executor {
             max_sleep_period: 15,
             min_sleep_period: 5,
             sleep_step: 5,
+            task_type: None,
         }
+    }
+
+    pub fn set_task_type(&mut self, task_type: String) {
+        self.task_type = Some(task_type);
     }
 
     pub fn run(&self, task: &Task) {
@@ -59,7 +69,7 @@ impl Executor {
 
     pub fn run_tasks(&mut self) {
         loop {
-            match self.storage.fetch_and_touch() {
+            match self.storage.fetch_and_touch(&self.task_type.clone()) {
                 Ok(Some(task)) => {
                     self.maybe_reset_sleep_period();
                     self.run(&task);
@@ -147,6 +157,34 @@ mod executor_tests {
         }
     }
 
+    #[derive(Serialize, Deserialize)]
+    struct JobType1 {}
+
+    #[typetag::serde]
+    impl Runnable for JobType1 {
+        fn run(&self) -> Result<(), Error> {
+            Ok(())
+        }
+
+        fn task_type(&self) -> String {
+            "type1".to_string()
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct JobType2 {}
+
+    #[typetag::serde]
+    impl Runnable for JobType2 {
+        fn run(&self) -> Result<(), Error> {
+            Ok(())
+        }
+
+        fn task_type(&self) -> String {
+            "type2".to_string()
+        }
+    }
+
     pub fn serialize(job: &dyn Runnable) -> serde_json::Value {
         serde_json::to_value(job).unwrap()
     }
@@ -157,6 +195,7 @@ mod executor_tests {
 
         let new_task = NewTask {
             metadata: serialize(&job),
+            task_type: "common".to_string(),
         };
 
         let executor = Executor::new(Postgres::new(None));
@@ -180,11 +219,53 @@ mod executor_tests {
     }
 
     #[test]
+    #[ignore]
+    fn executes_task_only_of_specific_type() {
+        let job1 = JobType1 {};
+        let job2 = JobType2 {};
+
+        let new_task1 = NewTask {
+            metadata: serialize(&job1),
+            task_type: "type1".to_string(),
+        };
+
+        let new_task2 = NewTask {
+            metadata: serialize(&job2),
+            task_type: "type2".to_string(),
+        };
+
+        let executor = Executor::new(Postgres::new(None));
+
+        let task1 = executor.storage.insert(&new_task1).unwrap();
+        let task2 = executor.storage.insert(&new_task2).unwrap();
+
+        assert_eq!(FangTaskState::New, task1.state);
+        assert_eq!(FangTaskState::New, task2.state);
+
+        std::thread::spawn(move || {
+            let postgres = Postgres::new(None);
+            let mut executor = Executor::new(postgres);
+            executor.set_task_type("type1".to_string());
+
+            executor.run_tasks();
+        });
+
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+
+        let found_task1 = executor.storage.find_task_by_id(task1.id).unwrap();
+        assert_eq!(FangTaskState::Finished, found_task1.state);
+
+        let found_task2 = executor.storage.find_task_by_id(task2.id).unwrap();
+        assert_eq!(FangTaskState::New, found_task2.state);
+    }
+
+    #[test]
     fn saves_error_for_failed_task() {
         let job = FailedJob { number: 10 };
 
         let new_task = NewTask {
             metadata: serialize(&job),
+            task_type: "common".to_string(),
         };
 
         let executor = Executor::new(Postgres::new(None));
@@ -217,6 +298,7 @@ mod executor_tests {
 
         let new_task = NewTask {
             metadata: serialize(&job),
+            task_type: "common".to_string(),
         };
 
         let executor = Executor::new(Postgres::new(None));
