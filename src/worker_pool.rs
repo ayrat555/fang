@@ -55,7 +55,7 @@ impl WorkerThread {
                 // when _job is dropped, it will be restarted (see Drop trait impl)
                 let _job = WorkerThread::new(task_type.clone(), name, restarts);
 
-                let postgres = Postgres::new(None);
+                let postgres = Postgres::new();
 
                 let mut executor = Executor::new(postgres);
 
@@ -114,7 +114,7 @@ mod job_pool_tests {
     #[typetag::serde]
     impl Runnable for MyJob {
         fn run(&self) -> Result<(), Error> {
-            let postgres = Postgres::new(None);
+            let postgres = Postgres::new();
 
             thread::sleep(Duration::from_secs(3));
 
@@ -132,7 +132,7 @@ mod job_pool_tests {
     fn tasks_are_split_between_two_threads() {
         env_logger::init();
 
-        let postgres = Postgres::new(None);
+        let postgres = Postgres::new();
         let job_pool = WorkerPool::new(2, None);
 
         postgres.push_task(&MyJob::new(0)).unwrap();

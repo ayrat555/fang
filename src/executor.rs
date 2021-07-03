@@ -272,7 +272,7 @@ mod executor_tests {
             task_type: "common".to_string(),
         };
 
-        let mut executor = Executor::new(Postgres::new(None));
+        let mut executor = Executor::new(Postgres::new());
         executor.set_retention_mode(RetentionMode::KeepAll);
 
         executor
@@ -309,7 +309,7 @@ mod executor_tests {
             task_type: "type2".to_string(),
         };
 
-        let executor = Executor::new(Postgres::new(None));
+        let executor = Executor::new(Postgres::new());
 
         let task1 = executor.storage.insert(&new_task1).unwrap();
         let task2 = executor.storage.insert(&new_task2).unwrap();
@@ -318,7 +318,7 @@ mod executor_tests {
         assert_eq!(FangTaskState::New, task2.state);
 
         std::thread::spawn(move || {
-            let postgres = Postgres::new(None);
+            let postgres = Postgres::new();
             let mut executor = Executor::new(postgres);
             executor.set_retention_mode(RetentionMode::KeepAll);
             executor.set_task_type("type1".to_string());
@@ -344,7 +344,7 @@ mod executor_tests {
             task_type: "common".to_string(),
         };
 
-        let executor = Executor::new(Postgres::new(None));
+        let executor = Executor::new(Postgres::new());
 
         executor
             .storage
@@ -377,7 +377,7 @@ mod executor_tests {
             task_type: "common".to_string(),
         };
 
-        let executor = Executor::new(Postgres::new(None));
+        let executor = Executor::new(Postgres::new());
 
         executor
             .storage
