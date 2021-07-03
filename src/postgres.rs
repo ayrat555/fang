@@ -33,8 +33,14 @@ pub struct Postgres {
 }
 
 impl Postgres {
-    pub fn new(database_url: Option<String>) -> Self {
-        let connection = Self::pg_connection(database_url);
+    pub fn new() -> Self {
+        let connection = Self::pg_connection(None);
+
+        Self { connection }
+    }
+
+    pub fn new_with_url(database_url: String) -> Self {
+        let connection = Self::pg_connection(Some(database_url));
 
         Self { connection }
     }
@@ -51,7 +57,7 @@ impl Postgres {
     }
 
     pub fn enqueue_task(job: &dyn Runnable) -> Result<Task, Error> {
-        Self::new(None).push_task(job)
+        Self::new().push_task(job)
     }
 
     pub fn insert(&self, params: &NewTask) -> Result<Task, Error> {
@@ -83,13 +89,16 @@ impl Postgres {
     }
 
     pub fn find_task_by_id(&self, id: Uuid) -> Option<Task> {
-        match fang_tasks::table
+        fang_tasks::table
             .filter(fang_tasks::id.eq(id))
             .first::<Task>(&self.connection)
-        {
-            Ok(record) => Some(record),
-            _ => None,
-        }
+            .ok()
+    }
+
+    pub fn remove_task(&self, id: Uuid) -> Result<usize, Error> {
+        let query = fang_tasks::table.filter(fang_tasks::id.eq(id));
+
+        diesel::delete(query).execute(&self.connection)
     }
 
     pub fn finish_task(&self, task: &Task) -> Result<Task, Error> {
@@ -136,21 +145,18 @@ impl Postgres {
     }
 
     fn fetch_any_task(&self) -> Option<Task> {
-        match fang_tasks::table
+        fang_tasks::table
             .order(fang_tasks::created_at.asc())
             .limit(1)
             .filter(fang_tasks::state.eq(FangTaskState::New))
             .for_update()
             .skip_locked()
             .get_result::<Task>(&self.connection)
-        {
-            Ok(record) => Some(record),
-            _ => None,
-        }
+            .ok()
     }
 
     fn fetch_task_of_type(&self, task_type: &String) -> Option<Task> {
-        match fang_tasks::table
+        fang_tasks::table
             .order(fang_tasks::created_at.asc())
             .limit(1)
             .filter(fang_tasks::state.eq(FangTaskState::New))
@@ -158,10 +164,7 @@ impl Postgres {
             .for_update()
             .skip_locked()
             .get_result::<Task>(&self.connection)
-        {
-            Ok(record) => Some(record),
-            _ => None,
-        }
+            .ok()
     }
 }
 
@@ -182,7 +185,7 @@ mod postgres_tests {
 
     #[test]
     fn insert_inserts_task() {
-        let postgres = Postgres::new(None);
+        let postgres = Postgres::new();
 
         let new_task = NewTask {
             metadata: serde_json::json!(true),
@@ -199,7 +202,7 @@ mod postgres_tests {
 
     #[test]
     fn fetch_task_fetches_the_oldest_task() {
-        let postgres = Postgres::new(None);
+        let postgres = Postgres::new();
 
         postgres.connection.test_transaction::<(), Error, _>(|| {
             let timestamp1 = Utc::now() - Duration::hours(40);
@@ -220,7 +223,7 @@ mod postgres_tests {
 
     #[test]
     fn finish_task_updates_state_field() {
-        let postgres = Postgres::new(None);
+        let postgres = Postgres::new();
 
         postgres.connection.test_transaction::<(), Error, _>(|| {
             let task = insert_new_job(&postgres.connection);
@@ -235,7 +238,7 @@ mod postgres_tests {
 
     #[test]
     fn fail_task_updates_state_field_and_sets_error_message() {
-        let postgres = Postgres::new(None);
+        let postgres = Postgres::new();
 
         postgres.connection.test_transaction::<(), Error, _>(|| {
             let task = insert_new_job(&postgres.connection);
@@ -252,7 +255,7 @@ mod postgres_tests {
 
     #[test]
     fn fetch_and_touch_updates_state() {
-        let postgres = Postgres::new(None);
+        let postgres = Postgres::new();
 
         postgres.connection.test_transaction::<(), Error, _>(|| {
             let _task = insert_new_job(&postgres.connection);
@@ -267,7 +270,7 @@ mod postgres_tests {
 
     #[test]
     fn fetch_and_touch_returns_none() {
-        let postgres = Postgres::new(None);
+        let postgres = Postgres::new();
 
         postgres.connection.test_transaction::<(), Error, _>(|| {
             let task = postgres.fetch_and_touch(&None).unwrap();
@@ -280,7 +283,7 @@ mod postgres_tests {
 
     #[test]
     fn push_task_serializes_and_inserts_task() {
-        let postgres = Postgres::new(None);
+        let postgres = Postgres::new();
 
         postgres.connection.test_transaction::<(), Error, _>(|| {
             let job = Job { number: 10 };
@@ -302,11 +305,43 @@ mod postgres_tests {
         });
     }
 
+    #[test]
+    fn remove_task() {
+        let postgres = Postgres::new();
+
+        let new_task1 = NewTask {
+            metadata: serde_json::json!(true),
+            task_type: "common".to_string(),
+        };
+
+        let new_task2 = NewTask {
+            metadata: serde_json::json!(true),
+            task_type: "common".to_string(),
+        };
+
+        postgres.connection.test_transaction::<(), Error, _>(|| {
+            let task1 = postgres.insert(&new_task1).unwrap();
+            assert!(postgres.find_task_by_id(task1.id).is_some());
+
+            let task2 = postgres.insert(&new_task2).unwrap();
+            assert!(postgres.find_task_by_id(task2.id).is_some());
+
+            postgres.remove_task(task1.id).unwrap();
+            assert!(postgres.find_task_by_id(task1.id).is_none());
+            assert!(postgres.find_task_by_id(task2.id).is_some());
+
+            postgres.remove_task(task2.id).unwrap();
+            assert!(postgres.find_task_by_id(task2.id).is_none());
+
+            Ok(())
+        });
+    }
+
     // this test is ignored because it commits data to the db
     #[test]
     #[ignore]
     fn fetch_task_locks_the_record() {
-        let postgres = Postgres::new(None);
+        let postgres = Postgres::new();
         let timestamp1 = Utc::now() - Duration::hours(40);
 
         let task1 = insert_job(serde_json::json!(true), timestamp1, &postgres.connection);
@@ -318,7 +353,7 @@ mod postgres_tests {
         let task2 = insert_job(serde_json::json!(false), timestamp2, &postgres.connection);
 
         let thread = std::thread::spawn(move || {
-            let postgres = Postgres::new(None);
+            let postgres = Postgres::new();
 
             postgres.connection.transaction::<(), Error, _>(|| {
                 let found_task = postgres.fetch_task(&None).unwrap();
