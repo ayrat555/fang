@@ -69,7 +69,7 @@ impl Executor {
 
     pub fn run_tasks(&mut self) {
         loop {
-            match self.storage.fetch_and_touch(self.task_type.clone()) {
+            match self.storage.fetch_and_touch(&self.task_type.clone()) {
                 Ok(Some(task)) => {
                     self.maybe_reset_sleep_period();
                     self.run(&task);
