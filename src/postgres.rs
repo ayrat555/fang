@@ -83,13 +83,10 @@ impl Postgres {
     }
 
     pub fn find_task_by_id(&self, id: Uuid) -> Option<Task> {
-        match fang_tasks::table
+        fang_tasks::table
             .filter(fang_tasks::id.eq(id))
             .first::<Task>(&self.connection)
-        {
-            Ok(record) => Some(record),
-            _ => None,
-        }
+            .ok()
     }
 
     pub fn remove_task(&self, id: Uuid) -> Result<usize, Error> {
@@ -142,21 +139,18 @@ impl Postgres {
     }
 
     fn fetch_any_task(&self) -> Option<Task> {
-        match fang_tasks::table
+        fang_tasks::table
             .order(fang_tasks::created_at.asc())
             .limit(1)
             .filter(fang_tasks::state.eq(FangTaskState::New))
             .for_update()
             .skip_locked()
             .get_result::<Task>(&self.connection)
-        {
-            Ok(record) => Some(record),
-            _ => None,
-        }
+            .ok()
     }
 
     fn fetch_task_of_type(&self, task_type: &String) -> Option<Task> {
-        match fang_tasks::table
+        fang_tasks::table
             .order(fang_tasks::created_at.asc())
             .limit(1)
             .filter(fang_tasks::state.eq(FangTaskState::New))
@@ -164,10 +158,7 @@ impl Postgres {
             .for_update()
             .skip_locked()
             .get_result::<Task>(&self.connection)
-        {
-            Ok(record) => Some(record),
-            _ => None,
-        }
+            .ok()
     }
 }
 

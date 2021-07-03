@@ -8,10 +8,46 @@ use std::time::Duration;
 pub struct Executor {
     pub storage: Postgres,
     pub task_type: Option<String>,
+    pub sleep_params: SleepParams,
+    pub retention_mode: RetentionMode,
+}
+
+pub enum RetentionMode {
+    KeepAll,
+    RemoveAll,
+    RemoveFinished,
+}
+
+pub struct SleepParams {
     pub sleep_period: u64,
     pub max_sleep_period: u64,
     pub min_sleep_period: u64,
     pub sleep_step: u64,
+}
+
+impl SleepParams {
+    pub fn maybe_reset_sleep_period(&mut self) {
+        if self.sleep_period != self.min_sleep_period {
+            self.sleep_period = self.min_sleep_period;
+        }
+    }
+
+    pub fn maybe_increase_sleep_period(&mut self) {
+        if self.sleep_period < self.max_sleep_period {
+            self.sleep_period += self.sleep_step;
+        }
+    }
+}
+
+impl Default for SleepParams {
+    fn default() -> Self {
+        SleepParams {
+            sleep_period: 5,
+            max_sleep_period: 15,
+            min_sleep_period: 5,
+            sleep_step: 5,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -35,10 +71,8 @@ impl Executor {
     pub fn new(storage: Postgres) -> Self {
         Self {
             storage,
-            sleep_period: 5,
-            max_sleep_period: 15,
-            min_sleep_period: 5,
-            sleep_step: 5,
+            sleep_params: SleepParams::default(),
+            retention_mode: RetentionMode::RemoveFinished,
             task_type: None,
         }
     }
@@ -47,30 +81,18 @@ impl Executor {
         self.task_type = Some(task_type);
     }
 
-    pub fn run(&self, task: &Task) {
-        let actual_task: Box<dyn Runnable> = serde_json::from_value(task.metadata.clone()).unwrap();
+    pub fn set_sleep_params(&mut self, sleep_params: SleepParams) {
+        self.sleep_params = sleep_params;
+    }
 
-        let task_result = panic::catch_unwind(|| actual_task.run());
+    pub fn set_retention_mode(&mut self, retention_mode: RetentionMode) {
+        self.retention_mode = retention_mode;
+    }
 
-        match task_result {
-            Ok(result) => {
-                match result {
-                    Ok(()) => {
-                        self.storage.remove_task(task.id).unwrap();
-                        ()
-                    }
-                    Err(error) => {
-                        self.storage.fail_task(task, error.description).unwrap();
-                        ()
-                    }
-                };
-            }
+    pub fn run(&self, task: Task) {
+        let result = self.execute_task(task);
 
-            Err(error) => {
-                let message = format!("panicked during tak execution {:?}", error);
-                self.storage.fail_task(task, message).unwrap();
-            }
-        }
+        self.finalize_task(result)
     }
 
     pub fn run_tasks(&mut self) {
@@ -78,7 +100,7 @@ impl Executor {
             match self.storage.fetch_and_touch(&self.task_type.clone()) {
                 Ok(Some(task)) => {
                     self.maybe_reset_sleep_period();
-                    self.run(&task);
+                    self.run(task);
                 }
                 Ok(None) => {
                     self.sleep();
@@ -94,17 +116,62 @@ impl Executor {
     }
 
     pub fn maybe_reset_sleep_period(&mut self) {
-        if self.sleep_period != self.min_sleep_period {
-            self.sleep_period = self.min_sleep_period;
-        }
+        self.sleep_params.maybe_reset_sleep_period();
     }
 
     pub fn sleep(&mut self) {
-        if self.sleep_period < self.max_sleep_period {
-            self.sleep_period += self.sleep_step;
-        }
+        self.sleep_params.maybe_increase_sleep_period();
 
-        thread::sleep(Duration::from_secs(self.sleep_period));
+        thread::sleep(Duration::from_secs(self.sleep_params.sleep_period));
+    }
+
+    fn execute_task(&self, task: Task) -> Result<Task, (Task, String)> {
+        let actual_task: Box<dyn Runnable> = serde_json::from_value(task.metadata.clone()).unwrap();
+        let task_result = panic::catch_unwind(|| actual_task.run());
+
+        match task_result {
+            Ok(result) => match result {
+                Ok(()) => Ok(task),
+                Err(error) => Err((task, error.description)),
+            },
+
+            Err(error) => {
+                let message = format!("panicked during task execution {:?}", error);
+
+                Err((task, message))
+            }
+        }
+    }
+
+    fn finalize_task(&self, result: Result<Task, (Task, String)>) {
+        match self.retention_mode {
+            RetentionMode::KeepAll => {
+                match result {
+                    Ok(task) => self.storage.finish_task(&task).unwrap(),
+                    Err((task, error)) => self.storage.fail_task(&task, error).unwrap(),
+                };
+
+                ()
+            }
+            RetentionMode::RemoveAll => {
+                match result {
+                    Ok(task) => self.storage.remove_task(task.id).unwrap(),
+                    Err((task, _error)) => self.storage.remove_task(task.id).unwrap(),
+                };
+
+                ()
+            }
+            RetentionMode::RemoveFinished => match result {
+                Ok(task) => {
+                    self.storage.remove_task(task.id).unwrap();
+                    ()
+                }
+                Err((task, error)) => {
+                    self.storage.fail_task(&task, error).unwrap();
+                    ()
+                }
+            },
+        }
     }
 }
 
@@ -112,6 +179,7 @@ impl Executor {
 mod executor_tests {
     use super::Error;
     use super::Executor;
+    use super::RetentionMode;
     use super::Runnable;
     use crate::postgres::NewTask;
     use crate::postgres::Postgres;
@@ -204,7 +272,8 @@ mod executor_tests {
             task_type: "common".to_string(),
         };
 
-        let executor = Executor::new(Postgres::new(None));
+        let mut executor = Executor::new(Postgres::new(None));
+        executor.set_retention_mode(RetentionMode::KeepAll);
 
         executor
             .storage
@@ -214,7 +283,7 @@ mod executor_tests {
 
                 assert_eq!(FangTaskState::New, task.state);
 
-                executor.run(&task);
+                executor.run(task.clone());
 
                 let found_task = executor.storage.find_task_by_id(task.id).unwrap();
 
@@ -251,6 +320,7 @@ mod executor_tests {
         std::thread::spawn(move || {
             let postgres = Postgres::new(None);
             let mut executor = Executor::new(postgres);
+            executor.set_retention_mode(RetentionMode::KeepAll);
             executor.set_task_type("type1".to_string());
 
             executor.run_tasks();
@@ -284,7 +354,7 @@ mod executor_tests {
 
                 assert_eq!(FangTaskState::New, task.state);
 
-                executor.run(&task);
+                executor.run(task.clone());
 
                 let found_task = executor.storage.find_task_by_id(task.id).unwrap();
 
@@ -317,13 +387,13 @@ mod executor_tests {
 
                 assert_eq!(FangTaskState::New, task.state);
 
-                executor.run(&task);
+                executor.run(task.clone());
 
                 let found_task = executor.storage.find_task_by_id(task.id).unwrap();
 
                 assert_eq!(FangTaskState::Failed, found_task.state);
                 assert_eq!(
-                    "panicked during tak execution Any".to_string(),
+                    "panicked during task execution Any".to_string(),
                     found_task.error_message.unwrap()
                 );
 
