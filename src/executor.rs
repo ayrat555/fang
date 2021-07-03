@@ -12,12 +12,14 @@ pub struct Executor {
     pub retention_mode: RetentionMode,
 }
 
+#[derive(Clone)]
 pub enum RetentionMode {
     KeepAll,
     RemoveAll,
     RemoveFinished,
 }
 
+#[derive(Clone)]
 pub struct SleepParams {
     pub sleep_period: u64,
     pub max_sleep_period: u64,
