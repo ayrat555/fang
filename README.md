@@ -13,7 +13,7 @@ Currently, it uses Postgres to store state. But in the future, more backends wil
 
 ```toml
 [dependencies]
-fang = "0.2"
+fang = "0.3"
 typetag = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 ```
@@ -64,27 +64,127 @@ Postgres::enqueue_task(&Job { number: 10 }).unwrap();
 
 ```
 
+The example above creates a new postgres connection on every call. If you want to reuse the same postgres connection to enqueue several jobs use Postgres struct instance:
+
+```rust
+let postgres = Postgres::new();
+
+for id in &unsynced_feed_ids {
+    postgres.push_task(&SyncFeedJob { feed_id: *id }).unwrap();
+}
+
+```
 
 ### Starting workers
 
 Every worker runs in a separate thread. In case of panic, they are always restarted.
 
-Use `WorkerPool` to start workers. It accepts two parameters - the number of workers and the prefix for the worker thread name.
+Use `WorkerPool` to start workers. `WorkerPool::new` accepts one parameter - the number of workers.
 
 
 ```rust
 use fang::WorkerPool;
 
-WorkerPool::new(10, "sync".to_string()).start();
+WorkerPool::new(10).start();
+```
+
+### Configuration
+
+To configure workers, instead of `WorkerPool::new` which uses default values, use `WorkerPool.new_with_params`. It accepts two parameters - the number of workers and `WorkerParams` struct.
+
+### Configuring the type of workers
+
+You can start workers for a specific types of tasks. These workers will be executing only tasks of the specified type.
+
+Add `task_type` method to the `Runnable` trait implementation:
+
+```rust
+...
+
+#[typetag::serde]
+impl Runnable for Job {
+    fn run(&self) -> Result<(), Error> {
+        println!("the number is {}", self.number);
+
+        Ok(())
+    }
+
+    fn task_type(&self) -> String {
+        "number".to_string()
+    }
+}
+```
+
+Set `task_type` to the `WorkerParamas`:
+
+```
+let mut worker_params = WorkerParams::new();
+worker_params.set_task_type("number".to_string());
+
+WorkerPool::new_with_params(10, worker_params).start();
+```
+
+Without setting `task_type` workers will be executing any type of task.
+
+
+### Configuring retention mode
+
+By default, all successfully finished tasks are removed from the DB, failed tasks aren't.
+
+There are three retention modes you can use:
+
+```rust
+pub enum RetentionMode {
+    KeepAll,        \\ doesn't remove tasks
+    RemoveAll,      \\ removes all tasks
+    RemoveFinished, \\ default value
+}
+```
+
+Set retention mode with `set_retention_mode`:
+
+```rust
+let mut worker_params = WorkerParams::new();
+worker_params.set_retention_mode(RetentionMode::RemoveAll);
+
+WorkerPool::new_with_params(10, worker_params).start();
+```
+
+### Configuring sleep values
+
+You can use use `SleepParams` to confugure sleep values:
+
+```rust
+pub struct SleepParams {
+    pub sleep_period: u64,     \\ default value is 5
+    pub max_sleep_period: u64, \\ default value is 15
+    pub min_sleep_period: u64, \\ default value is 5
+    pub sleep_step: u64,       \\ default value is 5
+}p
+```
+
+If there are no tasks in the DB, a worker sleeps for `sleep_period` and each time this value increases by `sleep_step` until it reaches `max_sleep_period`. `min_sleep_period` is the initial value for `sleep_period`. All values are in seconds.
+
+
+Use `set_sleep_params` to set it:
+```rust
+let sleep_params = SleepParams {
+    sleep_period: 2,
+    max_sleep_period: 6,
+    min_sleep_period: 2,
+    sleep_step: 1,
+};
+let mut worker_params = WorkerParams::new();
+worker_params.set_sleep_params(sleep_params);
+
+WorkerPool::new_with_params(10, worker_params).start();
 ```
 
 ## Potential/future features
 
-  * Extendable/new backends
-  * Workers for specific types of tasks. Currently, each worker execute all types of tasks
-  * Configurable db records retention. Currently, fang doesn't remove tasks from the db.
   * Retries
   * Scheduled tasks
+  * Extendable/new backends
 
 ## Contributing
 

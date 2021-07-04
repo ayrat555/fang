@@ -1,4 +1,4 @@
-## Unreleased
+## 0.3.0 (2021-07-04)
 
 - Execute different types of tasks in separate workers - [#1](https://github.com/ayrat555/fang/pull/1)
 - Add retention mode for tasks - [#2](https://github.com/ayrat555/fang/pull/2)
