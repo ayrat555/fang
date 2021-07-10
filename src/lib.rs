@@ -18,7 +18,7 @@ pub use worker_pool::*;
 pub use typetag::serde as fang_typetag;
 
 #[doc(hidden)]
-pub use typetag;
+pub use ::typetag;
 
 #[doc(hidden)]
 pub use serde::{Deserialize, Serialize};
