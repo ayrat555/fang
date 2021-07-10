@@ -13,3 +13,9 @@ pub mod worker_pool;
 pub use executor::*;
 pub use postgres::*;
 pub use worker_pool::*;
+
+#[doc(hidden)]
+pub use typetag::serde as fang_typetag;
+
+#[doc(hidden)]
+pub use serde::{Deserialize, Serialize};

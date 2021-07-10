@@ -133,12 +133,13 @@ mod job_pool_tests {
     use super::WorkerPool;
     use crate::executor::Error;
     use crate::executor::Runnable;
+    use crate::fang_typetag;
     use crate::postgres::Postgres;
     use crate::postgres::Task;
     use crate::schema::fang_tasks;
+    use crate::{Deserialize, Serialize};
     use diesel::pg::PgConnection;
     use diesel::prelude::*;
-    use serde::{Deserialize, Serialize};
     use std::thread;
     use std::time::Duration;
 
@@ -164,7 +165,7 @@ mod job_pool_tests {
         fang_tasks::table.get_results::<Task>(conn).unwrap()
     }
 
-    #[typetag::serde]
+    #[fang_typetag]
     impl Runnable for MyJob {
         fn run(&self) -> Result<(), Error> {
             let postgres = Postgres::new();

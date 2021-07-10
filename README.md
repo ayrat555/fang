@@ -13,9 +13,7 @@ Currently, it uses Postgres to store state. But in the future, more backends wil
 
 ```toml
 [dependencies]
-fang = "0.3"
-typetag = "0.1"
-serde = { version = "1.0", features = ["derive"] }
+fang = "0.4"
 ```
 
 2. Create `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/migrations/2021-06-05-112912_create_fang_tasks/up.sql).
@@ -30,7 +28,8 @@ Every job should implement `fang::Runnable` trait which is used by `fang` to exe
 ```rust
     use fang::Error;
     use fang::Runnable;
-    use serde::{Deserialize, Serialize};
+    use fang::{Deserialize, Serialize};
+    use fang::fang_typetag;
 
 
     #[derive(Serialize, Deserialize)]
@@ -38,7 +37,7 @@ Every job should implement `fang::Runnable` trait which is used by `fang` to exe
         pub number: u16,
     }
 
-    #[typetag::serde]
+    #[fang_typetag]
     impl Runnable for Job {
         fn run(&self) -> Result<(), Error> {
             println!("the number is {}", self.number);
@@ -48,7 +47,7 @@ Every job should implement `fang::Runnable` trait which is used by `fang` to exe
     }
 ```
 
-As you can see from the example above, the trait implementation has `#[typetag::serde]` attribute which is used to deserialize the job.
+As you can see from the example above, the trait implementation has `#[fang::fang_typetag]` attribute which is used to deserialize the job.
 
 ### Enqueuing a job
 
@@ -101,7 +100,7 @@ Add `task_type` method to the `Runnable` trait implementation:
 ```rust
 ...
 
-#[typetag::serde]
+#[fang_typetag]
 impl Runnable for Job {
     fn run(&self) -> Result<(), Error> {
         println!("the number is {}", self.number);
