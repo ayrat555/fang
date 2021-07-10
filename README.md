@@ -26,25 +26,25 @@ Every job should implement `fang::Runnable` trait which is used by `fang` to exe
 
 
 ```rust
-    use fang::Error;
-    use fang::Runnable;
-    use fang::{Deserialize, Serialize};
-    use fang::fang_typetag;
+use fang::Error;
+use fang::Runnable;
+use fang::{Deserialize, Serialize};
+use fang::fang_typetag;
 
 
-    #[derive(Serialize, Deserialize)]
-    struct Job {
-        pub number: u16,
+#[derive(Serialize, Deserialize)]
+struct Job {
+    pub number: u16,
+}
+
+#[fang_typetag]
+impl Runnable for Job {
+    fn run(&self) -> Result<(), Error> {
+        println!("the number is {}", self.number);
+
+        Ok(())
     }
-
-    #[fang_typetag]
-    impl Runnable for Job {
-        fn run(&self) -> Result<(), Error> {
-            println!("the number is {}", self.number);
-
-            Ok(())
-        }
-    }
+}
 ```
 
 As you can see from the example above, the trait implementation has `#[fang::fang_typetag]` attribute which is used to deserialize the job.
@@ -116,7 +116,7 @@ impl Runnable for Job {
 
 Set `task_type` to the `WorkerParamas`:
 
-```
+```rust
 let mut worker_params = WorkerParams::new();
 worker_params.set_task_type("number".to_string());
 
