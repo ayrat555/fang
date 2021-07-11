@@ -206,26 +206,19 @@ mod job_pool_tests {
 
         assert!(tasks.len() > 40);
 
-        let test_worker1_jobs: Vec<Task> = tasks
-            .clone()
-            .into_iter()
-            .filter(|job| {
-                serde_json::to_string(&job.metadata)
-                    .unwrap()
-                    .contains("worker_1")
-            })
-            .collect();
+        let test_worker1_jobs = tasks.clone().into_iter().filter(|job| {
+            serde_json::to_string(&job.metadata)
+                .unwrap()
+                .contains("worker_1")
+        });
 
-        let test_worker2_jobs: Vec<Task> = tasks
-            .into_iter()
-            .filter(|job| {
-                serde_json::to_string(&job.metadata)
-                    .unwrap()
-                    .contains("worker_2")
-            })
-            .collect();
+        let test_worker2_jobs = tasks.into_iter().filter(|job| {
+            serde_json::to_string(&job.metadata)
+                .unwrap()
+                .contains("worker_2")
+        });
 
-        assert!(test_worker1_jobs.len() > 20);
-        assert!(test_worker2_jobs.len() > 20);
+        assert!(test_worker1_jobs.count() > 20);
+        assert!(test_worker2_jobs.count() > 20);
     }
 }
