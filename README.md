@@ -1,5 +1,7 @@
 <p align="center"><img src="logo.png" alt="fang" height="300px"></p>
 
+[![Crates.io][s1]][ci] [![docs page][docs-badge]][docs] ![test][ga-test] ![style][ga-style]
+
 # Fang
 
 Background job processing library for Rust.
@@ -15,7 +17,7 @@ Note that the README follows the master branch, to see instructions for the late
 
 ```toml
 [dependencies]
-fang = "0.4"
+fang = "0.3.1"
 ```
 
 2. Create `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/migrations/2021-06-05-112912_create_fang_tasks/up.sql).
@@ -198,3 +200,11 @@ WorkerPool::new_with_params(10, worker_params).start();
 ## Author
 
 Ayrat Badykov (@ayrat555)
+
+
+[s1]: https://img.shields.io/crates/v/fang.svg
+[docs-badge]: https://img.shields.io/badge/docs-website-blue.svg
+[ci]: https://crates.io/crates/fang
+[docs]: https://docs.rs/fang/
+[ga-test]: https://github.com/ayrat555/fang/actions/workflows/rust.yml/badge.svg
+[ga-style]: https://github.com/ayrat555/fang/actions/workflows/style.yml/badge.svg

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.1 (2021-07-11)
 
  - Simplify usage by re-exporting serde traits - [#3](https://github.com/ayrat555/fang/pull/3)
 
