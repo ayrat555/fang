@@ -1,3 +1,5 @@
+#![allow(clippy::nonstandard_macro_braces)]
+
 #[macro_use]
 extern crate diesel;
 
