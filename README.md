@@ -49,7 +49,7 @@ impl Runnable for Job {
 }
 ```
 
-As you can see from the example above, the trait implementation has `#[fang::fang_typetag]` attribute which is used to deserialize the job.
+As you can see from the example above, the trait implementation has `#[typetag::serde]` attribute which is used to deserialize the job.
 
 ### Enqueuing a job
 
