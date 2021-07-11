@@ -29,7 +29,7 @@ Every job should implement `fang::Runnable` trait which is used by `fang` to exe
 use fang::Error;
 use fang::Runnable;
 use fang::{Deserialize, Serialize};
-use fang::fang_typetag;
+use fang::typetag;
 
 
 #[derive(Serialize, Deserialize)]
@@ -37,7 +37,7 @@ struct Job {
     pub number: u16,
 }
 
-#[fang_typetag]
+#[typetag::serde]
 impl Runnable for Job {
     fn run(&self) -> Result<(), Error> {
         println!("the number is {}", self.number);
@@ -100,7 +100,7 @@ Add `task_type` method to the `Runnable` trait implementation:
 ```rust
 ...
 
-#[fang_typetag]
+#[typetag::serde]
 impl Runnable for Job {
     fn run(&self) -> Result<(), Error> {
         println!("the number is {}", self.number);

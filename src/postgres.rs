@@ -175,9 +175,9 @@ mod postgres_tests {
     use super::Task;
     use crate::executor::Error as ExecutorError;
     use crate::executor::Runnable;
-    use crate::fang_typetag;
     use crate::schema::fang_tasks;
     use crate::schema::FangTaskState;
+    use crate::typetag;
     use crate::{Deserialize, Serialize};
     use chrono::{DateTime, Duration, Utc};
     use diesel::connection::Connection;
@@ -387,7 +387,7 @@ mod postgres_tests {
         pub number: u16,
     }
 
-    #[fang_typetag]
+    #[typetag::serde]
     impl Runnable for Job {
         fn run(&self) -> Result<(), ExecutorError> {
             println!("the number is {}", self.number);

@@ -183,10 +183,10 @@ mod executor_tests {
     use super::Executor;
     use super::RetentionMode;
     use super::Runnable;
-    use crate::fang_typetag;
     use crate::postgres::NewTask;
     use crate::postgres::Postgres;
     use crate::schema::FangTaskState;
+    use crate::typetag;
     use crate::{Deserialize, Serialize};
     use diesel::connection::Connection;
 
@@ -195,7 +195,7 @@ mod executor_tests {
         pub number: u16,
     }
 
-    #[fang_typetag]
+    #[typetag::serde]
     impl Runnable for ExecutorJobTest {
         fn run(&self) -> Result<(), Error> {
             println!("the number is {}", self.number);
@@ -209,7 +209,7 @@ mod executor_tests {
         pub number: u16,
     }
 
-    #[fang_typetag]
+    #[typetag::serde]
     impl Runnable for FailedJob {
         fn run(&self) -> Result<(), Error> {
             let message = format!("the number is {}", self.number);
@@ -223,7 +223,7 @@ mod executor_tests {
     #[derive(Serialize, Deserialize)]
     struct PanicJob {}
 
-    #[fang_typetag]
+    #[typetag::serde]
     impl Runnable for PanicJob {
         fn run(&self) -> Result<(), Error> {
             if true {
@@ -237,7 +237,7 @@ mod executor_tests {
     #[derive(Serialize, Deserialize)]
     struct JobType1 {}
 
-    #[fang_typetag]
+    #[typetag::serde]
     impl Runnable for JobType1 {
         fn run(&self) -> Result<(), Error> {
             Ok(())
@@ -251,7 +251,7 @@ mod executor_tests {
     #[derive(Serialize, Deserialize)]
     struct JobType2 {}
 
-    #[fang_typetag]
+    #[typetag::serde]
     impl Runnable for JobType2 {
         fn run(&self) -> Result<(), Error> {
             Ok(())
