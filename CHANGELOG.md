@@ -1,3 +1,9 @@
+# Changelog
+
+## Unreleased
+
+ - Simplify usage by re-exporting serde traits - [#3](https://github.com/ayrat555/fang/pull/2)
+
 ## 0.3.0 (2021-07-04)
 
 - Execute different types of tasks in separate workers - [#1](https://github.com/ayrat555/fang/pull/1)

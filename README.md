@@ -6,6 +6,8 @@ Background job processing library for Rust.
 
 Currently, it uses Postgres to store state. But in the future, more backends will be supported.
 
+Note that the README follows the master branch, to see instructions for the latest published version, check [crates.io](https://crates.io/crates/fang).
+
 ## Installation
 
 1. Add this to your Cargo.toml
