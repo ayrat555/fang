@@ -136,8 +136,10 @@ impl Drop for WorkerThread {
 
 #[cfg(test)]
 mod job_pool_tests {
+    use super::WorkerParams;
     use super::WorkerPool;
     use crate::executor::Error;
+    use crate::executor::RetentionMode;
     use crate::executor::Runnable;
     use crate::postgres::Postgres;
     use crate::postgres::Task;
@@ -193,7 +195,10 @@ mod job_pool_tests {
         env_logger::init();
 
         let postgres = Postgres::new();
-        let job_pool = WorkerPool::new(2);
+
+        let mut worker_params = WorkerParams::new();
+        worker_params.set_retention_mode(RetentionMode::KeepAll);
+        let job_pool = WorkerPool::new_with_params(2, worker_params);
 
         postgres.push_task(&MyJob::new(0)).unwrap();
         postgres.push_task(&MyJob::new(0)).unwrap();
