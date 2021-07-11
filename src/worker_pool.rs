@@ -136,9 +136,10 @@ mod job_pool_tests {
     use crate::postgres::Postgres;
     use crate::postgres::Task;
     use crate::schema::fang_tasks;
+    use crate::typetag;
+    use crate::{Deserialize, Serialize};
     use diesel::pg::PgConnection;
     use diesel::prelude::*;
-    use serde::{Deserialize, Serialize};
     use std::thread;
     use std::time::Duration;
 

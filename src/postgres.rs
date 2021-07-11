@@ -177,11 +177,12 @@ mod postgres_tests {
     use crate::executor::Runnable;
     use crate::schema::fang_tasks;
     use crate::schema::FangTaskState;
+    use crate::typetag;
+    use crate::{Deserialize, Serialize};
     use chrono::{DateTime, Duration, Utc};
     use diesel::connection::Connection;
     use diesel::prelude::*;
     use diesel::result::Error;
-    use serde::{Deserialize, Serialize};
 
     #[test]
     fn insert_inserts_task() {

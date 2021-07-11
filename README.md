@@ -6,6 +6,8 @@ Background job processing library for Rust.
 
 Currently, it uses Postgres to store state. But in the future, more backends will be supported.
 
+Note that the README follows the master branch, to see instructions for the latest published version, check [crates.io](https://crates.io/crates/fang).
+
 ## Installation
 
 1. Add this to your Cargo.toml
@@ -13,9 +15,7 @@ Currently, it uses Postgres to store state. But in the future, more backends wil
 
 ```toml
 [dependencies]
-fang = "0.3"
-typetag = "0.1"
-serde = { version = "1.0", features = ["derive"] }
+fang = "0.4"
 ```
 
 2. Create `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/migrations/2021-06-05-112912_create_fang_tasks/up.sql).
@@ -28,24 +28,25 @@ Every job should implement `fang::Runnable` trait which is used by `fang` to exe
 
 
 ```rust
-    use fang::Error;
-    use fang::Runnable;
-    use serde::{Deserialize, Serialize};
+use fang::Error;
+use fang::Runnable;
+use fang::{Deserialize, Serialize};
+use fang::typetag;
 
 
-    #[derive(Serialize, Deserialize)]
-    struct Job {
-        pub number: u16,
+#[derive(Serialize, Deserialize)]
+struct Job {
+    pub number: u16,
+}
+
+#[typetag::serde]
+impl Runnable for Job {
+    fn run(&self) -> Result<(), Error> {
+        println!("the number is {}", self.number);
+
+        Ok(())
     }
-
-    #[typetag::serde]
-    impl Runnable for Job {
-        fn run(&self) -> Result<(), Error> {
-            println!("the number is {}", self.number);
-
-            Ok(())
-        }
-    }
+}
 ```
 
 As you can see from the example above, the trait implementation has `#[typetag::serde]` attribute which is used to deserialize the job.
@@ -117,7 +118,7 @@ impl Runnable for Job {
 
 Set `task_type` to the `WorkerParamas`:
 
-```
+```rust
 let mut worker_params = WorkerParams::new();
 worker_params.set_task_type("number".to_string());
 

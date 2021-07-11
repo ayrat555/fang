@@ -186,8 +186,9 @@ mod executor_tests {
     use crate::postgres::NewTask;
     use crate::postgres::Postgres;
     use crate::schema::FangTaskState;
+    use crate::typetag;
+    use crate::{Deserialize, Serialize};
     use diesel::connection::Connection;
-    use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]
     struct ExecutorJobTest {
