@@ -32,6 +32,12 @@ pub struct Postgres {
     pub connection: PgConnection,
 }
 
+impl Default for Postgres {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Postgres {
     pub fn new() -> Self {
         let connection = Self::pg_connection(None);
@@ -155,7 +161,7 @@ impl Postgres {
             .ok()
     }
 
-    fn fetch_task_of_type(&self, task_type: &String) -> Option<Task> {
+    fn fetch_task_of_type(&self, task_type: &str) -> Option<Task> {
         fang_tasks::table
             .order(fang_tasks::created_at.asc())
             .limit(1)

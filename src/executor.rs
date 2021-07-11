@@ -152,25 +152,19 @@ impl Executor {
                     Ok(task) => self.storage.finish_task(&task).unwrap(),
                     Err((task, error)) => self.storage.fail_task(&task, error).unwrap(),
                 };
-
-                ()
             }
             RetentionMode::RemoveAll => {
                 match result {
                     Ok(task) => self.storage.remove_task(task.id).unwrap(),
                     Err((task, _error)) => self.storage.remove_task(task.id).unwrap(),
                 };
-
-                ()
             }
             RetentionMode::RemoveFinished => match result {
                 Ok(task) => {
                     self.storage.remove_task(task.id).unwrap();
-                    ()
                 }
                 Err((task, error)) => {
                     self.storage.fail_task(&task, error).unwrap();
-                    ()
                 }
             },
         }
@@ -395,10 +389,10 @@ mod executor_tests {
                 let found_task = executor.storage.find_task_by_id(task.id).unwrap();
 
                 assert_eq!(FangTaskState::Failed, found_task.state);
-                assert_eq!(
-                    "panicked during task execution Any".to_string(),
-                    found_task.error_message.unwrap()
-                );
+                assert!(found_task
+                    .error_message
+                    .unwrap()
+                    .contains("panicked during task execution Any"));
 
                 Ok(())
             });

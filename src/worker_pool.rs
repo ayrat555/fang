@@ -22,6 +22,12 @@ pub struct WorkerParams {
     pub task_type: Option<String>,
 }
 
+impl Default for WorkerParams {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WorkerParams {
     pub fn new() -> Self {
         Self {
@@ -67,7 +73,7 @@ impl WorkerPool {
                 .worker_params
                 .task_type
                 .clone()
-                .unwrap_or("".to_string());
+                .unwrap_or_else(|| "".to_string());
             let name = format!("worker_{}{}", worker_type, idx);
             WorkerThread::spawn_in_pool(self.worker_params.clone(), name, 0)
         }
@@ -200,26 +206,19 @@ mod job_pool_tests {
 
         assert!(tasks.len() > 40);
 
-        let test_worker1_jobs: Vec<Task> = tasks
-            .clone()
-            .into_iter()
-            .filter(|job| {
-                serde_json::to_string(&job.metadata)
-                    .unwrap()
-                    .contains("worker_1")
-            })
-            .collect();
+        let test_worker1_jobs = tasks.clone().into_iter().filter(|job| {
+            serde_json::to_string(&job.metadata)
+                .unwrap()
+                .contains("worker_1")
+        });
 
-        let test_worker2_jobs: Vec<Task> = tasks
-            .into_iter()
-            .filter(|job| {
-                serde_json::to_string(&job.metadata)
-                    .unwrap()
-                    .contains("worker_2")
-            })
-            .collect();
+        let test_worker2_jobs = tasks.into_iter().filter(|job| {
+            serde_json::to_string(&job.metadata)
+                .unwrap()
+                .contains("worker_2")
+        });
 
-        assert!(test_worker1_jobs.len() > 20);
-        assert!(test_worker2_jobs.len() > 20);
+        assert!(test_worker1_jobs.count() > 20);
+        assert!(test_worker2_jobs.count() > 20);
     }
 }

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
- - Simplify usage by re-exporting serde traits - [#3](https://github.com/ayrat555/fang/pull/2)
+ - Simplify usage by re-exporting serde traits - [#3](https://github.com/ayrat555/fang/pull/3)
 
 ## 0.3.0 (2021-07-04)
 

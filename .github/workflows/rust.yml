@@ -1,0 +1,93 @@
+name: Test and Build Rust
+
+on:
+  push:
+  pull_request:
+  schedule:
+    # Check if it works with current dependencies (weekly on Wednesday 2:32 UTC)
+    - cron: '32 2 * * 3'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres
+        # Provide the password for postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        # Set health checks to wait until postgres has started
+
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          components: clippy
+          override: true
+          profile: minimal
+          toolchain: nightly
+
+      - name: Run clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --verbose --all-targets --all-features -- -D warnings
+
+      - name: Install diesel-cli
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: diesel_cli --no-default-features --features "postgres"
+
+      - name: Setup db
+        run: diesel setup
+
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --verbose --all-features
+
+       - name: Run dirty tests
+         uses: actions-rs/cargo@v1
+         with:
+           command: test
+           args: --verbose --all-features --ignored
+
+  release:
+    name: Release x86_64-unknown-linux-gnu
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          override: true
+          profile: minimal
+          target: x86_64-unknown-linux-gnu
+          toolchain: nightly
+
+      - name: Build release
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --verbose --all-features --target x86_64-unknown-linux-gnu
