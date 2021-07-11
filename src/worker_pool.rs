@@ -22,6 +22,12 @@ pub struct WorkerParams {
     pub task_type: Option<String>,
 }
 
+impl Default for WorkerParams {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WorkerParams {
     pub fn new() -> Self {
         Self {
@@ -67,7 +73,7 @@ impl WorkerPool {
                 .worker_params
                 .task_type
                 .clone()
-                .unwrap_or("".to_string());
+                .unwrap_or_else(|| "".to_string());
             let name = format!("worker_{}{}", worker_type, idx);
             WorkerThread::spawn_in_pool(self.worker_params.clone(), name, 0)
         }
