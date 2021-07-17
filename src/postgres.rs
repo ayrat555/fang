@@ -1,7 +1,10 @@
 use crate::executor::Runnable;
+use crate::schema::fang_periodic_tasks;
 use crate::schema::fang_tasks;
 use crate::schema::FangTaskState;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Duration;
+use chrono::Utc;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::result::Error;
@@ -21,11 +24,29 @@ pub struct Task {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone)]
+#[table_name = "fang_periodic_tasks"]
+pub struct PeriodicTask {
+    pub id: Uuid,
+    pub metadata: serde_json::Value,
+    pub period_in_seconds: i32,
+    pub scheduled_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 #[derive(Insertable)]
 #[table_name = "fang_tasks"]
 pub struct NewTask {
     pub metadata: serde_json::Value,
     pub task_type: String,
+}
+
+#[derive(Insertable)]
+#[table_name = "fang_periodic_tasks"]
+pub struct NewPeriodicTask {
+    pub metadata: serde_json::Value,
+    pub period_in_seconds: i32,
 }
 
 pub struct Postgres {
@@ -60,6 +81,23 @@ impl Postgres {
         };
 
         self.insert(&new_task)
+    }
+
+    pub fn push_periodic_task(
+        &self,
+        job: &dyn Runnable,
+        period: i32,
+    ) -> Result<PeriodicTask, Error> {
+        let json_job = serde_json::to_value(job).unwrap();
+
+        let new_task = NewPeriodicTask {
+            metadata: json_job,
+            period_in_seconds: period,
+        };
+
+        diesel::insert_into(fang_periodic_tasks::table)
+            .values(new_task)
+            .get_result::<PeriodicTask>(&self.connection)
     }
 
     pub fn enqueue_task(job: &dyn Runnable) -> Result<Task, Error> {
@@ -98,6 +136,30 @@ impl Postgres {
         fang_tasks::table
             .filter(fang_tasks::id.eq(id))
             .first::<Task>(&self.connection)
+            .ok()
+    }
+
+    pub fn find_periodic_task_by_id(&self, id: Uuid) -> Option<PeriodicTask> {
+        fang_periodic_tasks::table
+            .filter(fang_periodic_tasks::id.eq(id))
+            .first::<PeriodicTask>(&self.connection)
+            .ok()
+    }
+
+    pub fn fetch_periodic_tasks(&self, error_margin_seconds: i64) -> Option<Vec<PeriodicTask>> {
+        let current_time = Self::current_time();
+
+        let low_limit = current_time - Duration::seconds(error_margin_seconds);
+        let high_limit = current_time + Duration::seconds(error_margin_seconds);
+
+        fang_periodic_tasks::table
+            .filter(
+                fang_periodic_tasks::scheduled_at
+                    .gt(low_limit)
+                    .and(fang_periodic_tasks::scheduled_at.lt(high_limit)),
+            )
+            .or_filter(fang_periodic_tasks::scheduled_at.is_null())
+            .load::<PeriodicTask>(&self.connection)
             .ok()
     }
 
@@ -307,6 +369,21 @@ mod postgres_tests {
             );
 
             assert_eq!(task.metadata, serde_json::value::Value::Object(m));
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn push_periodic_task() {
+        let postgres = Postgres::new();
+
+        postgres.connection.test_transaction::<(), Error, _>(|| {
+            let job = Job { number: 10 };
+            let task = postgres.push_periodic_task(&job, 60).unwrap();
+
+            assert_eq!(task.period_in_seconds, 60);
+            assert!(postgres.find_periodic_task_by_id(task.id).is_some());
 
             Ok(())
         });
