@@ -163,6 +163,26 @@ impl Postgres {
             .ok()
     }
 
+    pub fn schedule_next_task_execution(&self, task: &PeriodicTask) -> Result<PeriodicTask, Error> {
+        let current_time = Self::current_time();
+        let scheduled_at = current_time + Duration::seconds(task.period_in_seconds.into());
+
+        diesel::update(task)
+            .set((
+                fang_periodic_tasks::scheduled_at.eq(scheduled_at),
+                fang_periodic_tasks::updated_at.eq(current_time),
+            ))
+            .get_result::<PeriodicTask>(&self.connection)
+    }
+
+    pub fn remove_all_tasks(&self) -> Result<usize, Error> {
+        diesel::delete(fang_tasks::table).execute(&self.connection)
+    }
+
+    pub fn remove_all_periodic_tasks(&self) -> Result<usize, Error> {
+        diesel::delete(fang_periodic_tasks::table).execute(&self.connection)
+    }
+
     pub fn remove_task(&self, id: Uuid) -> Result<usize, Error> {
         let query = fang_tasks::table.filter(fang_tasks::id.eq(id));
 
@@ -239,14 +259,17 @@ impl Postgres {
 #[cfg(test)]
 mod postgres_tests {
     use super::NewTask;
+    use super::PeriodicTask;
     use super::Postgres;
     use super::Task;
     use crate::executor::Error as ExecutorError;
     use crate::executor::Runnable;
+    use crate::schema::fang_periodic_tasks;
     use crate::schema::fang_tasks;
     use crate::schema::FangTaskState;
     use crate::typetag;
     use crate::{Deserialize, Serialize};
+    use chrono::prelude::*;
     use chrono::{DateTime, Duration, Utc};
     use diesel::connection::Connection;
     use diesel::prelude::*;
@@ -390,6 +413,127 @@ mod postgres_tests {
     }
 
     #[test]
+    fn fetch_periodic_tasks_fetches_periodic_task_without_scheduled_at() {
+        let postgres = Postgres::new();
+
+        postgres.connection.test_transaction::<(), Error, _>(|| {
+            let job = Job { number: 10 };
+            let task = postgres.push_periodic_task(&job, 60).unwrap();
+
+            let schedule_in_future = Utc::now() + Duration::hours(100);
+
+            insert_periodic_job(
+                serde_json::json!(true),
+                schedule_in_future,
+                100,
+                &postgres.connection,
+            );
+
+            let tasks = postgres.fetch_periodic_tasks(100).unwrap();
+
+            assert_eq!(tasks.len(), 1);
+            assert_eq!(tasks[0].id, task.id);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn schedule_next_task_execution() {
+        let postgres = Postgres::new();
+
+        postgres.connection.test_transaction::<(), Error, _>(|| {
+            let task = insert_periodic_job(
+                serde_json::json!(true),
+                Utc::now(),
+                100,
+                &postgres.connection,
+            );
+
+            let updated_task = postgres.schedule_next_task_execution(&task).unwrap();
+
+            let next_schedule = (task.scheduled_at.unwrap()
+                + Duration::seconds(task.period_in_seconds.into()))
+            .round_subsecs(0);
+
+            assert_eq!(
+                next_schedule,
+                updated_task.scheduled_at.unwrap().round_subsecs(0)
+            );
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn remove_all_periodic_tasks() {
+        let postgres = Postgres::new();
+
+        postgres.connection.test_transaction::<(), Error, _>(|| {
+            let task = insert_periodic_job(
+                serde_json::json!(true),
+                Utc::now(),
+                100,
+                &postgres.connection,
+            );
+
+            let result = postgres.remove_all_periodic_tasks().unwrap();
+
+            assert_eq!(1, result);
+
+            assert_eq!(None, postgres.find_periodic_task_by_id(task.id));
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn remove_all_tasks() {
+        let postgres = Postgres::new();
+
+        postgres.connection.test_transaction::<(), Error, _>(|| {
+            let task = insert_job(serde_json::json!(true), Utc::now(), &postgres.connection);
+            let result = postgres.remove_all_tasks().unwrap();
+
+            assert_eq!(1, result);
+
+            assert_eq!(None, postgres.find_task_by_id(task.id));
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn fetch_periodic_tasks() {
+        let postgres = Postgres::new();
+
+        postgres.connection.test_transaction::<(), Error, _>(|| {
+            let schedule_in_future = Utc::now() + Duration::hours(100);
+
+            insert_periodic_job(
+                serde_json::json!(true),
+                schedule_in_future,
+                100,
+                &postgres.connection,
+            );
+
+            let task = insert_periodic_job(
+                serde_json::json!(true),
+                Utc::now(),
+                100,
+                &postgres.connection,
+            );
+
+            let tasks = postgres.fetch_periodic_tasks(100).unwrap();
+
+            assert_eq!(tasks.len(), 1);
+            assert_eq!(tasks[0].id, task.id);
+
+            Ok(())
+        });
+    }
+
+    #[test]
     fn remove_task() {
         let postgres = Postgres::new();
 
@@ -490,6 +634,22 @@ mod postgres_tests {
                 fang_tasks::created_at.eq(timestamp),
             )])
             .get_result::<Task>(connection)
+            .unwrap()
+    }
+
+    fn insert_periodic_job(
+        metadata: serde_json::Value,
+        timestamp: DateTime<Utc>,
+        period_in_seconds: i32,
+        connection: &PgConnection,
+    ) -> PeriodicTask {
+        diesel::insert_into(fang_periodic_tasks::table)
+            .values(&vec![(
+                fang_periodic_tasks::metadata.eq(metadata),
+                fang_periodic_tasks::scheduled_at.eq(timestamp),
+                fang_periodic_tasks::period_in_seconds.eq(period_in_seconds),
+            )])
+            .get_result::<PeriodicTask>(connection)
             .unwrap()
     }
 
