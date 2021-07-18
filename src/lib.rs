@@ -10,6 +10,7 @@ mod schema;
 
 pub mod executor;
 pub mod postgres;
+pub mod scheduler;
 pub mod worker_pool;
 
 pub use executor::*;
