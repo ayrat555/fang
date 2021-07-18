@@ -170,7 +170,10 @@ mod job_pool_tests {
     }
 
     fn get_all_tasks(conn: &PgConnection) -> Vec<Task> {
-        fang_tasks::table.get_results::<Task>(conn).unwrap()
+        fang_tasks::table
+            .filter(fang_tasks::task_type.eq("worker_pool_test"))
+            .get_results::<Task>(conn)
+            .unwrap()
     }
 
     #[typetag::serde]
@@ -186,6 +189,10 @@ mod job_pool_tests {
 
             Ok(())
         }
+
+        fn task_type(&self) -> String {
+            "worker_pool_test".to_string()
+        }
     }
 
     // this test is ignored because it commits data to the db
@@ -200,8 +207,8 @@ mod job_pool_tests {
         worker_params.set_retention_mode(RetentionMode::KeepAll);
         let job_pool = WorkerPool::new_with_params(2, worker_params);
 
-        postgres.push_task(&MyJob::new(0)).unwrap();
-        postgres.push_task(&MyJob::new(0)).unwrap();
+        postgres.push_task(&MyJob::new(100)).unwrap();
+        postgres.push_task(&MyJob::new(200)).unwrap();
 
         job_pool.start();
 
