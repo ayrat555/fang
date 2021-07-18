@@ -75,12 +75,16 @@ impl Postgres {
     pub fn push_task(&self, job: &dyn Runnable) -> Result<Task, Error> {
         let json_job = serde_json::to_value(job).unwrap();
 
-        let new_task = NewTask {
-            metadata: json_job,
-            task_type: job.task_type(),
-        };
-
-        self.insert(&new_task)
+        match self.find_task_by_metadata(&json_job) {
+            Some(task) => Ok(task),
+            None => {
+                let new_task = NewTask {
+                    metadata: json_job.clone(),
+                    task_type: job.task_type(),
+                };
+                self.insert(&new_task)
+            }
+        }
     }
 
     pub fn push_periodic_task(
@@ -266,6 +270,18 @@ impl Postgres {
             .first::<PeriodicTask>(&self.connection)
             .ok()
     }
+
+    fn find_task_by_metadata(&self, metadata: &serde_json::Value) -> Option<Task> {
+        fang_tasks::table
+            .filter(fang_tasks::metadata.eq(metadata))
+            .filter(
+                fang_tasks::state
+                    .eq(FangTaskState::New)
+                    .or(fang_tasks::state.eq(FangTaskState::InProgress)),
+            )
+            .first::<Task>(&self.connection)
+            .ok()
+    }
 }
 
 #[cfg(test)]
@@ -404,6 +420,22 @@ mod postgres_tests {
             );
 
             assert_eq!(task.metadata, serde_json::value::Value::Object(m));
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn push_task_does_not_insert_the_same_task() {
+        let postgres = Postgres::new();
+
+        postgres.connection.test_transaction::<(), Error, _>(|| {
+            let job = Job { number: 10 };
+            let task2 = postgres.push_task(&job).unwrap();
+
+            let task1 = postgres.push_task(&job).unwrap();
+
+            assert_eq!(task1.id, task2.id);
 
             Ok(())
         });
