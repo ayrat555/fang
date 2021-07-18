@@ -20,12 +20,8 @@ impl Drop for Scheduler {
     }
 }
 
-pub struct SchedulerThread {
-    pub scheduler: Scheduler,
-}
-
 impl Scheduler {
-    fn start(check_period: u64, error_margin_seconds: u64, postgres: Postgres) {
+    pub fn start(check_period: u64, error_margin_seconds: u64, postgres: Postgres) {
         let builder = thread::Builder::new().name("scheduler".to_string());
 
         builder
