@@ -56,17 +56,14 @@ impl Scheduler {
     }
 
     pub fn schedule(&self) {
-        match self
+        if let Some(tasks) = self
             .postgres
             .fetch_periodic_tasks(self.error_margin_seconds as i64)
         {
-            Some(tasks) => {
-                for task in tasks {
-                    self.process_task(task);
-                }
+            for task in tasks {
+                self.process_task(task);
             }
-            None => (),
-        }
+        };
     }
 
     fn process_task(&self, task: PeriodicTask) {
