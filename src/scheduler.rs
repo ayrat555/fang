@@ -102,6 +102,10 @@ mod job_scheduler_tests {
         fn run(&self) -> Result<(), Error> {
             Ok(())
         }
+
+        fn task_type(&self) -> String {
+            "schedule".to_string()
+        }
     }
 
     #[test]
@@ -109,20 +113,21 @@ mod job_scheduler_tests {
     fn schedules_jobs() {
         let postgres = Postgres::new();
 
-        postgres.remove_all_tasks().unwrap();
-
         postgres.push_periodic_task(&ScheduledJob {}, 10).unwrap();
         Scheduler::start(1, 2, Postgres::new());
 
-        let sleep_duration = Duration::from_secs(30);
+        let sleep_duration = Duration::from_secs(15);
         thread::sleep(sleep_duration);
 
         let tasks = get_all_tasks(&postgres.connection);
 
-        assert_eq!(3, tasks.len());
+        assert_eq!(1, tasks.len());
     }
 
     fn get_all_tasks(conn: &PgConnection) -> Vec<Task> {
-        fang_tasks::table.get_results::<Task>(conn).unwrap()
+        fang_tasks::table
+            .filter(fang_tasks::task_type.eq("schedule"))
+            .get_results::<Task>(conn)
+            .unwrap()
     }
 }
