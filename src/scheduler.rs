@@ -112,6 +112,7 @@ mod job_scheduler_tests {
     }
 
     #[test]
+    #[ignore]
     fn schedules_jobs() {
         let postgres = Postgres::new();
 
