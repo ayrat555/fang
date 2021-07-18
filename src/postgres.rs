@@ -632,13 +632,21 @@ mod postgres_tests {
         let postgres = Postgres::new();
         let timestamp1 = Utc::now() - Duration::hours(40);
 
-        let task1 = insert_job(serde_json::json!(true), timestamp1, &postgres.connection);
+        let task1 = insert_job(
+            serde_json::json!(Job { number: 12 }),
+            timestamp1,
+            &postgres.connection,
+        );
 
         let task1_id = task1.id;
 
         let timestamp2 = Utc::now() - Duration::hours(20);
 
-        let task2 = insert_job(serde_json::json!(false), timestamp2, &postgres.connection);
+        let task2 = insert_job(
+            serde_json::json!(Job { number: 11 }),
+            timestamp2,
+            &postgres.connection,
+        );
 
         let thread = std::thread::spawn(move || {
             let postgres = Postgres::new();
