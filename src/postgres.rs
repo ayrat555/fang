@@ -90,14 +90,19 @@ impl Postgres {
     ) -> Result<PeriodicTask, Error> {
         let json_job = serde_json::to_value(job).unwrap();
 
-        let new_task = NewPeriodicTask {
-            metadata: json_job,
-            period_in_seconds: period,
-        };
+        match self.find_periodic_task_by_metadata(&json_job) {
+            Some(task) => Ok(task),
+            None => {
+                let new_task = NewPeriodicTask {
+                    metadata: json_job,
+                    period_in_seconds: period,
+                };
 
-        diesel::insert_into(fang_periodic_tasks::table)
-            .values(new_task)
-            .get_result::<PeriodicTask>(&self.connection)
+                diesel::insert_into(fang_periodic_tasks::table)
+                    .values(new_task)
+                    .get_result::<PeriodicTask>(&self.connection)
+            }
+        }
     }
 
     pub fn enqueue_task(job: &dyn Runnable) -> Result<Task, Error> {
@@ -254,6 +259,13 @@ impl Postgres {
             .get_result::<Task>(&self.connection)
             .ok()
     }
+
+    fn find_periodic_task_by_metadata(&self, metadata: &serde_json::Value) -> Option<PeriodicTask> {
+        fang_periodic_tasks::table
+            .filter(fang_periodic_tasks::metadata.eq(metadata))
+            .first::<PeriodicTask>(&self.connection)
+            .ok()
+    }
 }
 
 #[cfg(test)]
@@ -407,6 +419,22 @@ mod postgres_tests {
 
             assert_eq!(task.period_in_seconds, 60);
             assert!(postgres.find_periodic_task_by_id(task.id).is_some());
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn push_periodic_task_returns_existing_job() {
+        let postgres = Postgres::new();
+
+        postgres.connection.test_transaction::<(), Error, _>(|| {
+            let job = Job { number: 10 };
+            let task1 = postgres.push_periodic_task(&job, 60).unwrap();
+
+            let task2 = postgres.push_periodic_task(&job, 60).unwrap();
+
+            assert_eq!(task1.id, task2.id);
 
             Ok(())
         });

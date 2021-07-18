@@ -26,3 +26,4 @@ CREATE TABLE fang_periodic_tasks (
 );
 
 CREATE INDEX fang_periodic_tasks_scheduled_at_index ON fang_periodic_tasks(scheduled_at);
+CREATE INDEX fang_periodic_tasks_metadata_index ON fang_periodic_tasks(metadata);
