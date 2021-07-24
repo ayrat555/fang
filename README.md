@@ -6,8 +6,6 @@
 
 Background job processing library for Rust.
 
-Currently, it uses Postgres to store state. But in the future, more backends will be supported.
-
 Note that the README follows the master branch, to see instructions for the latest published version, check [crates.io](https://crates.io/crates/fang).
 
 ## Installation
@@ -17,7 +15,7 @@ Note that the README follows the master branch, to see instructions for the late
 
 ```toml
 [dependencies]
-fang = "0.3.1"
+fang = "0.3.2"
 ```
 
 2. Create `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/migrations/2021-06-05-112912_create_fang_tasks/up.sql).
@@ -183,11 +181,35 @@ worker_params.set_sleep_params(sleep_params);
 WorkerPool::new_with_params(10, worker_params).start();
 ```
 
-## Potential/future features
+## Periodic Tasks
 
-  * Retries
-  * Scheduled tasks
-  * Extendable/new backends
+Fang can add tasks to `fang_tasks` periodically. To use this feature first run [the migration with `fang_periodic_tasks` table](https://github.com/ayrat555/fang/tree/master/migrations/2021-07-24-050243_create_fang_periodic_tasks/up.sql).
+
+Usage example:
+
+```rust
+use fang::Scheduler;
+use fang::Postgres;
+
+let postgres = Postgres::new();
+
+postgres
+     .push_periodic_task(&SyncJob::default(), 120)
+     .unwrap();
+
+postgres
+     .push_periodic_task(&DeliverJob::default(), 60)
+     .unwrap();
+
+Scheduler::start(10, 5);
+```
+
+In the example above, `push_periodic_task` is used to save the specified task to the `fang_periodic_tasks` table which will be enqueued (saved to `fang_tasks` table) every specied number of seconds.
+
+`Scheduler::start(10, 5)` starts scheduler. It accepts two parameters:
+- Db check period in seconds
+- Acceptable error limit in seconds - |current_time - scheduled_time| < error
+
 
 ## Contributing
 
