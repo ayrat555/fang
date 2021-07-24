@@ -188,6 +188,12 @@ impl Queue {
         diesel::delete(fang_tasks::table).execute(&self.connection)
     }
 
+    pub fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, Error> {
+        let query = fang_tasks::table.filter(fang_tasks::task_type.eq(task_type));
+
+        diesel::delete(query).execute(&self.connection)
+    }
+
     pub fn remove_all_periodic_tasks(&self) -> Result<usize, Error> {
         diesel::delete(fang_periodic_tasks::table).execute(&self.connection)
     }
@@ -608,6 +614,35 @@ mod queue_tests {
 
             queue.remove_task(task2.id).unwrap();
             assert!(queue.find_task_by_id(task2.id).is_none());
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn remove_task_of_type() {
+        let queue = Queue::new();
+
+        let new_task1 = NewTask {
+            metadata: serde_json::json!(true),
+            task_type: "type1".to_string(),
+        };
+
+        let new_task2 = NewTask {
+            metadata: serde_json::json!(true),
+            task_type: "type2".to_string(),
+        };
+
+        queue.connection.test_transaction::<(), Error, _>(|| {
+            let task1 = queue.insert(&new_task1).unwrap();
+            assert!(queue.find_task_by_id(task1.id).is_some());
+
+            let task2 = queue.insert(&new_task2).unwrap();
+            assert!(queue.find_task_by_id(task2.id).is_some());
+
+            queue.remove_tasks_of_type("type1").unwrap();
+            assert!(queue.find_task_by_id(task1.id).is_none());
+            assert!(queue.find_task_by_id(task2.id).is_some());
 
             Ok(())
         });
