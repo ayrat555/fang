@@ -1,7 +1,7 @@
 use crate::executor::Executor;
 use crate::executor::RetentionMode;
 use crate::executor::SleepParams;
-use crate::postgres::Postgres;
+use crate::queue::Queue;
 use std::thread;
 
 pub struct WorkerPool {
@@ -102,9 +102,9 @@ impl WorkerThread {
                 // when _job is dropped, it will be restarted (see Drop trait impl)
                 let _job = WorkerThread::new(worker_params.clone(), name, restarts);
 
-                let postgres = Postgres::new();
+                let queue = Queue::new();
 
-                let mut executor = Executor::new(postgres);
+                let mut executor = Executor::new(queue);
 
                 if let Some(task_type_str) = worker_params.task_type {
                     executor.set_task_type(task_type_str);
@@ -141,8 +141,8 @@ mod job_pool_tests {
     use crate::executor::Error;
     use crate::executor::RetentionMode;
     use crate::executor::Runnable;
-    use crate::postgres::Postgres;
-    use crate::postgres::Task;
+    use crate::queue::Queue;
+    use crate::queue::Task;
     use crate::schema::fang_tasks;
     use crate::typetag;
     use crate::{Deserialize, Serialize};
@@ -178,14 +178,14 @@ mod job_pool_tests {
 
     #[typetag::serde]
     impl Runnable for MyJob {
-        fn run(&self) -> Result<(), Error> {
-            let postgres = Postgres::new();
+        fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
+            let queue = Queue::new();
 
             thread::sleep(Duration::from_secs(3));
 
             let new_job = MyJob::new(self.number + 1);
 
-            postgres.push_task(&new_job).unwrap();
+            queue.push_task(&new_job).unwrap();
 
             Ok(())
         }
@@ -201,20 +201,20 @@ mod job_pool_tests {
     fn tasks_are_split_between_two_threads() {
         env_logger::init();
 
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
         let mut worker_params = WorkerParams::new();
         worker_params.set_retention_mode(RetentionMode::KeepAll);
         let job_pool = WorkerPool::new_with_params(2, worker_params);
 
-        postgres.push_task(&MyJob::new(100)).unwrap();
-        postgres.push_task(&MyJob::new(200)).unwrap();
+        queue.push_task(&MyJob::new(100)).unwrap();
+        queue.push_task(&MyJob::new(200)).unwrap();
 
         job_pool.start();
 
         thread::sleep(Duration::from_secs(100));
 
-        let tasks = get_all_tasks(&postgres.connection);
+        let tasks = get_all_tasks(&queue.connection);
 
         assert!(tasks.len() > 40);
 

@@ -9,12 +9,12 @@ extern crate log;
 mod schema;
 
 pub mod executor;
-pub mod postgres;
+pub mod queue;
 pub mod scheduler;
 pub mod worker_pool;
 
 pub use executor::*;
-pub use postgres::*;
+pub use queue::*;
 pub use scheduler::*;
 pub use worker_pool::*;
 

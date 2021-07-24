@@ -1,12 +1,11 @@
-use crate::postgres::Postgres;
-use crate::postgres::Task;
-use std::panic;
-use std::panic::RefUnwindSafe;
+use crate::queue::Queue;
+use crate::queue::Task;
+use diesel::pg::PgConnection;
 use std::thread;
 use std::time::Duration;
 
 pub struct Executor {
-    pub storage: Postgres,
+    pub storage: Queue,
     pub task_type: Option<String>,
     pub sleep_params: SleepParams,
     pub retention_mode: RetentionMode,
@@ -58,11 +57,8 @@ pub struct Error {
 }
 
 #[typetag::serde(tag = "type")]
-pub trait Runnable
-where
-    Self: RefUnwindSafe,
-{
-    fn run(&self) -> Result<(), Error>;
+pub trait Runnable {
+    fn run(&self, connection: &PgConnection) -> Result<(), Error>;
 
     fn task_type(&self) -> String {
         "common".to_string()
@@ -70,7 +66,7 @@ where
 }
 
 impl Executor {
-    pub fn new(storage: Postgres) -> Self {
+    pub fn new(storage: Queue) -> Self {
         Self {
             storage,
             sleep_params: SleepParams::default(),
@@ -129,19 +125,11 @@ impl Executor {
 
     fn execute_task(&self, task: Task) -> Result<Task, (Task, String)> {
         let actual_task: Box<dyn Runnable> = serde_json::from_value(task.metadata.clone()).unwrap();
-        let task_result = panic::catch_unwind(|| actual_task.run());
+        let task_result = actual_task.run(&self.storage.connection);
 
         match task_result {
-            Ok(result) => match result {
-                Ok(()) => Ok(task),
-                Err(error) => Err((task, error.description)),
-            },
-
-            Err(error) => {
-                let message = format!("panicked during task execution {:?}", error);
-
-                Err((task, message))
-            }
+            Ok(()) => Ok(task),
+            Err(error) => Err((task, error.description)),
         }
     }
 
@@ -177,12 +165,13 @@ mod executor_tests {
     use super::Executor;
     use super::RetentionMode;
     use super::Runnable;
-    use crate::postgres::NewTask;
-    use crate::postgres::Postgres;
+    use crate::queue::NewTask;
+    use crate::queue::Queue;
     use crate::schema::FangTaskState;
     use crate::typetag;
     use crate::{Deserialize, Serialize};
     use diesel::connection::Connection;
+    use diesel::pg::PgConnection;
 
     #[derive(Serialize, Deserialize)]
     struct ExecutorJobTest {
@@ -191,7 +180,7 @@ mod executor_tests {
 
     #[typetag::serde]
     impl Runnable for ExecutorJobTest {
-        fn run(&self) -> Result<(), Error> {
+        fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
             println!("the number is {}", self.number);
 
             Ok(())
@@ -205,7 +194,7 @@ mod executor_tests {
 
     #[typetag::serde]
     impl Runnable for FailedJob {
-        fn run(&self) -> Result<(), Error> {
+        fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
             let message = format!("the number is {}", self.number);
 
             Err(Error {
@@ -215,25 +204,11 @@ mod executor_tests {
     }
 
     #[derive(Serialize, Deserialize)]
-    struct PanicJob {}
-
-    #[typetag::serde]
-    impl Runnable for PanicJob {
-        fn run(&self) -> Result<(), Error> {
-            if true {
-                panic!("panic!");
-            }
-
-            Ok(())
-        }
-    }
-
-    #[derive(Serialize, Deserialize)]
     struct JobType1 {}
 
     #[typetag::serde]
     impl Runnable for JobType1 {
-        fn run(&self) -> Result<(), Error> {
+        fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
             Ok(())
         }
 
@@ -247,7 +222,7 @@ mod executor_tests {
 
     #[typetag::serde]
     impl Runnable for JobType2 {
-        fn run(&self) -> Result<(), Error> {
+        fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
             Ok(())
         }
 
@@ -269,7 +244,7 @@ mod executor_tests {
             task_type: "common".to_string(),
         };
 
-        let mut executor = Executor::new(Postgres::new());
+        let mut executor = Executor::new(Queue::new());
         executor.set_retention_mode(RetentionMode::KeepAll);
 
         executor
@@ -306,7 +281,7 @@ mod executor_tests {
             task_type: "type2".to_string(),
         };
 
-        let executor = Executor::new(Postgres::new());
+        let executor = Executor::new(Queue::new());
 
         let task1 = executor.storage.insert(&new_task1).unwrap();
         let task2 = executor.storage.insert(&new_task2).unwrap();
@@ -315,8 +290,8 @@ mod executor_tests {
         assert_eq!(FangTaskState::New, task2.state);
 
         std::thread::spawn(move || {
-            let postgres = Postgres::new();
-            let mut executor = Executor::new(postgres);
+            let queue = Queue::new();
+            let mut executor = Executor::new(queue);
             executor.set_retention_mode(RetentionMode::KeepAll);
             executor.set_task_type("type1".to_string());
 
@@ -341,7 +316,7 @@ mod executor_tests {
             task_type: "common".to_string(),
         };
 
-        let executor = Executor::new(Postgres::new());
+        let executor = Executor::new(Queue::new());
 
         executor
             .storage
@@ -360,39 +335,6 @@ mod executor_tests {
                     "the number is 10".to_string(),
                     found_task.error_message.unwrap()
                 );
-
-                Ok(())
-            });
-    }
-
-    #[test]
-    fn recovers_from_panics() {
-        let job = PanicJob {};
-
-        let new_task = NewTask {
-            metadata: serialize(&job),
-            task_type: "common".to_string(),
-        };
-
-        let executor = Executor::new(Postgres::new());
-
-        executor
-            .storage
-            .connection
-            .test_transaction::<(), Error, _>(|| {
-                let task = executor.storage.insert(&new_task).unwrap();
-
-                assert_eq!(FangTaskState::New, task.state);
-
-                executor.run(task.clone());
-
-                let found_task = executor.storage.find_task_by_id(task.id).unwrap();
-
-                assert_eq!(FangTaskState::Failed, found_task.state);
-                assert!(found_task
-                    .error_message
-                    .unwrap()
-                    .contains("panicked during task execution Any"));
 
                 Ok(())
             });

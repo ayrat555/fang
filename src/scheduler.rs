@@ -1,13 +1,13 @@
 use crate::executor::Runnable;
-use crate::postgres::PeriodicTask;
-use crate::postgres::Postgres;
+use crate::queue::PeriodicTask;
+use crate::queue::Queue;
 use std::thread;
 use std::time::Duration;
 
 pub struct Scheduler {
     pub check_period: u64,
     pub error_margin_seconds: u64,
-    pub postgres: Postgres,
+    pub queue: Queue,
 }
 
 impl Drop for Scheduler {
@@ -18,22 +18,22 @@ impl Drop for Scheduler {
 
 impl Scheduler {
     pub fn start(check_period: u64, error_margin_seconds: u64) {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
         let builder = thread::Builder::new().name("scheduler".to_string());
 
         builder
             .spawn(move || {
-                let scheduler = Self::new(check_period, error_margin_seconds, postgres);
+                let scheduler = Self::new(check_period, error_margin_seconds, queue);
 
                 scheduler.schedule_loop();
             })
             .unwrap();
     }
 
-    pub fn new(check_period: u64, error_margin_seconds: u64, postgres: Postgres) -> Self {
+    pub fn new(check_period: u64, error_margin_seconds: u64, queue: Queue) -> Self {
         Self {
             check_period,
-            postgres,
+            queue,
             error_margin_seconds,
         }
     }
@@ -50,7 +50,7 @@ impl Scheduler {
 
     pub fn schedule(&self) {
         if let Some(tasks) = self
-            .postgres
+            .queue
             .fetch_periodic_tasks(self.error_margin_seconds as i64)
         {
             for task in tasks {
@@ -62,15 +62,15 @@ impl Scheduler {
     fn process_task(&self, task: PeriodicTask) {
         match task.scheduled_at {
             None => {
-                self.postgres.schedule_next_task_execution(&task).unwrap();
+                self.queue.schedule_next_task_execution(&task).unwrap();
             }
             Some(_) => {
                 let actual_task: Box<dyn Runnable> =
                     serde_json::from_value(task.metadata.clone()).unwrap();
 
-                self.postgres.push_task(&(*actual_task)).unwrap();
+                self.queue.push_task(&(*actual_task)).unwrap();
 
-                self.postgres.schedule_next_task_execution(&task).unwrap();
+                self.queue.schedule_next_task_execution(&task).unwrap();
             }
         }
     }
@@ -81,8 +81,8 @@ mod job_scheduler_tests {
     use super::Scheduler;
     use crate::executor::Error;
     use crate::executor::Runnable;
-    use crate::postgres::Postgres;
-    use crate::postgres::Task;
+    use crate::queue::Queue;
+    use crate::queue::Task;
     use crate::schema::fang_tasks;
     use crate::typetag;
     use crate::{Deserialize, Serialize};
@@ -96,7 +96,7 @@ mod job_scheduler_tests {
 
     #[typetag::serde]
     impl Runnable for ScheduledJob {
-        fn run(&self) -> Result<(), Error> {
+        fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
             Ok(())
         }
 
@@ -108,15 +108,15 @@ mod job_scheduler_tests {
     #[test]
     #[ignore]
     fn schedules_jobs() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
-        postgres.push_periodic_task(&ScheduledJob {}, 10).unwrap();
+        queue.push_periodic_task(&ScheduledJob {}, 10).unwrap();
         Scheduler::start(1, 2);
 
         let sleep_duration = Duration::from_secs(15);
         thread::sleep(sleep_duration);
 
-        let tasks = get_all_tasks(&postgres.connection);
+        let tasks = get_all_tasks(&queue.connection);
 
         assert_eq!(1, tasks.len());
     }

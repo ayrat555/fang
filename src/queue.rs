@@ -49,17 +49,17 @@ pub struct NewPeriodicTask {
     pub period_in_seconds: i32,
 }
 
-pub struct Postgres {
+pub struct Queue {
     pub connection: PgConnection,
 }
 
-impl Default for Postgres {
+impl Default for Queue {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Postgres {
+impl Queue {
     pub fn new() -> Self {
         let connection = Self::pg_connection(None);
 
@@ -285,10 +285,10 @@ impl Postgres {
 }
 
 #[cfg(test)]
-mod postgres_tests {
+mod queue_tests {
     use super::NewTask;
     use super::PeriodicTask;
-    use super::Postgres;
+    use super::Queue;
     use super::Task;
     use crate::executor::Error as ExecutorError;
     use crate::executor::Runnable;
@@ -305,16 +305,16 @@ mod postgres_tests {
 
     #[test]
     fn insert_inserts_task() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
         let new_task = NewTask {
             metadata: serde_json::json!(true),
             task_type: "common".to_string(),
         };
 
-        let result = postgres
+        let result = queue
             .connection
-            .test_transaction::<Task, Error, _>(|| postgres.insert(&new_task));
+            .test_transaction::<Task, Error, _>(|| queue.insert(&new_task));
 
         assert_eq!(result.state, FangTaskState::New);
         assert_eq!(result.error_message, None);
@@ -322,18 +322,18 @@ mod postgres_tests {
 
     #[test]
     fn fetch_task_fetches_the_oldest_task() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
+        queue.connection.test_transaction::<(), Error, _>(|| {
             let timestamp1 = Utc::now() - Duration::hours(40);
 
-            let task1 = insert_job(serde_json::json!(true), timestamp1, &postgres.connection);
+            let task1 = insert_job(serde_json::json!(true), timestamp1, &queue.connection);
 
             let timestamp2 = Utc::now() - Duration::hours(20);
 
-            insert_job(serde_json::json!(false), timestamp2, &postgres.connection);
+            insert_job(serde_json::json!(false), timestamp2, &queue.connection);
 
-            let found_task = postgres.fetch_task(&None).unwrap();
+            let found_task = queue.fetch_task(&None).unwrap();
 
             assert_eq!(found_task.id, task1.id);
 
@@ -343,12 +343,12 @@ mod postgres_tests {
 
     #[test]
     fn finish_task_updates_state_field() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
-            let task = insert_new_job(&postgres.connection);
+        queue.connection.test_transaction::<(), Error, _>(|| {
+            let task = insert_new_job(&queue.connection);
 
-            let updated_task = postgres.finish_task(&task).unwrap();
+            let updated_task = queue.finish_task(&task).unwrap();
 
             assert_eq!(FangTaskState::Finished, updated_task.state);
 
@@ -358,13 +358,13 @@ mod postgres_tests {
 
     #[test]
     fn fail_task_updates_state_field_and_sets_error_message() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
-            let task = insert_new_job(&postgres.connection);
+        queue.connection.test_transaction::<(), Error, _>(|| {
+            let task = insert_new_job(&queue.connection);
             let error = "Failed".to_string();
 
-            let updated_task = postgres.fail_task(&task, error.clone()).unwrap();
+            let updated_task = queue.fail_task(&task, error.clone()).unwrap();
 
             assert_eq!(FangTaskState::Failed, updated_task.state);
             assert_eq!(error, updated_task.error_message.unwrap());
@@ -375,12 +375,12 @@ mod postgres_tests {
 
     #[test]
     fn fetch_and_touch_updates_state() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
-            let _task = insert_new_job(&postgres.connection);
+        queue.connection.test_transaction::<(), Error, _>(|| {
+            let _task = insert_new_job(&queue.connection);
 
-            let updated_task = postgres.fetch_and_touch(&None).unwrap().unwrap();
+            let updated_task = queue.fetch_and_touch(&None).unwrap().unwrap();
 
             assert_eq!(FangTaskState::InProgress, updated_task.state);
 
@@ -390,10 +390,10 @@ mod postgres_tests {
 
     #[test]
     fn fetch_and_touch_returns_none() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
-            let task = postgres.fetch_and_touch(&None).unwrap();
+        queue.connection.test_transaction::<(), Error, _>(|| {
+            let task = queue.fetch_and_touch(&None).unwrap();
 
             assert_eq!(None, task);
 
@@ -403,11 +403,11 @@ mod postgres_tests {
 
     #[test]
     fn push_task_serializes_and_inserts_task() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
+        queue.connection.test_transaction::<(), Error, _>(|| {
             let job = Job { number: 10 };
-            let task = postgres.push_task(&job).unwrap();
+            let task = queue.push_task(&job).unwrap();
 
             let mut m = serde_json::value::Map::new();
             m.insert(
@@ -427,13 +427,13 @@ mod postgres_tests {
 
     #[test]
     fn push_task_does_not_insert_the_same_task() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
+        queue.connection.test_transaction::<(), Error, _>(|| {
             let job = Job { number: 10 };
-            let task2 = postgres.push_task(&job).unwrap();
+            let task2 = queue.push_task(&job).unwrap();
 
-            let task1 = postgres.push_task(&job).unwrap();
+            let task1 = queue.push_task(&job).unwrap();
 
             assert_eq!(task1.id, task2.id);
 
@@ -443,14 +443,14 @@ mod postgres_tests {
 
     #[test]
     fn push_periodic_task() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
+        queue.connection.test_transaction::<(), Error, _>(|| {
             let job = Job { number: 10 };
-            let task = postgres.push_periodic_task(&job, 60).unwrap();
+            let task = queue.push_periodic_task(&job, 60).unwrap();
 
             assert_eq!(task.period_in_seconds, 60);
-            assert!(postgres.find_periodic_task_by_id(task.id).is_some());
+            assert!(queue.find_periodic_task_by_id(task.id).is_some());
 
             Ok(())
         });
@@ -458,13 +458,13 @@ mod postgres_tests {
 
     #[test]
     fn push_periodic_task_returns_existing_job() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
+        queue.connection.test_transaction::<(), Error, _>(|| {
             let job = Job { number: 10 };
-            let task1 = postgres.push_periodic_task(&job, 60).unwrap();
+            let task1 = queue.push_periodic_task(&job, 60).unwrap();
 
-            let task2 = postgres.push_periodic_task(&job, 60).unwrap();
+            let task2 = queue.push_periodic_task(&job, 60).unwrap();
 
             assert_eq!(task1.id, task2.id);
 
@@ -474,11 +474,11 @@ mod postgres_tests {
 
     #[test]
     fn fetch_periodic_tasks_fetches_periodic_task_without_scheduled_at() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
+        queue.connection.test_transaction::<(), Error, _>(|| {
             let job = Job { number: 10 };
-            let task = postgres.push_periodic_task(&job, 60).unwrap();
+            let task = queue.push_periodic_task(&job, 60).unwrap();
 
             let schedule_in_future = Utc::now() + Duration::hours(100);
 
@@ -486,10 +486,10 @@ mod postgres_tests {
                 serde_json::json!(true),
                 schedule_in_future,
                 100,
-                &postgres.connection,
+                &queue.connection,
             );
 
-            let tasks = postgres.fetch_periodic_tasks(100).unwrap();
+            let tasks = queue.fetch_periodic_tasks(100).unwrap();
 
             assert_eq!(tasks.len(), 1);
             assert_eq!(tasks[0].id, task.id);
@@ -500,17 +500,13 @@ mod postgres_tests {
 
     #[test]
     fn schedule_next_task_execution() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
-            let task = insert_periodic_job(
-                serde_json::json!(true),
-                Utc::now(),
-                100,
-                &postgres.connection,
-            );
+        queue.connection.test_transaction::<(), Error, _>(|| {
+            let task =
+                insert_periodic_job(serde_json::json!(true), Utc::now(), 100, &queue.connection);
 
-            let updated_task = postgres.schedule_next_task_execution(&task).unwrap();
+            let updated_task = queue.schedule_next_task_execution(&task).unwrap();
 
             let next_schedule = (task.scheduled_at.unwrap()
                 + Duration::seconds(task.period_in_seconds.into()))
@@ -527,21 +523,17 @@ mod postgres_tests {
 
     #[test]
     fn remove_all_periodic_tasks() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
-            let task = insert_periodic_job(
-                serde_json::json!(true),
-                Utc::now(),
-                100,
-                &postgres.connection,
-            );
+        queue.connection.test_transaction::<(), Error, _>(|| {
+            let task =
+                insert_periodic_job(serde_json::json!(true), Utc::now(), 100, &queue.connection);
 
-            let result = postgres.remove_all_periodic_tasks().unwrap();
+            let result = queue.remove_all_periodic_tasks().unwrap();
 
             assert_eq!(1, result);
 
-            assert_eq!(None, postgres.find_periodic_task_by_id(task.id));
+            assert_eq!(None, queue.find_periodic_task_by_id(task.id));
 
             Ok(())
         });
@@ -549,15 +541,15 @@ mod postgres_tests {
 
     #[test]
     fn remove_all_tasks() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
-            let task = insert_job(serde_json::json!(true), Utc::now(), &postgres.connection);
-            let result = postgres.remove_all_tasks().unwrap();
+        queue.connection.test_transaction::<(), Error, _>(|| {
+            let task = insert_job(serde_json::json!(true), Utc::now(), &queue.connection);
+            let result = queue.remove_all_tasks().unwrap();
 
             assert_eq!(1, result);
 
-            assert_eq!(None, postgres.find_task_by_id(task.id));
+            assert_eq!(None, queue.find_task_by_id(task.id));
 
             Ok(())
         });
@@ -565,26 +557,22 @@ mod postgres_tests {
 
     #[test]
     fn fetch_periodic_tasks() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
+        queue.connection.test_transaction::<(), Error, _>(|| {
             let schedule_in_future = Utc::now() + Duration::hours(100);
 
             insert_periodic_job(
                 serde_json::json!(true),
                 schedule_in_future,
                 100,
-                &postgres.connection,
+                &queue.connection,
             );
 
-            let task = insert_periodic_job(
-                serde_json::json!(true),
-                Utc::now(),
-                100,
-                &postgres.connection,
-            );
+            let task =
+                insert_periodic_job(serde_json::json!(true), Utc::now(), 100, &queue.connection);
 
-            let tasks = postgres.fetch_periodic_tasks(100).unwrap();
+            let tasks = queue.fetch_periodic_tasks(100).unwrap();
 
             assert_eq!(tasks.len(), 1);
             assert_eq!(tasks[0].id, task.id);
@@ -595,7 +583,7 @@ mod postgres_tests {
 
     #[test]
     fn remove_task() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
 
         let new_task1 = NewTask {
             metadata: serde_json::json!(true),
@@ -607,19 +595,19 @@ mod postgres_tests {
             task_type: "common".to_string(),
         };
 
-        postgres.connection.test_transaction::<(), Error, _>(|| {
-            let task1 = postgres.insert(&new_task1).unwrap();
-            assert!(postgres.find_task_by_id(task1.id).is_some());
+        queue.connection.test_transaction::<(), Error, _>(|| {
+            let task1 = queue.insert(&new_task1).unwrap();
+            assert!(queue.find_task_by_id(task1.id).is_some());
 
-            let task2 = postgres.insert(&new_task2).unwrap();
-            assert!(postgres.find_task_by_id(task2.id).is_some());
+            let task2 = queue.insert(&new_task2).unwrap();
+            assert!(queue.find_task_by_id(task2.id).is_some());
 
-            postgres.remove_task(task1.id).unwrap();
-            assert!(postgres.find_task_by_id(task1.id).is_none());
-            assert!(postgres.find_task_by_id(task2.id).is_some());
+            queue.remove_task(task1.id).unwrap();
+            assert!(queue.find_task_by_id(task1.id).is_none());
+            assert!(queue.find_task_by_id(task2.id).is_some());
 
-            postgres.remove_task(task2.id).unwrap();
-            assert!(postgres.find_task_by_id(task2.id).is_none());
+            queue.remove_task(task2.id).unwrap();
+            assert!(queue.find_task_by_id(task2.id).is_none());
 
             Ok(())
         });
@@ -629,13 +617,13 @@ mod postgres_tests {
     #[test]
     #[ignore]
     fn fetch_task_locks_the_record() {
-        let postgres = Postgres::new();
+        let queue = Queue::new();
         let timestamp1 = Utc::now() - Duration::hours(40);
 
         let task1 = insert_job(
             serde_json::json!(Job { number: 12 }),
             timestamp1,
-            &postgres.connection,
+            &queue.connection,
         );
 
         let task1_id = task1.id;
@@ -645,14 +633,14 @@ mod postgres_tests {
         let task2 = insert_job(
             serde_json::json!(Job { number: 11 }),
             timestamp2,
-            &postgres.connection,
+            &queue.connection,
         );
 
         let thread = std::thread::spawn(move || {
-            let postgres = Postgres::new();
+            let queue = Queue::new();
 
-            postgres.connection.transaction::<(), Error, _>(|| {
-                let found_task = postgres.fetch_task(&None).unwrap();
+            queue.connection.transaction::<(), Error, _>(|| {
+                let found_task = queue.fetch_task(&None).unwrap();
 
                 assert_eq!(found_task.id, task1.id);
 
@@ -664,7 +652,7 @@ mod postgres_tests {
 
         std::thread::sleep(std::time::Duration::from_millis(1000));
 
-        let found_task = postgres.fetch_task(&None).unwrap();
+        let found_task = queue.fetch_task(&None).unwrap();
 
         assert_eq!(found_task.id, task2.id);
 
@@ -672,7 +660,7 @@ mod postgres_tests {
 
         // returns unlocked record
 
-        let found_task = postgres.fetch_task(&None).unwrap();
+        let found_task = queue.fetch_task(&None).unwrap();
 
         assert_eq!(found_task.id, task1_id);
     }
@@ -684,7 +672,7 @@ mod postgres_tests {
 
     #[typetag::serde]
     impl Runnable for Job {
-        fn run(&self) -> Result<(), ExecutorError> {
+        fn run(&self, _connection: &PgConnection) -> Result<(), ExecutorError> {
             println!("the number is {}", self.number);
 
             Ok(())
