@@ -1,8 +1,12 @@
 # Changelog
 
+## 0.3.1 (2021-07-24)
+
+- Add periodic tasks - [#5](https://github.com/ayrat555/fang/pull/5), [#7](https://github.com/ayrat555/fang/pull/7)
+
 ## 0.3.1 (2021-07-11)
 
- - Simplify usage by re-exporting serde traits - [#3](https://github.com/ayrat555/fang/pull/3)
+- Simplify usage by re-exporting serde traits - [#3](https://github.com/ayrat555/fang/pull/3)
 
 ## 0.3.0 (2021-07-04)
 

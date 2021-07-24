@@ -4,9 +4,7 @@
 
 # Fang
 
-Background job processing library for Rust.
-
-Note that the README follows the master branch, to see instructions for the latest published version, check [crates.io](https://crates.io/crates/fang).
+Background job processing library for Rust. It uses Postgres DB as a task queue.
 
 ## Installation
 
