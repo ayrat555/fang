@@ -15,6 +15,7 @@ pub mod worker_pool;
 
 pub use executor::*;
 pub use postgres::*;
+pub use scheduler::*;
 pub use worker_pool::*;
 
 #[doc(hidden)]

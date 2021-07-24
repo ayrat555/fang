@@ -12,16 +12,13 @@ pub struct Scheduler {
 
 impl Drop for Scheduler {
     fn drop(&mut self) {
-        Scheduler::start(
-            self.check_period,
-            self.error_margin_seconds,
-            Postgres::new(),
-        )
+        Scheduler::start(self.check_period, self.error_margin_seconds)
     }
 }
 
 impl Scheduler {
-    pub fn start(check_period: u64, error_margin_seconds: u64, postgres: Postgres) {
+    pub fn start(check_period: u64, error_margin_seconds: u64) {
+        let postgres = Postgres::new();
         let builder = thread::Builder::new().name("scheduler".to_string());
 
         builder
@@ -114,7 +111,7 @@ mod job_scheduler_tests {
         let postgres = Postgres::new();
 
         postgres.push_periodic_task(&ScheduledJob {}, 10).unwrap();
-        Scheduler::start(1, 2, Postgres::new());
+        Scheduler::start(1, 2);
 
         let sleep_duration = Duration::from_secs(15);
         thread::sleep(sleep_duration);
