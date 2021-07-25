@@ -1,12 +1,12 @@
-use crate::postgres::Postgres;
-use crate::postgres::Task;
-use std::panic;
-use std::panic::RefUnwindSafe;
+use crate::queue::Queue;
+use crate::queue::Task;
+use diesel::pg::PgConnection;
+use diesel::r2d2::{ConnectionManager, PooledConnection};
 use std::thread;
 use std::time::Duration;
 
 pub struct Executor {
-    pub storage: Postgres,
+    pub pooled_connection: PooledConnection<ConnectionManager<PgConnection>>,
     pub task_type: Option<String>,
     pub sleep_params: SleepParams,
     pub retention_mode: RetentionMode,
@@ -58,11 +58,8 @@ pub struct Error {
 }
 
 #[typetag::serde(tag = "type")]
-pub trait Runnable
-where
-    Self: RefUnwindSafe,
-{
-    fn run(&self) -> Result<(), Error>;
+pub trait Runnable {
+    fn run(&self, connection: &PgConnection) -> Result<(), Error>;
 
     fn task_type(&self) -> String {
         "common".to_string()
@@ -70,9 +67,9 @@ where
 }
 
 impl Executor {
-    pub fn new(storage: Postgres) -> Self {
+    pub fn new(pooled_connection: PooledConnection<ConnectionManager<PgConnection>>) -> Self {
         Self {
-            storage,
+            pooled_connection,
             sleep_params: SleepParams::default(),
             retention_mode: RetentionMode::RemoveFinished,
             task_type: None,
@@ -99,7 +96,7 @@ impl Executor {
 
     pub fn run_tasks(&mut self) {
         loop {
-            match self.storage.fetch_and_touch(&self.task_type.clone()) {
+            match Queue::fetch_and_touch_query(&self.pooled_connection, &self.task_type.clone()) {
                 Ok(Some(task)) => {
                     self.maybe_reset_sleep_period();
                     self.run(task);
@@ -129,19 +126,11 @@ impl Executor {
 
     fn execute_task(&self, task: Task) -> Result<Task, (Task, String)> {
         let actual_task: Box<dyn Runnable> = serde_json::from_value(task.metadata.clone()).unwrap();
-        let task_result = panic::catch_unwind(|| actual_task.run());
+        let task_result = actual_task.run(&self.pooled_connection);
 
         match task_result {
-            Ok(result) => match result {
-                Ok(()) => Ok(task),
-                Err(error) => Err((task, error.description)),
-            },
-
-            Err(error) => {
-                let message = format!("panicked during task execution {:?}", error);
-
-                Err((task, message))
-            }
+            Ok(()) => Ok(task),
+            Err(error) => Err((task, error.description)),
         }
     }
 
@@ -149,22 +138,26 @@ impl Executor {
         match self.retention_mode {
             RetentionMode::KeepAll => {
                 match result {
-                    Ok(task) => self.storage.finish_task(&task).unwrap(),
-                    Err((task, error)) => self.storage.fail_task(&task, error).unwrap(),
+                    Ok(task) => Queue::finish_task_query(&self.pooled_connection, &task).unwrap(),
+                    Err((task, error)) => {
+                        Queue::fail_task_query(&self.pooled_connection, &task, error).unwrap()
+                    }
                 };
             }
             RetentionMode::RemoveAll => {
                 match result {
-                    Ok(task) => self.storage.remove_task(task.id).unwrap(),
-                    Err((task, _error)) => self.storage.remove_task(task.id).unwrap(),
+                    Ok(task) => Queue::remove_task_query(&self.pooled_connection, task.id).unwrap(),
+                    Err((task, _error)) => {
+                        Queue::remove_task_query(&self.pooled_connection, task.id).unwrap()
+                    }
                 };
             }
             RetentionMode::RemoveFinished => match result {
                 Ok(task) => {
-                    self.storage.remove_task(task.id).unwrap();
+                    Queue::remove_task_query(&self.pooled_connection, task.id).unwrap();
                 }
                 Err((task, error)) => {
-                    self.storage.fail_task(&task, error).unwrap();
+                    Queue::fail_task_query(&self.pooled_connection, &task, error).unwrap();
                 }
             },
         }
@@ -177,12 +170,14 @@ mod executor_tests {
     use super::Executor;
     use super::RetentionMode;
     use super::Runnable;
-    use crate::postgres::NewTask;
-    use crate::postgres::Postgres;
+    use crate::queue::NewTask;
+    use crate::queue::Queue;
     use crate::schema::FangTaskState;
     use crate::typetag;
     use crate::{Deserialize, Serialize};
     use diesel::connection::Connection;
+    use diesel::pg::PgConnection;
+    use diesel::r2d2::{ConnectionManager, PooledConnection};
 
     #[derive(Serialize, Deserialize)]
     struct ExecutorJobTest {
@@ -191,7 +186,7 @@ mod executor_tests {
 
     #[typetag::serde]
     impl Runnable for ExecutorJobTest {
-        fn run(&self) -> Result<(), Error> {
+        fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
             println!("the number is {}", self.number);
 
             Ok(())
@@ -205,7 +200,7 @@ mod executor_tests {
 
     #[typetag::serde]
     impl Runnable for FailedJob {
-        fn run(&self) -> Result<(), Error> {
+        fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
             let message = format!("the number is {}", self.number);
 
             Err(Error {
@@ -215,25 +210,11 @@ mod executor_tests {
     }
 
     #[derive(Serialize, Deserialize)]
-    struct PanicJob {}
-
-    #[typetag::serde]
-    impl Runnable for PanicJob {
-        fn run(&self) -> Result<(), Error> {
-            if true {
-                panic!("panic!");
-            }
-
-            Ok(())
-        }
-    }
-
-    #[derive(Serialize, Deserialize)]
     struct JobType1 {}
 
     #[typetag::serde]
     impl Runnable for JobType1 {
-        fn run(&self) -> Result<(), Error> {
+        fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
             Ok(())
         }
 
@@ -247,7 +228,7 @@ mod executor_tests {
 
     #[typetag::serde]
     impl Runnable for JobType2 {
-        fn run(&self) -> Result<(), Error> {
+        fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
             Ok(())
         }
 
@@ -269,20 +250,20 @@ mod executor_tests {
             task_type: "common".to_string(),
         };
 
-        let mut executor = Executor::new(Postgres::new());
+        let mut executor = Executor::new(pooled_connection());
         executor.set_retention_mode(RetentionMode::KeepAll);
 
         executor
-            .storage
-            .connection
+            .pooled_connection
             .test_transaction::<(), Error, _>(|| {
-                let task = executor.storage.insert(&new_task).unwrap();
+                let task = Queue::insert_query(&executor.pooled_connection, &new_task).unwrap();
 
                 assert_eq!(FangTaskState::New, task.state);
 
                 executor.run(task.clone());
 
-                let found_task = executor.storage.find_task_by_id(task.id).unwrap();
+                let found_task =
+                    Queue::find_task_by_id_query(&executor.pooled_connection, task.id).unwrap();
 
                 assert_eq!(FangTaskState::Finished, found_task.state);
 
@@ -306,17 +287,16 @@ mod executor_tests {
             task_type: "type2".to_string(),
         };
 
-        let executor = Executor::new(Postgres::new());
+        let executor = Executor::new(pooled_connection());
 
-        let task1 = executor.storage.insert(&new_task1).unwrap();
-        let task2 = executor.storage.insert(&new_task2).unwrap();
+        let task1 = Queue::insert_query(&executor.pooled_connection, &new_task1).unwrap();
+        let task2 = Queue::insert_query(&executor.pooled_connection, &new_task2).unwrap();
 
         assert_eq!(FangTaskState::New, task1.state);
         assert_eq!(FangTaskState::New, task2.state);
 
         std::thread::spawn(move || {
-            let postgres = Postgres::new();
-            let mut executor = Executor::new(postgres);
+            let mut executor = Executor::new(pooled_connection());
             executor.set_retention_mode(RetentionMode::KeepAll);
             executor.set_task_type("type1".to_string());
 
@@ -325,10 +305,12 @@ mod executor_tests {
 
         std::thread::sleep(std::time::Duration::from_millis(1000));
 
-        let found_task1 = executor.storage.find_task_by_id(task1.id).unwrap();
+        let found_task1 =
+            Queue::find_task_by_id_query(&executor.pooled_connection, task1.id).unwrap();
         assert_eq!(FangTaskState::Finished, found_task1.state);
 
-        let found_task2 = executor.storage.find_task_by_id(task2.id).unwrap();
+        let found_task2 =
+            Queue::find_task_by_id_query(&executor.pooled_connection, task2.id).unwrap();
         assert_eq!(FangTaskState::New, found_task2.state);
     }
 
@@ -341,19 +323,19 @@ mod executor_tests {
             task_type: "common".to_string(),
         };
 
-        let executor = Executor::new(Postgres::new());
+        let executor = Executor::new(pooled_connection());
 
         executor
-            .storage
-            .connection
+            .pooled_connection
             .test_transaction::<(), Error, _>(|| {
-                let task = executor.storage.insert(&new_task).unwrap();
+                let task = Queue::insert_query(&executor.pooled_connection, &new_task).unwrap();
 
                 assert_eq!(FangTaskState::New, task.state);
 
                 executor.run(task.clone());
 
-                let found_task = executor.storage.find_task_by_id(task.id).unwrap();
+                let found_task =
+                    Queue::find_task_by_id_query(&executor.pooled_connection, task.id).unwrap();
 
                 assert_eq!(FangTaskState::Failed, found_task.state);
                 assert_eq!(
@@ -365,36 +347,7 @@ mod executor_tests {
             });
     }
 
-    #[test]
-    fn recovers_from_panics() {
-        let job = PanicJob {};
-
-        let new_task = NewTask {
-            metadata: serialize(&job),
-            task_type: "common".to_string(),
-        };
-
-        let executor = Executor::new(Postgres::new());
-
-        executor
-            .storage
-            .connection
-            .test_transaction::<(), Error, _>(|| {
-                let task = executor.storage.insert(&new_task).unwrap();
-
-                assert_eq!(FangTaskState::New, task.state);
-
-                executor.run(task.clone());
-
-                let found_task = executor.storage.find_task_by_id(task.id).unwrap();
-
-                assert_eq!(FangTaskState::Failed, found_task.state);
-                assert!(found_task
-                    .error_message
-                    .unwrap()
-                    .contains("panicked during task execution Any"));
-
-                Ok(())
-            });
+    fn pooled_connection() -> PooledConnection<ConnectionManager<PgConnection>> {
+        Queue::connection_pool(5).get().unwrap()
     }
 }

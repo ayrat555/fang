@@ -11,7 +11,7 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-diesel = { version = "1.4.6", features = ["postgres", "serde_json", "chrono", "uuidv07"] }
+diesel = { version = "1.4.6", features = ["postgres", "serde_json", "chrono", "uuidv07", "r2d2"] }
 diesel-derive-enum = { version = "1", features = ["postgres"] }
 dotenv = "0.15.0"
 uuid = { version = "0.8", features = ["v4"] }
