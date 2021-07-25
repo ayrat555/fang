@@ -214,14 +214,12 @@ mod job_pool_tests {
 
     #[typetag::serde]
     impl Runnable for MyJob {
-        fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
-            let queue = Queue::new();
-
+        fn run(&self, connection: &PgConnection) -> Result<(), Error> {
             thread::sleep(Duration::from_secs(3));
 
             let new_job = MyJob::new(self.number + 1);
 
-            queue.push_task(&new_job).unwrap();
+            Queue::push_task_query(connection, &new_job).unwrap();
 
             Ok(())
         }
