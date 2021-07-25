@@ -73,16 +73,20 @@ impl Queue {
     }
 
     pub fn push_task(&self, job: &dyn Runnable) -> Result<Task, Error> {
+        Self::push_task_query(&self.connection, job)
+    }
+
+    pub fn push_task_query(connection: &PgConnection, job: &dyn Runnable) -> Result<Task, Error> {
         let json_job = serde_json::to_value(job).unwrap();
 
-        match self.find_task_by_metadata(&json_job) {
+        match Self::find_task_by_metadata_query(connection, &json_job) {
             Some(task) => Ok(task),
             None => {
                 let new_task = NewTask {
                     metadata: json_job.clone(),
                     task_type: job.task_type(),
                 };
-                self.insert(&new_task)
+                Self::insert_query(connection, &new_task)
             }
         }
     }
@@ -92,9 +96,17 @@ impl Queue {
         job: &dyn Runnable,
         period: i32,
     ) -> Result<PeriodicTask, Error> {
+        Self::push_periodic_task_query(&self.connection, job, period)
+    }
+
+    pub fn push_periodic_task_query(
+        connection: &PgConnection,
+        job: &dyn Runnable,
+        period: i32,
+    ) -> Result<PeriodicTask, Error> {
         let json_job = serde_json::to_value(job).unwrap();
 
-        match self.find_periodic_task_by_metadata(&json_job) {
+        match Self::find_periodic_task_by_metadata_query(connection, &json_job) {
             Some(task) => Ok(task),
             None => {
                 let new_task = NewPeriodicTask {
@@ -104,7 +116,7 @@ impl Queue {
 
                 diesel::insert_into(fang_periodic_tasks::table)
                     .values(new_task)
-                    .get_result::<PeriodicTask>(&self.connection)
+                    .get_result::<PeriodicTask>(connection)
             }
         }
     }
@@ -114,27 +126,42 @@ impl Queue {
     }
 
     pub fn insert(&self, params: &NewTask) -> Result<Task, Error> {
+        Self::insert_query(&self.connection, params)
+    }
+
+    pub fn insert_query(connection: &PgConnection, params: &NewTask) -> Result<Task, Error> {
         diesel::insert_into(fang_tasks::table)
             .values(params)
-            .get_result::<Task>(&self.connection)
+            .get_result::<Task>(connection)
     }
 
     pub fn fetch_task(&self, task_type: &Option<String>) -> Option<Task> {
+        Self::fetch_task_query(&self.connection, task_type)
+    }
+
+    pub fn fetch_task_query(connection: &PgConnection, task_type: &Option<String>) -> Option<Task> {
         match task_type {
-            None => self.fetch_any_task(),
-            Some(task_type_str) => self.fetch_task_of_type(task_type_str),
+            None => Self::fetch_any_task_query(connection),
+            Some(task_type_str) => Self::fetch_task_of_type_query(connection, task_type_str),
         }
     }
 
     pub fn fetch_and_touch(&self, task_type: &Option<String>) -> Result<Option<Task>, Error> {
-        self.connection.transaction::<Option<Task>, Error, _>(|| {
-            let found_task = self.fetch_task(task_type);
+        Self::fetch_and_touch_query(&self.connection, task_type)
+    }
+
+    pub fn fetch_and_touch_query(
+        connection: &PgConnection,
+        task_type: &Option<String>,
+    ) -> Result<Option<Task>, Error> {
+        connection.transaction::<Option<Task>, Error, _>(|| {
+            let found_task = Self::fetch_task_query(connection, task_type);
 
             if found_task.is_none() {
                 return Ok(None);
             }
 
-            match self.start_processing_task(&found_task.unwrap()) {
+            match Self::start_processing_task_query(connection, &found_task.unwrap()) {
                 Ok(updated_task) => Ok(Some(updated_task)),
                 Err(err) => Err(err),
             }
@@ -142,20 +169,38 @@ impl Queue {
     }
 
     pub fn find_task_by_id(&self, id: Uuid) -> Option<Task> {
+        Self::find_task_by_id_query(&self.connection, id)
+    }
+
+    pub fn find_task_by_id_query(connection: &PgConnection, id: Uuid) -> Option<Task> {
         fang_tasks::table
             .filter(fang_tasks::id.eq(id))
-            .first::<Task>(&self.connection)
+            .first::<Task>(connection)
             .ok()
     }
 
     pub fn find_periodic_task_by_id(&self, id: Uuid) -> Option<PeriodicTask> {
+        Self::find_periodic_task_by_id_query(&self.connection, id)
+    }
+
+    pub fn find_periodic_task_by_id_query(
+        connection: &PgConnection,
+        id: Uuid,
+    ) -> Option<PeriodicTask> {
         fang_periodic_tasks::table
             .filter(fang_periodic_tasks::id.eq(id))
-            .first::<PeriodicTask>(&self.connection)
+            .first::<PeriodicTask>(connection)
             .ok()
     }
 
     pub fn fetch_periodic_tasks(&self, error_margin_seconds: i64) -> Option<Vec<PeriodicTask>> {
+        Self::fetch_periodic_tasks_query(&self.connection, error_margin_seconds)
+    }
+
+    pub fn fetch_periodic_tasks_query(
+        connection: &PgConnection,
+        error_margin_seconds: i64,
+    ) -> Option<Vec<PeriodicTask>> {
         let current_time = Self::current_time();
 
         let low_limit = current_time - Duration::seconds(error_margin_seconds);
@@ -168,7 +213,7 @@ impl Queue {
                     .and(fang_periodic_tasks::scheduled_at.lt(high_limit)),
             )
             .or_filter(fang_periodic_tasks::scheduled_at.is_null())
-            .load::<PeriodicTask>(&self.connection)
+            .load::<PeriodicTask>(connection)
             .ok()
     }
 
@@ -185,51 +230,89 @@ impl Queue {
     }
 
     pub fn remove_all_tasks(&self) -> Result<usize, Error> {
-        diesel::delete(fang_tasks::table).execute(&self.connection)
+        Self::remove_all_tasks_query(&self.connection)
+    }
+
+    pub fn remove_all_tasks_query(connection: &PgConnection) -> Result<usize, Error> {
+        diesel::delete(fang_tasks::table).execute(connection)
     }
 
     pub fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, Error> {
+        Self::remove_tasks_of_type_query(&self.connection, task_type)
+    }
+
+    pub fn remove_tasks_of_type_query(
+        connection: &PgConnection,
+        task_type: &str,
+    ) -> Result<usize, Error> {
         let query = fang_tasks::table.filter(fang_tasks::task_type.eq(task_type));
 
-        diesel::delete(query).execute(&self.connection)
+        diesel::delete(query).execute(connection)
     }
 
     pub fn remove_all_periodic_tasks(&self) -> Result<usize, Error> {
-        diesel::delete(fang_periodic_tasks::table).execute(&self.connection)
+        Self::remove_all_periodic_tasks_query(&self.connection)
+    }
+
+    pub fn remove_all_periodic_tasks_query(connection: &PgConnection) -> Result<usize, Error> {
+        diesel::delete(fang_periodic_tasks::table).execute(connection)
     }
 
     pub fn remove_task(&self, id: Uuid) -> Result<usize, Error> {
+        Self::remove_task_query(&self.connection, id)
+    }
+
+    pub fn remove_task_query(connection: &PgConnection, id: Uuid) -> Result<usize, Error> {
         let query = fang_tasks::table.filter(fang_tasks::id.eq(id));
 
-        diesel::delete(query).execute(&self.connection)
+        diesel::delete(query).execute(connection)
     }
 
     pub fn finish_task(&self, task: &Task) -> Result<Task, Error> {
+        Self::finish_task_query(&self.connection, task)
+    }
+
+    pub fn finish_task_query(connection: &PgConnection, task: &Task) -> Result<Task, Error> {
         diesel::update(task)
             .set((
                 fang_tasks::state.eq(FangTaskState::Finished),
                 fang_tasks::updated_at.eq(Self::current_time()),
             ))
-            .get_result::<Task>(&self.connection)
+            .get_result::<Task>(connection)
     }
 
     pub fn start_processing_task(&self, task: &Task) -> Result<Task, Error> {
+        Self::start_processing_task_query(&self.connection, task)
+    }
+
+    pub fn start_processing_task_query(
+        connection: &PgConnection,
+        task: &Task,
+    ) -> Result<Task, Error> {
         diesel::update(task)
             .set((
                 fang_tasks::state.eq(FangTaskState::InProgress),
                 fang_tasks::updated_at.eq(Self::current_time()),
             ))
-            .get_result::<Task>(&self.connection)
+            .get_result::<Task>(connection)
     }
 
     pub fn fail_task(&self, task: &Task, error: String) -> Result<Task, Error> {
+        Self::fail_task_query(&self.connection, task, error)
+    }
+
+    pub fn fail_task_query(
+        connection: &PgConnection,
+        task: &Task,
+        error: String,
+    ) -> Result<Task, Error> {
         diesel::update(task)
             .set((
                 fang_tasks::state.eq(FangTaskState::Failed),
                 fang_tasks::error_message.eq(error),
                 fang_tasks::updated_at.eq(Self::current_time()),
             ))
-            .get_result::<Task>(&self.connection)
+            .get_result::<Task>(connection)
     }
 
     fn current_time() -> DateTime<Utc> {
@@ -247,18 +330,18 @@ impl Queue {
         PgConnection::establish(&url).unwrap_or_else(|_| panic!("Error connecting to {}", url))
     }
 
-    fn fetch_any_task(&self) -> Option<Task> {
+    fn fetch_any_task_query(connection: &PgConnection) -> Option<Task> {
         fang_tasks::table
             .order(fang_tasks::created_at.asc())
             .limit(1)
             .filter(fang_tasks::state.eq(FangTaskState::New))
             .for_update()
             .skip_locked()
-            .get_result::<Task>(&self.connection)
+            .get_result::<Task>(connection)
             .ok()
     }
 
-    fn fetch_task_of_type(&self, task_type: &str) -> Option<Task> {
+    fn fetch_task_of_type_query(connection: &PgConnection, task_type: &str) -> Option<Task> {
         fang_tasks::table
             .order(fang_tasks::created_at.asc())
             .limit(1)
@@ -266,18 +349,24 @@ impl Queue {
             .filter(fang_tasks::task_type.eq(task_type))
             .for_update()
             .skip_locked()
-            .get_result::<Task>(&self.connection)
+            .get_result::<Task>(connection)
             .ok()
     }
 
-    fn find_periodic_task_by_metadata(&self, metadata: &serde_json::Value) -> Option<PeriodicTask> {
+    fn find_periodic_task_by_metadata_query(
+        connection: &PgConnection,
+        metadata: &serde_json::Value,
+    ) -> Option<PeriodicTask> {
         fang_periodic_tasks::table
             .filter(fang_periodic_tasks::metadata.eq(metadata))
-            .first::<PeriodicTask>(&self.connection)
+            .first::<PeriodicTask>(connection)
             .ok()
     }
 
-    fn find_task_by_metadata(&self, metadata: &serde_json::Value) -> Option<Task> {
+    fn find_task_by_metadata_query(
+        connection: &PgConnection,
+        metadata: &serde_json::Value,
+    ) -> Option<Task> {
         fang_tasks::table
             .filter(fang_tasks::metadata.eq(metadata))
             .filter(
@@ -285,7 +374,7 @@ impl Queue {
                     .eq(FangTaskState::New)
                     .or(fang_tasks::state.eq(FangTaskState::InProgress)),
             )
-            .first::<Task>(&self.connection)
+            .first::<Task>(connection)
             .ok()
     }
 }
