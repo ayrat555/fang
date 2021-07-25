@@ -7,6 +7,7 @@ use chrono::Duration;
 use chrono::Utc;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use diesel::r2d2;
 use diesel::result::Error;
 use dotenv::dotenv;
 use std::env;
@@ -69,6 +70,10 @@ impl Queue {
     pub fn new_with_url(database_url: String) -> Self {
         let connection = Self::pg_connection(Some(database_url));
 
+        Self { connection }
+    }
+
+    pub fn new_with_connection(connection: PgConnection) -> Self {
         Self { connection }
     }
 
@@ -313,6 +318,19 @@ impl Queue {
                 fang_tasks::updated_at.eq(Self::current_time()),
             ))
             .get_result::<Task>(connection)
+    }
+
+    pub fn connection_pool(pool_size: u32) -> r2d2::Pool<r2d2::ConnectionManager<PgConnection>> {
+        dotenv().ok();
+
+        let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+
+        let manager = r2d2::ConnectionManager::<PgConnection>::new(database_url);
+
+        r2d2::Pool::builder()
+            .max_size(pool_size)
+            .build(manager)
+            .unwrap()
     }
 
     fn current_time() -> DateTime<Utc> {

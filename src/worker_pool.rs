@@ -1,3 +1,5 @@
+use crate::diesel::r2d2;
+use crate::diesel::PgConnection;
 use crate::executor::Executor;
 use crate::executor::RetentionMode;
 use crate::executor::SleepParams;
@@ -5,14 +7,16 @@ use crate::queue::Queue;
 use std::thread;
 
 pub struct WorkerPool {
-    pub number_of_workers: u16,
+    pub number_of_workers: u32,
     pub worker_params: WorkerParams,
+    pub connection_pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
 }
 
 pub struct WorkerThread {
     pub name: String,
     pub worker_params: WorkerParams,
     pub restarts: u64,
+    pub connection_pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
 }
 
 #[derive(Clone)]
@@ -51,19 +55,24 @@ impl WorkerParams {
 }
 
 impl WorkerPool {
-    pub fn new(number_of_workers: u16) -> Self {
+    pub fn new(number_of_workers: u32) -> Self {
         let worker_params = WorkerParams::new();
+        let connection_pool = Queue::connection_pool(number_of_workers);
 
         Self {
             number_of_workers,
             worker_params,
+            connection_pool,
         }
     }
 
-    pub fn new_with_params(number_of_workers: u16, worker_params: WorkerParams) -> Self {
+    pub fn new_with_params(number_of_workers: u32, worker_params: WorkerParams) -> Self {
+        let connection_pool = Queue::connection_pool(number_of_workers);
+
         Self {
             number_of_workers,
             worker_params,
+            connection_pool,
         }
     }
 
@@ -75,21 +84,37 @@ impl WorkerPool {
                 .clone()
                 .unwrap_or_else(|| "".to_string());
             let name = format!("worker_{}{}", worker_type, idx);
-            WorkerThread::spawn_in_pool(self.worker_params.clone(), name, 0)
+            WorkerThread::spawn_in_pool(
+                self.worker_params.clone(),
+                name,
+                0,
+                self.connection_pool.clone(),
+            )
         }
     }
 }
 
 impl WorkerThread {
-    pub fn new(worker_params: WorkerParams, name: String, restarts: u64) -> Self {
+    pub fn new(
+        worker_params: WorkerParams,
+        name: String,
+        restarts: u64,
+        connection_pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
+    ) -> Self {
         Self {
             name,
             worker_params,
             restarts,
+            connection_pool,
         }
     }
 
-    pub fn spawn_in_pool(worker_params: WorkerParams, name: String, restarts: u64) {
+    pub fn spawn_in_pool(
+        worker_params: WorkerParams,
+        name: String,
+        restarts: u64,
+        connection_pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
+    ) {
         let builder = thread::Builder::new().name(name.clone());
 
         info!(
@@ -100,25 +125,35 @@ impl WorkerThread {
         builder
             .spawn(move || {
                 // when _job is dropped, it will be restarted (see Drop trait impl)
-                let _job = WorkerThread::new(worker_params.clone(), name, restarts);
+                let _job = WorkerThread::new(
+                    worker_params.clone(),
+                    name,
+                    restarts,
+                    connection_pool.clone(),
+                );
 
-                let queue = Queue::new();
+                match connection_pool.get() {
+                    Ok(connection) => {
+                        let mut executor = Executor::new(connection);
 
-                let mut executor = Executor::new(queue);
+                        if let Some(task_type_str) = worker_params.task_type {
+                            executor.set_task_type(task_type_str);
+                        }
 
-                if let Some(task_type_str) = worker_params.task_type {
-                    executor.set_task_type(task_type_str);
+                        if let Some(retention_mode) = worker_params.retention_mode {
+                            executor.set_retention_mode(retention_mode);
+                        }
+
+                        if let Some(sleep_params) = worker_params.sleep_params {
+                            executor.set_sleep_params(sleep_params);
+                        }
+
+                        executor.run_tasks();
+                    }
+                    Err(error) => {
+                        error!("Failed to get postgres connection: {:?}", error);
+                    }
                 }
-
-                if let Some(retention_mode) = worker_params.retention_mode {
-                    executor.set_retention_mode(retention_mode);
-                }
-
-                if let Some(sleep_params) = worker_params.sleep_params {
-                    executor.set_sleep_params(sleep_params);
-                }
-
-                executor.run_tasks();
             })
             .unwrap();
     }
@@ -130,6 +165,7 @@ impl Drop for WorkerThread {
             self.worker_params.clone(),
             self.name.clone(),
             self.restarts + 1,
+            self.connection_pool.clone(),
         )
     }
 }
