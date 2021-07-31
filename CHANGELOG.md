@@ -2,7 +2,7 @@
 
 ## 0.4.0 (2021-07-31)
 
-### [#6](https://github.com/ayrat555/fang/pull/8):
+### [#8](https://github.com/ayrat555/fang/pull/8):
 
 - Maintain ConnectionPool for Worker Threads
 - Rename Postgres into Queue
