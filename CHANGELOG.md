@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 (2021-07-31)
+
+### [#6](https://github.com/ayrat555/fang/pull/8):
+
+- Maintain ConnectionPool for Worker Threads
+- Rename Postgres into Queue
+- Pass PgConnection into run function
+- Add function to remove all tasks of the specified type
+
 ## 0.3.1 (2021-07-24)
 
 - Add periodic tasks - [#5](https://github.com/ayrat555/fang/pull/5), [#7](https://github.com/ayrat555/fang/pull/7)
