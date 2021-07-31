@@ -77,6 +77,8 @@ impl WorkerPool {
     }
 
     pub fn start(&self) {
+        env_logger::init();
+
         for idx in 1..self.number_of_workers + 1 {
             let worker_type = self
                 .worker_params
@@ -181,9 +183,9 @@ mod job_pool_tests {
     use crate::queue::Task;
     use crate::schema::fang_tasks;
     use crate::typetag;
-    use crate::{Deserialize, Serialize};
     use diesel::pg::PgConnection;
     use diesel::prelude::*;
+    use serde::{Deserialize, Serialize};
     use std::thread;
     use std::time::Duration;
 
@@ -233,8 +235,6 @@ mod job_pool_tests {
     #[test]
     #[ignore]
     fn tasks_are_split_between_two_threads() {
-        env_logger::init();
-
         let queue = Queue::new();
 
         let mut worker_params = WorkerParams::new();

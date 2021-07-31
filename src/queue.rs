@@ -409,12 +409,12 @@ mod queue_tests {
     use crate::schema::fang_tasks;
     use crate::schema::FangTaskState;
     use crate::typetag;
-    use crate::{Deserialize, Serialize};
     use chrono::prelude::*;
     use chrono::{DateTime, Duration, Utc};
     use diesel::connection::Connection;
     use diesel::prelude::*;
     use diesel::result::Error;
+    use serde::{Deserialize, Serialize};
 
     #[test]
     fn insert_inserts_task() {
