@@ -6,8 +6,6 @@
 
 Background job processing library for Rust. It uses Postgres DB as a task queue.
 
-Note that the README follows the master branch, to see instructions for the latest published version, check [crates.io](https://crates.io/crates/fang).
-
 
 ## Installation
 
@@ -27,7 +25,6 @@ serde = { version = "1.0", features = ["derive"] }
 ### Defining a job
 
 Every job should implement `fang::Runnable` trait which is used by `fang` to execute it.
-
 
 ```rust
 use fang::Error;
@@ -53,9 +50,7 @@ impl Runnable for Job {
 
 As you can see from the example above, the trait implementation has `#[typetag::serde]` attribute which is used to deserialize the job.
 
-
-The second parameter  of the `run` function is diesel's PgConnection, You can re-use it to manipulate the job queue, for example, to add a new job during the current job's execution. Or you can just re-use it in your own queries if you're using diesel.
-
+The second parameter  of the `run` function is diesel's PgConnection, You can re-use it to manipulate the job queue, for example, to add a new job during the current job's execution. Or you can just re-use it in your own queries if you're using diesel. If you don't need it, just ignore it.
 
 ### Enqueuing a job
 
@@ -87,7 +82,6 @@ Or you can use `PgConnection` struct:
 ```rust
 Queue::push_task_query(pg_connection, &new_job).unwrap();
 ```
-
 
 ### Starting workers
 
@@ -225,7 +219,6 @@ In the example above, `push_periodic_task` is used to save the specified task to
 `Scheduler::start(10, 5)` starts scheduler. It accepts two parameters:
 - Db check period in seconds
 - Acceptable error limit in seconds - |current_time - scheduled_time| < error
-
 
 ## Contributing
 
