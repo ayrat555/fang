@@ -174,10 +174,10 @@ mod executor_tests {
     use crate::queue::Queue;
     use crate::schema::FangTaskState;
     use crate::typetag;
-    use crate::{Deserialize, Serialize};
     use diesel::connection::Connection;
     use diesel::pg::PgConnection;
     use diesel::r2d2::{ConnectionManager, PooledConnection};
+    use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]
     struct ExecutorJobTest {
