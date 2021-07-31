@@ -235,8 +235,6 @@ mod job_pool_tests {
     #[test]
     #[ignore]
     fn tasks_are_split_between_two_threads() {
-        env_logger::init();
-
         let queue = Queue::new();
 
         let mut worker_params = WorkerParams::new();
