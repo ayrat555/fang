@@ -6,8 +6,6 @@
 
 Background job processing library for Rust. It uses Postgres DB as a task queue.
 
-Note that the README follows the master branch, to see instructions for the latest published version, check [crates.io](https://crates.io/crates/fang).
-
 
 ## Installation
 
@@ -16,7 +14,8 @@ Note that the README follows the master branch, to see instructions for the late
 
 ```toml
 [dependencies]
-fang = "0.3.2"
+fang = "0.4.0"
+serde = { version = "1.0", features = ["derive"] }
 ```
 
 2. Create `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/migrations/2021-06-05-112912_create_fang_tasks/up.sql).
@@ -27,13 +26,12 @@ fang = "0.3.2"
 
 Every job should implement `fang::Runnable` trait which is used by `fang` to execute it.
 
-
 ```rust
 use fang::Error;
 use fang::Runnable;
-use fang::{Deserialize, Serialize};
 use fang::typetag;
-
+use fang::PgConnection;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 struct Job {
@@ -42,7 +40,7 @@ struct Job {
 
 #[typetag::serde]
 impl Runnable for Job {
-    fn run(&self) -> Result<(), Error> {
+    fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
         println!("the number is {}", self.number);
 
         Ok(())
@@ -52,29 +50,37 @@ impl Runnable for Job {
 
 As you can see from the example above, the trait implementation has `#[typetag::serde]` attribute which is used to deserialize the job.
 
+The second parameter  of the `run` function is diesel's PgConnection, You can re-use it to manipulate the job queue, for example, to add a new job during the current job's execution. Or you can just re-use it in your own queries if you're using diesel. If you don't need it, just ignore it.
+
 ### Enqueuing a job
 
-To enqueue a job use `Postgres::enqueue_task`
+To enqueue a job use `Queue::enqueue_task`
 
 
 ```rust
-use fang::Postgres;
+use fang::Queue;
 
 ...
 
-Postgres::enqueue_task(&Job { number: 10 }).unwrap();
+Queue::enqueue_task(&Job { number: 10 }).unwrap();
 
 ```
 
 The example above creates a new postgres connection on every call. If you want to reuse the same postgres connection to enqueue several jobs use Postgres struct instance:
 
 ```rust
-let postgres = Postgres::new();
+let queue = Queue::new();
 
 for id in &unsynced_feed_ids {
-    postgres.push_task(&SyncFeedJob { feed_id: *id }).unwrap();
+    queue.push_task(&SyncFeedJob { feed_id: *id }).unwrap();
 }
 
+```
+
+Or you can use `PgConnection` struct:
+
+```rust
+Queue::push_task_query(pg_connection, &new_job).unwrap();
 ```
 
 ### Starting workers
@@ -89,6 +95,9 @@ use fang::WorkerPool;
 
 WorkerPool::new(10).start();
 ```
+
+
+Checkout out a [simple example](https://github.com/ayrat555/fang/tree/master/fang_examples/simple_worker).
 
 ### Configuration
 
@@ -190,15 +199,15 @@ Usage example:
 
 ```rust
 use fang::Scheduler;
-use fang::Postgres;
+use fang::Queue;
 
-let postgres = Postgres::new();
+let queue = Queue::new();
 
-postgres
+queue
      .push_periodic_task(&SyncJob::default(), 120)
      .unwrap();
 
-postgres
+queue
      .push_periodic_task(&DeliverJob::default(), 60)
      .unwrap();
 
@@ -210,7 +219,6 @@ In the example above, `push_periodic_task` is used to save the specified task to
 `Scheduler::start(10, 5)` starts scheduler. It accepts two parameters:
 - Db check period in seconds
 - Acceptable error limit in seconds - |current_time - scheduled_time| < error
-
 
 ## Contributing
 
