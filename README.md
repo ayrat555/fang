@@ -97,7 +97,10 @@ WorkerPool::new(10).start();
 ```
 
 
-Checkout out a [simple example](https://github.com/ayrat555/fang/tree/master/fang_examples/simple_worker).
+Check out:
+
+- [simple example](https://github.com/ayrat555/fang/tree/master/fang_examples/simple_worker) - simple worker example
+- [El Monitorro](https://github.com/ayrat555/el_monitorro) - telegram feed reader. It uses Fang to synchronize feeds and deliver updates to users.
 
 ### Configuration
 
