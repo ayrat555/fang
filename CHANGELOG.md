@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 (2021-08-22)
+
+- Do not use env-logger - [#11](https://github.com/ayrat555/fang/pull/11)
+
 ## 0.4.0 (2021-07-31)
 
 ### [#8](https://github.com/ayrat555/fang/pull/8):

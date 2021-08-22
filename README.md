@@ -14,7 +14,7 @@ Background job processing library for Rust. It uses Postgres DB as a task queue.
 
 ```toml
 [dependencies]
-fang = "0.4.0"
+fang = "0.4.1"
 serde = { version = "1.0", features = ["derive"] }
 ```
 
