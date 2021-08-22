@@ -8,6 +8,8 @@ use simple_worker::MyJob;
 fn main() {
     dotenv().ok();
 
+    env_logger::init();
+
     let mut worker_params = WorkerParams::new();
     worker_params.set_retention_mode(RetentionMode::KeepAll);
 

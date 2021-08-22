@@ -4,6 +4,8 @@ use crate::executor::Executor;
 use crate::executor::RetentionMode;
 use crate::executor::SleepParams;
 use crate::queue::Queue;
+use log::error;
+use log::info;
 use std::thread;
 
 pub struct WorkerPool {
@@ -77,8 +79,6 @@ impl WorkerPool {
     }
 
     pub fn start(&self) {
-        env_logger::init();
-
         for idx in 1..self.number_of_workers + 1 {
             let worker_type = self
                 .worker_params
