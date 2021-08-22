@@ -2,6 +2,7 @@ use crate::queue::Queue;
 use crate::queue::Task;
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
+use log::error;
 use std::thread;
 use std::time::Duration;
 
