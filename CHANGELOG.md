@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2 (2021-11-30)
+
+- Bump deps - [#13](https://github.com/ayrat555/fang/pull/13)
+
 ## 0.4.1 (2021-08-22)
 
 - Do not use env-logger - [#11](https://github.com/ayrat555/fang/pull/11)
