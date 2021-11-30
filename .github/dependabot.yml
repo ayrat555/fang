@@ -4,8 +4,8 @@ updates:
     directory: "/"
     open-pull-requests-limit: 30
     schedule:
-      interval: "weekly"
-      time: "03:37" # UTC
+      interval: "daily"
+      time: "07:10" # UTC
     commit-message:
       prefix: "chore(cargo):"
 
