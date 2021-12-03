@@ -7,23 +7,24 @@ use crate::executor::SleepParams;
 use crate::queue::Queue;
 use log::error;
 use log::info;
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::thread;
 
+#[derive(Clone)]
 pub struct WorkerPool {
     pub number_of_workers: u32,
     pub worker_params: WorkerParams,
     pub connection_pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
     shared_state: SharedState,
-    thread_join_handles: Vec<thread::JoinHandle<()>>,
+    thread_join_handles: Arc<RwLock<HashMap<String, thread::JoinHandle<()>>>>,
 }
 
+#[derive(Clone)]
 pub struct WorkerThread {
     pub name: String,
-    pub worker_params: WorkerParams,
     pub restarts: u64,
-    pub shared_state: SharedState,
-    pub connection_pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
+    pub worker_pool: WorkerPool,
     graceful_shutdown: bool,
 }
 
@@ -78,7 +79,9 @@ impl WorkerPool {
             worker_params,
             connection_pool,
             shared_state: Arc::new(RwLock::new(None)),
-            thread_join_handles: Vec::new(),
+            thread_join_handles: Arc::new(RwLock::new(HashMap::with_capacity(
+                number_of_workers as usize,
+            ))),
         }
     }
 
@@ -90,7 +93,9 @@ impl WorkerPool {
             worker_params,
             connection_pool,
             shared_state: Arc::new(RwLock::new(None)),
-            thread_join_handles: Vec::new(),
+            thread_join_handles: Arc::new(RwLock::new(HashMap::with_capacity(
+                number_of_workers as usize,
+            ))),
         }
     }
 
@@ -102,14 +107,7 @@ impl WorkerPool {
                 .clone()
                 .unwrap_or_else(|| "".to_string());
             let name = format!("worker_{}{}", worker_type, idx);
-            let join_handle = WorkerThread::spawn_in_pool(
-                self.worker_params.clone(),
-                name,
-                0,
-                self.shared_state.clone(),
-                self.connection_pool.clone(),
-            )?;
-            self.thread_join_handles.push(join_handle);
+            WorkerThread::spawn_in_pool(name.clone(), 0, self.clone())?;
         }
         Ok(())
     }
@@ -117,15 +115,15 @@ impl WorkerPool {
     /// Attempt graceful shutdown of each job thread, blocks until all threads exit. Threads exit
     /// when their current job finishes.
     pub fn shutdown(&mut self) -> Result<(), FangError> {
-        let mut shared_state = self
-            .shared_state
-            .write()
-            .map_err(|_| FangError::SharedStatePoisoned)?;
+        let mut shared_state = self.shared_state.write()?;
         *shared_state = Some(WorkerState::Shutdown);
 
-        for thread in self.thread_join_handles.drain(..) {
+        for (worker_name, thread) in self.thread_join_handles.write()?.drain() {
             if let Err(err) = thread.join() {
-                error!("Failed to exit executor thread cleanly: {:?}", err);
+                error!(
+                    "Failed to exit executor thread '{}' cleanly: {:?}",
+                    worker_name, err
+                );
             }
         }
         Ok(())
@@ -133,66 +131,68 @@ impl WorkerPool {
 }
 
 impl WorkerThread {
-    pub fn new(
-        worker_params: WorkerParams,
-        name: String,
-        restarts: u64,
-        shared_state: SharedState,
-        connection_pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
-    ) -> Self {
+    pub fn new(name: String, restarts: u64, worker_pool: WorkerPool) -> Self {
         Self {
             name,
-            worker_params,
             restarts,
-            shared_state,
-            connection_pool,
+            worker_pool,
             graceful_shutdown: false,
         }
     }
 
     pub fn spawn_in_pool(
-        worker_params: WorkerParams,
         name: String,
         restarts: u64,
-        shared_state: SharedState,
-        connection_pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
-    ) -> Result<thread::JoinHandle<()>, FangError> {
-        let builder = thread::Builder::new().name(name.clone());
-
+        worker_pool: WorkerPool,
+    ) -> Result<WorkerThread, FangError> {
         info!(
             "starting a worker thread {}, number of restarts {}",
             name, restarts
         );
 
+        let job = WorkerThread::new(name.clone(), restarts, worker_pool.clone());
+        let join_handle = Self::spawn_thread(name.clone(), job.clone())?;
+        job.worker_pool
+            .thread_join_handles
+            .write()?
+            .insert(name, join_handle);
+        Ok(job)
+    }
+
+    fn spawn_thread(
+        name: String,
+        mut job: WorkerThread,
+    ) -> Result<thread::JoinHandle<()>, FangError> {
+        let builder = thread::Builder::new().name(name.clone());
         builder
             .spawn(move || {
-                let mut _job = WorkerThread::new(
-                    worker_params.clone(),
-                    name,
-                    restarts,
-                    shared_state.clone(),
-                    connection_pool.clone(),
-                );
-
-                match connection_pool.get() {
+                match job.worker_pool.connection_pool.get() {
                     Ok(connection) => {
                         let mut executor = Executor::new(connection);
-                        executor.set_shared_state(shared_state);
+                        executor.set_shared_state(job.worker_pool.shared_state.clone());
 
-                        if let Some(task_type_str) = worker_params.task_type {
-                            executor.set_task_type(task_type_str);
+                        if let Some(ref task_type_str) = job.worker_pool.worker_params.task_type {
+                            executor.set_task_type(task_type_str.to_owned());
                         }
 
-                        if let Some(retention_mode) = worker_params.retention_mode {
-                            executor.set_retention_mode(retention_mode);
+                        if let Some(ref retention_mode) =
+                            job.worker_pool.worker_params.retention_mode
+                        {
+                            executor.set_retention_mode(retention_mode.to_owned());
                         }
 
-                        if let Some(sleep_params) = worker_params.sleep_params {
-                            executor.set_sleep_params(sleep_params);
+                        if let Some(ref sleep_params) = job.worker_pool.worker_params.sleep_params {
+                            executor.set_sleep_params(sleep_params.clone());
                         }
 
-                        if let Ok(_) = executor.run_tasks() {
-                            _job.graceful_shutdown = true;
+                        // Run executor
+                        match executor.run_tasks() {
+                            Ok(_) => {
+                                job.graceful_shutdown = true;
+                            }
+                            Err(error) => {
+                                error!("Error executing tasks in worker '{}': {:?}", name, error);
+                            }
                         }
                     }
                     Err(error) => {
@@ -210,14 +210,10 @@ impl Drop for WorkerThread {
             return;
         }
 
-        // TODO - can't join these on shutdown; replace with monitoring crashed threads in main
-        // thread and restarting there? Maybe use Weakref pattern or something
         WorkerThread::spawn_in_pool(
-            self.worker_params.clone(),
             self.name.clone(),
             self.restarts + 1,
-            self.shared_state.clone(),
-            self.connection_pool.clone(),
+            self.worker_pool.clone(),
         )
         .unwrap();
     }

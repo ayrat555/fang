@@ -105,9 +105,7 @@ impl Executor {
     pub fn run_tasks(&mut self) -> Result<(), FangError> {
         loop {
             if let Some(ref shared_state) = self.shared_state {
-                let shared_state = shared_state
-                    .read()
-                    .map_err(|_| FangError::SharedStatePoisoned)?;
+                let shared_state = shared_state.read()?;
                 match *shared_state {
                     Some(WorkerState::Shutdown) => return Ok(()),
                     None => {}
