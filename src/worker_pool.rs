@@ -27,9 +27,10 @@ pub struct WorkerThread {
     graceful_shutdown: bool,
 }
 
-pub type SharedState = Arc<RwLock<Option<WorkerState>>>;
+pub type SharedState = Arc<RwLock<WorkerState>>;
 
 pub enum WorkerState {
+    Running,
     Shutdown,
 }
 
@@ -77,7 +78,7 @@ impl WorkerPool {
             number_of_workers,
             worker_params,
             connection_pool,
-            shared_state: Arc::new(RwLock::new(None)),
+            shared_state: Arc::new(RwLock::new(WorkerState::Running)),
             thread_join_handles: Arc::new(RwLock::new(HashMap::with_capacity(
                 number_of_workers as usize,
             ))),
@@ -91,7 +92,7 @@ impl WorkerPool {
             number_of_workers,
             worker_params,
             connection_pool,
-            shared_state: Arc::new(RwLock::new(None)),
+            shared_state: Arc::new(RwLock::new(WorkerState::Running)),
             thread_join_handles: Arc::new(RwLock::new(HashMap::with_capacity(
                 number_of_workers as usize,
             ))),
@@ -114,8 +115,7 @@ impl WorkerPool {
     /// Attempt graceful shutdown of each job thread, blocks until all threads exit. Threads exit
     /// when their current job finishes.
     pub fn shutdown(&mut self) -> Result<(), FangError> {
-        let mut shared_state = self.shared_state.write()?;
-        *shared_state = Some(WorkerState::Shutdown);
+        *self.shared_state.write()? = WorkerState::Shutdown;
 
         for (worker_name, thread) in self.thread_join_handles.write()?.drain() {
             if let Err(err) = thread.join() {

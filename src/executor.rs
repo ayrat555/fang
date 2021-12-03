@@ -106,9 +106,8 @@ impl Executor {
         loop {
             if let Some(ref shared_state) = self.shared_state {
                 let shared_state = shared_state.read()?;
-                match *shared_state {
-                    Some(WorkerState::Shutdown) => return Ok(()),
-                    None => {}
+                if let WorkerState::Shutdown = *shared_state {
+                    return Ok(());
                 }
             }
 
