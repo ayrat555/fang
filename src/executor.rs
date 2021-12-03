@@ -1,3 +1,4 @@
+use crate::error::FangError;
 use crate::queue::Queue;
 use crate::queue::Task;
 use crate::worker_pool::{SharedState, WorkerState};
@@ -98,15 +99,17 @@ impl Executor {
 
     pub fn run(&self, task: Task) {
         let result = self.execute_task(task);
-
         self.finalize_task(result)
     }
 
-    pub fn run_tasks(&mut self) {
+    pub fn run_tasks(&mut self) -> Result<(), FangError> {
         loop {
             if let Some(ref shared_state) = self.shared_state {
-                match *shared_state.read().unwrap() {
-                    Some(WorkerState::Shutdown) => return,
+                let shared_state = shared_state
+                    .read()
+                    .map_err(|_| FangError::SharedStatePoisoned)?;
+                match *shared_state {
+                    Some(WorkerState::Shutdown) => return Ok(()),
                     None => {}
                 }
             }
@@ -315,7 +318,7 @@ mod executor_tests {
             executor.set_retention_mode(RetentionMode::KeepAll);
             executor.set_task_type("type1".to_string());
 
-            executor.run_tasks();
+            executor.run_tasks().unwrap();
         });
 
         std::thread::sleep(std::time::Duration::from_millis(1000));

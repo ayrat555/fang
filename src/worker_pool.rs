@@ -1,5 +1,6 @@
 use crate::diesel::r2d2;
 use crate::diesel::PgConnection;
+use crate::error::FangError;
 use crate::executor::Executor;
 use crate::executor::RetentionMode;
 use crate::executor::SleepParams;
@@ -93,7 +94,7 @@ impl WorkerPool {
         }
     }
 
-    pub fn start(&mut self) {
+    pub fn start(&mut self) -> Result<(), FangError> {
         for idx in 1..self.number_of_workers + 1 {
             let worker_type = self
                 .worker_params
@@ -107,18 +108,25 @@ impl WorkerPool {
                 0,
                 self.shared_state.clone(),
                 self.connection_pool.clone(),
-            );
+            )?;
             self.thread_join_handles.push(join_handle);
         }
+        Ok(())
     }
 
-    /// Attempt graceful shutdown of each job thread, waiting for the current job to finish before
-    /// exiting.
-    pub fn shutdown(&mut self) -> Result<(), ()> {
-        *self.shared_state.write().unwrap() = Some(WorkerState::Shutdown); // TODO
+    /// Attempt graceful shutdown of each job thread, blocks until all threads exit. Threads exit
+    /// when their current job finishes.
+    pub fn shutdown(&mut self) -> Result<(), FangError> {
+        let mut shared_state = self
+            .shared_state
+            .write()
+            .map_err(|_| FangError::SharedStatePoisoned)?;
+        *shared_state = Some(WorkerState::Shutdown);
 
         for thread in self.thread_join_handles.drain(..) {
-            thread.join().unwrap(); // TODO - Better error handling
+            if let Err(err) = thread.join() {
+                error!("Failed to exit executor thread cleanly: {:?}", err);
+            }
         }
         Ok(())
     }
@@ -148,7 +156,7 @@ impl WorkerThread {
         restarts: u64,
         shared_state: SharedState,
         connection_pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
-    ) -> thread::JoinHandle<()> {
+    ) -> Result<thread::JoinHandle<()>, FangError> {
         let builder = thread::Builder::new().name(name.clone());
 
         info!(
@@ -183,16 +191,16 @@ impl WorkerThread {
                             executor.set_sleep_params(sleep_params);
                         }
 
-                        executor.run_tasks();
-                        // Assume graceful shutdown if run_tasks returns
-                        _job.graceful_shutdown = true;
+                        if let Ok(_) = executor.run_tasks() {
+                            _job.graceful_shutdown = true;
+                        }
                     }
                     Err(error) => {
                         error!("Failed to get postgres connection: {:?}", error);
                     }
                 }
             })
-            .unwrap()
+            .map_err(FangError::from)
     }
 }
 
@@ -210,7 +218,8 @@ impl Drop for WorkerThread {
             self.restarts + 1,
             self.shared_state.clone(),
             self.connection_pool.clone(),
-        );
+        )
+        .unwrap();
     }
 }
 
@@ -286,7 +295,7 @@ mod job_pool_tests {
         queue.push_task(&MyJob::new(100)).unwrap();
         queue.push_task(&MyJob::new(200)).unwrap();
 
-        job_pool.start();
+        job_pool.start().unwrap();
 
         thread::sleep(Duration::from_secs(100));
 
