@@ -231,6 +231,28 @@ In the example above, `push_periodic_task` is used to save the specified task to
 4. Push to the branch (`git push origin my-new-feature`)
 5. Create new Pull Request
 
+### Running tests locally
+
+```
+cargo install diesel_cli
+
+docker run --rm -d --name postgres -p 5432:5432 \
+  -e POSTGRES_DB=fang \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  postgres:latest
+
+DATABASE_URL=postgres://postgres:postgres@localhost/fang diesel migration run
+
+// Run regular tests
+cargo test --all-features
+
+// Run dirty/long tests, DB must be recreated afterwards
+cargo test --all-features -- --ignored --test-threads=1
+
+docker kill postgres
+```
+
 ## Author
 
 Ayrat Badykov (@ayrat555)
