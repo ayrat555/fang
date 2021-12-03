@@ -1,5 +1,6 @@
 use crate::queue::Queue;
 use crate::queue::Task;
+use crate::worker_pool::{SharedState, WorkerState};
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use log::error;
@@ -11,6 +12,7 @@ pub struct Executor {
     pub task_type: Option<String>,
     pub sleep_params: SleepParams,
     pub retention_mode: RetentionMode,
+    shared_state: Option<SharedState>,
 }
 
 #[derive(Clone)]
@@ -74,7 +76,12 @@ impl Executor {
             sleep_params: SleepParams::default(),
             retention_mode: RetentionMode::RemoveFinished,
             task_type: None,
+            shared_state: None,
         }
+    }
+
+    pub fn set_shared_state(&mut self, shared_state: SharedState) {
+        self.shared_state = Some(shared_state);
     }
 
     pub fn set_task_type(&mut self, task_type: String) {
@@ -97,6 +104,13 @@ impl Executor {
 
     pub fn run_tasks(&mut self) {
         loop {
+            if let Some(ref shared_state) = self.shared_state {
+                match *shared_state.read().unwrap() {
+                    Some(WorkerState::Shutdown) => return,
+                    None => {}
+                }
+            }
+
             match Queue::fetch_and_touch_query(&self.pooled_connection, &self.task_type.clone()) {
                 Ok(Some(task)) => {
                     self.maybe_reset_sleep_period();

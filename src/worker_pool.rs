@@ -6,19 +6,30 @@ use crate::executor::SleepParams;
 use crate::queue::Queue;
 use log::error;
 use log::info;
+use std::sync::{Arc, RwLock};
 use std::thread;
 
 pub struct WorkerPool {
     pub number_of_workers: u32,
     pub worker_params: WorkerParams,
     pub connection_pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
+    shared_state: SharedState,
+    thread_join_handles: Vec<thread::JoinHandle<()>>,
 }
 
 pub struct WorkerThread {
     pub name: String,
     pub worker_params: WorkerParams,
     pub restarts: u64,
+    pub shared_state: SharedState,
     pub connection_pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
+    graceful_shutdown: bool,
+}
+
+pub type SharedState = Arc<RwLock<Option<WorkerState>>>;
+
+pub enum WorkerState {
+    Shutdown,
 }
 
 #[derive(Clone)]
@@ -65,6 +76,8 @@ impl WorkerPool {
             number_of_workers,
             worker_params,
             connection_pool,
+            shared_state: Arc::new(RwLock::new(None)),
+            thread_join_handles: Vec::new(),
         }
     }
 
@@ -75,10 +88,12 @@ impl WorkerPool {
             number_of_workers,
             worker_params,
             connection_pool,
+            shared_state: Arc::new(RwLock::new(None)),
+            thread_join_handles: Vec::new(),
         }
     }
 
-    pub fn start(&self) {
+    pub fn start(&mut self) {
         for idx in 1..self.number_of_workers + 1 {
             let worker_type = self
                 .worker_params
@@ -86,13 +101,26 @@ impl WorkerPool {
                 .clone()
                 .unwrap_or_else(|| "".to_string());
             let name = format!("worker_{}{}", worker_type, idx);
-            WorkerThread::spawn_in_pool(
+            let join_handle = WorkerThread::spawn_in_pool(
                 self.worker_params.clone(),
                 name,
                 0,
+                self.shared_state.clone(),
                 self.connection_pool.clone(),
-            )
+            );
+            self.thread_join_handles.push(join_handle);
         }
+    }
+
+    /// Attempt graceful shutdown of each job thread, waiting for the current job to finish before
+    /// exiting.
+    pub fn shutdown(&mut self) -> Result<(), ()> {
+        *self.shared_state.write().unwrap() = Some(WorkerState::Shutdown); // TODO
+
+        for thread in self.thread_join_handles.drain(..) {
+            thread.join().unwrap(); // TODO - Better error handling
+        }
+        Ok(())
     }
 }
 
@@ -101,13 +129,16 @@ impl WorkerThread {
         worker_params: WorkerParams,
         name: String,
         restarts: u64,
+        shared_state: SharedState,
         connection_pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
     ) -> Self {
         Self {
             name,
             worker_params,
             restarts,
+            shared_state,
             connection_pool,
+            graceful_shutdown: false,
         }
     }
 
@@ -115,8 +146,9 @@ impl WorkerThread {
         worker_params: WorkerParams,
         name: String,
         restarts: u64,
+        shared_state: SharedState,
         connection_pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
-    ) {
+    ) -> thread::JoinHandle<()> {
         let builder = thread::Builder::new().name(name.clone());
 
         info!(
@@ -126,17 +158,18 @@ impl WorkerThread {
 
         builder
             .spawn(move || {
-                // when _job is dropped, it will be restarted (see Drop trait impl)
-                let _job = WorkerThread::new(
+                let mut _job = WorkerThread::new(
                     worker_params.clone(),
                     name,
                     restarts,
+                    shared_state.clone(),
                     connection_pool.clone(),
                 );
 
                 match connection_pool.get() {
                     Ok(connection) => {
                         let mut executor = Executor::new(connection);
+                        executor.set_shared_state(shared_state);
 
                         if let Some(task_type_str) = worker_params.task_type {
                             executor.set_task_type(task_type_str);
@@ -151,24 +184,33 @@ impl WorkerThread {
                         }
 
                         executor.run_tasks();
+                        // Assume graceful shutdown if run_tasks returns
+                        _job.graceful_shutdown = true;
                     }
                     Err(error) => {
                         error!("Failed to get postgres connection: {:?}", error);
                     }
                 }
             })
-            .unwrap();
+            .unwrap()
     }
 }
 
 impl Drop for WorkerThread {
     fn drop(&mut self) {
+        if self.graceful_shutdown {
+            return;
+        }
+
+        // TODO - can't join these on shutdown; replace with monitoring crashed threads in main
+        // thread and restarting there? Maybe use Weakref pattern or something
         WorkerThread::spawn_in_pool(
             self.worker_params.clone(),
             self.name.clone(),
             self.restarts + 1,
+            self.shared_state.clone(),
             self.connection_pool.clone(),
-        )
+        );
     }
 }
 
@@ -207,13 +249,6 @@ mod job_pool_tests {
         }
     }
 
-    fn get_all_tasks(conn: &PgConnection) -> Vec<Task> {
-        fang_tasks::table
-            .filter(fang_tasks::task_type.eq("worker_pool_test"))
-            .get_results::<Task>(conn)
-            .unwrap()
-    }
-
     #[typetag::serde]
     impl Runnable for MyJob {
         fn run(&self, connection: &PgConnection) -> Result<(), Error> {
@@ -231,6 +266,13 @@ mod job_pool_tests {
         }
     }
 
+    fn get_all_tasks(conn: &PgConnection) -> Vec<Task> {
+        fang_tasks::table
+            .filter(fang_tasks::task_type.eq("worker_pool_test"))
+            .get_results::<Task>(conn)
+            .unwrap()
+    }
+
     // this test is ignored because it commits data to the db
     #[test]
     #[ignore]
@@ -239,7 +281,7 @@ mod job_pool_tests {
 
         let mut worker_params = WorkerParams::new();
         worker_params.set_retention_mode(RetentionMode::KeepAll);
-        let job_pool = WorkerPool::new_with_params(2, worker_params);
+        let mut job_pool = WorkerPool::new_with_params(2, worker_params);
 
         queue.push_task(&MyJob::new(100)).unwrap();
         queue.push_task(&MyJob::new(200)).unwrap();
