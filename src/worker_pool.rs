@@ -227,7 +227,7 @@ mod job_pool_tests {
     use crate::executor::Runnable;
     use crate::queue::Queue;
     use crate::queue::Task;
-    use crate::schema::fang_tasks;
+    use crate::schema::{fang_tasks, FangTaskState};
     use crate::typetag;
     use diesel::pg::PgConnection;
     use diesel::prelude::*;
@@ -277,7 +277,41 @@ mod job_pool_tests {
             .unwrap()
     }
 
-    // this test is ignored because it commits data to the db
+    // Following tests ignored because they commit data to the db
+    #[test]
+    #[ignore]
+    fn tasks_are_finished_on_shutdown() {
+        let queue = Queue::new();
+
+        let mut worker_params = WorkerParams::new();
+        worker_params.set_retention_mode(RetentionMode::KeepAll);
+        let mut job_pool = WorkerPool::new_with_params(2, worker_params);
+
+        queue.push_task(&MyJob::new(100)).unwrap();
+        queue.push_task(&MyJob::new(200)).unwrap();
+
+        job_pool.start().unwrap();
+        thread::sleep(Duration::from_secs(1));
+        job_pool.shutdown().unwrap();
+        thread::sleep(Duration::from_secs(5));
+
+        let tasks = get_all_tasks(&queue.connection);
+        // TODO - Replace with group_by when it's not nightly anymore
+        let new_tasks = tasks.iter().filter(|task| task.state == FangTaskState::New);
+        // let in_progress_tasks = tasks
+        //     .iter()
+        //     .filter(|task| task.state == FangTaskState::InProgress);
+        let finished_tasks = tasks
+            .iter()
+            .filter(|task| task.state == FangTaskState::Finished);
+
+        // Asserts first two tasks are allowed to finish, the tasks they spawn are not started
+        // though. No tasks should be in progress after a graceful shutdown.
+        assert_eq!(new_tasks.count(), 2);
+        // assert_eq!(in_progress_tasks.count(), 0); // TODO - Can't verify because of dirty DB
+        assert_eq!(finished_tasks.count(), 2);
+    }
+
     #[test]
     #[ignore]
     fn tasks_are_split_between_two_threads() {
