@@ -20,7 +20,6 @@ pub struct WorkerPool {
     thread_join_handles: Arc<RwLock<HashMap<String, thread::JoinHandle<()>>>>,
 }
 
-#[derive(Clone)]
 pub struct WorkerThread {
     pub name: String,
     pub restarts: u64,
@@ -144,19 +143,19 @@ impl WorkerThread {
         name: String,
         restarts: u64,
         worker_pool: WorkerPool,
-    ) -> Result<WorkerThread, FangError> {
+    ) -> Result<(), FangError> {
         info!(
             "starting a worker thread {}, number of restarts {}",
             name, restarts
         );
 
         let job = WorkerThread::new(name.clone(), restarts, worker_pool.clone());
-        let join_handle = Self::spawn_thread(name.clone(), job.clone())?;
-        job.worker_pool
+        let join_handle = Self::spawn_thread(name.clone(), job)?;
+        worker_pool
             .thread_join_handles
             .write()?
             .insert(name, join_handle);
-        Ok(job)
+        Ok(())
     }
 
     fn spawn_thread(
