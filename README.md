@@ -96,10 +96,12 @@ use fang::WorkerPool;
 WorkerPool::new(10).start();
 ```
 
+Using a library like [signal-hook][signal-hook], it's possible to gracefully shutdown a worker. See the
+Simple Worker for an example implementation.
 
 Check out:
 
-- [simple example](https://github.com/ayrat555/fang/tree/master/fang_examples/simple_worker) - simple worker example
+- [Simple Worker Example](https://github.com/ayrat555/fang/tree/master/fang_examples/simple_worker) - simple worker example
 - [El Monitorro](https://github.com/ayrat555/el_monitorro) - telegram feed reader. It uses Fang to synchronize feeds and deliver updates to users.
 
 ### Configuration
@@ -264,3 +266,4 @@ Ayrat Badykov (@ayrat555)
 [docs]: https://docs.rs/fang/
 [ga-test]: https://github.com/ayrat555/fang/actions/workflows/rust.yml/badge.svg
 [ga-style]: https://github.com/ayrat555/fang/actions/workflows/style.yml/badge.svg
+[signal-hook]: https://crates.io/crates/signal-hook
