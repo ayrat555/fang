@@ -96,10 +96,12 @@ use fang::WorkerPool;
 WorkerPool::new(10).start();
 ```
 
+Using a library like [signal-hook][signal-hook], it's possible to gracefully shutdown a worker. See the
+Simple Worker for an example implementation.
 
 Check out:
 
-- [simple example](https://github.com/ayrat555/fang/tree/master/fang_examples/simple_worker) - simple worker example
+- [Simple Worker Example](https://github.com/ayrat555/fang/tree/master/fang_examples/simple_worker) - simple worker example
 - [El Monitorro](https://github.com/ayrat555/el_monitorro) - telegram feed reader. It uses Fang to synchronize feeds and deliver updates to users.
 
 ### Configuration
@@ -231,6 +233,28 @@ In the example above, `push_periodic_task` is used to save the specified task to
 4. Push to the branch (`git push origin my-new-feature`)
 5. Create new Pull Request
 
+### Running tests locally
+
+```
+cargo install diesel_cli
+
+docker run --rm -d --name postgres -p 5432:5432 \
+  -e POSTGRES_DB=fang \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  postgres:latest
+
+DATABASE_URL=postgres://postgres:postgres@localhost/fang diesel migration run
+
+// Run regular tests
+cargo test --all-features
+
+// Run dirty/long tests, DB must be recreated afterwards
+cargo test --all-features -- --ignored --test-threads=1
+
+docker kill postgres
+```
+
 ## Author
 
 Ayrat Badykov (@ayrat555)
@@ -242,3 +266,4 @@ Ayrat Badykov (@ayrat555)
 [docs]: https://docs.rs/fang/
 [ga-test]: https://github.com/ayrat555/fang/actions/workflows/rust.yml/badge.svg
 [ga-style]: https://github.com/ayrat555/fang/actions/workflows/style.yml/badge.svg
+[signal-hook]: https://crates.io/crates/signal-hook
