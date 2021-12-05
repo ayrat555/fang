@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0 (2021-12-05)
+
+- Add graceful shutdown - [#14](https://github.com/ayrat555/fang/pull/14)
+
 ## 0.4.2 (2021-11-30)
 
 - Bump deps - [#13](https://github.com/ayrat555/fang/pull/13)

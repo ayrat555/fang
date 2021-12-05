@@ -14,7 +14,7 @@ Background job processing library for Rust. It uses Postgres DB as a task queue.
 
 ```toml
 [dependencies]
-fang = "0.4.1"
+fang = "0.5"
 serde = { version = "1.0", features = ["derive"] }
 ```
 
@@ -94,6 +94,17 @@ Use `WorkerPool` to start workers. `WorkerPool::new` accepts one parameter - the
 use fang::WorkerPool;
 
 WorkerPool::new(10).start();
+```
+
+Use `shutdown` to stop worker threads, they will try to finish in-progress tasks.
+
+```rust
+
+use fang::WorkerPool;
+
+worker_pool = WorkerPool::new(10).start().unwrap;
+
+worker_pool.shutdown()
 ```
 
 Using a library like [signal-hook][signal-hook], it's possible to gracefully shutdown a worker. See the
