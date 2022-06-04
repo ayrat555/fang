@@ -41,7 +41,7 @@ jobs:
           components: clippy
           override: true
           profile: minimal
-          toolchain: nightly
+          toolchain: stable
 
       - name: Run clippy
         uses: actions-rs/cargo@v1
