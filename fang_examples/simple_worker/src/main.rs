@@ -3,8 +3,8 @@ use fang::Queue;
 use fang::RetentionMode;
 use fang::WorkerParams;
 use fang::WorkerPool;
-use simple_worker::MyJob;
 use signal_hook::{consts::signal::*, iterator::Signals};
+use simple_worker::MyJob;
 
 fn main() {
     dotenv().ok();
@@ -29,13 +29,13 @@ fn main() {
                 println!("Received SIGINT");
                 worker_pool.shutdown().unwrap();
                 break;
-            },
+            }
             SIGTERM => {
                 println!("Received SIGTERM");
                 worker_pool.shutdown().unwrap();
                 break;
-            },
-            _ => unreachable!(format!("Received unexpected signal: {:?}", sig)),
+            }
+            _ => unreachable!("Received unexpected signal: {:?}", sig),
         }
     }
 }

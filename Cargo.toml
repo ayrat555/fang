@@ -16,8 +16,8 @@ diesel-derive-enum = { version = "1", features = ["postgres"] }
 dotenv = "0.15"
 uuid = { version = "0.8", features = ["v4"] }
 chrono = "0.4"
-serde_json = "1.0"
+serde_json = "1"
 typetag = "0.1"
 log = "0.4"
-serde = { version = "1.0", features = ["derive"] }
-thiserror = "1.0.29"
+serde = { version = "1", features = ["derive"] }
+thiserror = "1.0"
