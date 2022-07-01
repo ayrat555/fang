@@ -14,9 +14,11 @@ Background job processing library for Rust. It uses Postgres DB as a task queue.
 
 ```toml
 [dependencies]
-fang = "0.5"
+fang = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 ```
+
+*Supports rustc 1.62+*
 
 2. Create `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/migrations/2021-06-05-112912_create_fang_tasks/up.sql).
 
