@@ -84,7 +84,7 @@ jobs:
           override: true
           profile: minimal
           target: x86_64-unknown-linux-gnu
-          toolchain: nightly
+          toolchain: stable
 
       - name: Build release
         uses: actions-rs/cargo@v1
