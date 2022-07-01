@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 (2022-07-01)
+
+- Rust 1.62 is required for `typetag`
+
 ## 0.5.0 (2021-12-05)
 
 - Add graceful shutdown - [#14](https://github.com/ayrat555/fang/pull/14)

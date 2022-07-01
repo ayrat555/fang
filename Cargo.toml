@@ -1,12 +1,13 @@
 [package]
 name = "fang"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["Ayrat Badykov <ayratin555@gmail.com>"]
 description = "Background job processing library for Rust"
 repository = "https://github.com/ayrat555/fang"
 edition = "2018"
 license = "MIT"
 readme = "README.md"
+rust-version = "1.62"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -17,7 +18,7 @@ dotenv = "0.15"
 uuid = { version = "0.8", features = ["v4"] }
 chrono = "0.4"
 serde_json = "1"
-typetag = "0.1"
+typetag = "0.2"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
 thiserror = "1.0"
