@@ -5,11 +5,12 @@ use bb8_postgres::tokio_postgres::tls::MakeTlsConnect;
 use bb8_postgres::tokio_postgres::tls::TlsConnect;
 use bb8_postgres::tokio_postgres::types::ToSql;
 use bb8_postgres::tokio_postgres::Socket;
+use bb8_postgres::tokio_postgres::Transaction;
 use bb8_postgres::PostgresConnectionManager;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum AsyncQueueError {
     #[error(transparent)]
     PoolError(#[from] RunError<bb8_postgres::tokio_postgres::Error>),
@@ -17,24 +18,27 @@ pub enum AsyncQueueError {
     PgError(#[from] bb8_postgres::tokio_postgres::Error),
     #[error("returned invalid result (expected {expected:?}, found {found:?})")]
     ResultError { expected: u64, found: u64 },
+    #[error("Queue doesn't have a connection")]
+    PoolAndTransactionEmpty,
 }
 
-#[derive(Debug, TypedBuilder)]
-pub struct AsyncQueue<Tls>
+#[derive(TypedBuilder)]
+pub struct AsyncQueue<'a, Tls>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
-    pool: Pool<PostgresConnectionManager<Tls>>,
-    #[builder(default = false)]
-    test: bool,
+    #[builder(default, setter(into))]
+    pool: Option<Pool<PostgresConnectionManager<Tls>>>,
+    #[builder(default, setter(into))]
+    transaction: Option<Transaction<'a>>,
 }
 
 const INSERT_TASK_QUERY: &str = include_str!("queries/insert_task.sql");
 
-impl<Tls> AsyncQueue<Tls>
+impl<'a, Tls> AsyncQueue<'a, Tls>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
@@ -43,6 +47,10 @@ where
 {
     pub fn new(pool: Pool<PostgresConnectionManager<Tls>>) -> Self {
         AsyncQueue::builder().pool(pool).build()
+    }
+
+    pub fn new_with_transaction(transaction: Transaction<'a>) -> Self {
+        AsyncQueue::builder().transaction(transaction).build()
     }
 
     pub async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<u64, AsyncQueueError> {
@@ -58,18 +66,14 @@ where
         query: &str,
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<u64, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
+        let result = if let Some(pool) = &self.pool {
+            let connection = pool.get().await?;
 
-        let result = if self.test {
-            let transaction = connection.transaction().await?;
-
-            let result = transaction.execute(query, params).await?;
-
-            transaction.rollback().await?;
-
-            result
-        } else {
             connection.execute(query, params).await?
+        } else if let Some(transaction) = &self.transaction {
+            transaction.execute(query, params).await?
+        } else {
+            return Err(AsyncQueueError::PoolAndTransactionEmpty);
         };
 
         if result != 1 {
@@ -110,22 +114,23 @@ mod async_queue_tests {
 
     #[tokio::test]
     async fn insert_task_creates_new_task() {
-        let mut queue = queue().await;
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
+        let mut queue = AsyncQueue::<NoTls>::new_with_transaction(transaction);
 
         let result = queue.insert_task(&Job { number: 1 }).await.unwrap();
 
         assert_eq!(1, result);
     }
 
-    async fn queue() -> AsyncQueue<NoTls> {
+    async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
         let pg_mgr = PostgresConnectionManager::new_from_stringlike(
             "postgres://postgres:postgres@localhost/fang",
             NoTls,
         )
         .unwrap();
 
-        let pool = Pool::builder().build(pg_mgr).await.unwrap();
-
-        AsyncQueue::builder().pool(pool).test(true).build()
+        Pool::builder().build(pg_mgr).await.unwrap()
     }
 }
