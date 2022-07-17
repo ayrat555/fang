@@ -4,7 +4,6 @@ use bb8_postgres::bb8::RunError;
 use bb8_postgres::tokio_postgres::tls::MakeTlsConnect;
 use bb8_postgres::tokio_postgres::tls::TlsConnect;
 use bb8_postgres::tokio_postgres::types::ToSql;
-use bb8_postgres::tokio_postgres::Row;
 use bb8_postgres::tokio_postgres::Socket;
 use bb8_postgres::PostgresConnectionManager;
 use thiserror::Error;
@@ -12,10 +11,12 @@ use typed_builder::TypedBuilder;
 
 #[derive(Error, Debug)]
 pub enum AsyncQueueError {
-    #[error("pool error")]
+    #[error(transparent)]
     PoolError(#[from] RunError<bb8_postgres::tokio_postgres::Error>),
-    #[error("pg query error")]
+    #[error(transparent)]
     PgError(#[from] bb8_postgres::tokio_postgres::Error),
+    #[error("returned invalid result (expected {expected:?}, found {found:?})")]
+    ResultError { expected: u64, found: u64 },
 }
 
 #[derive(Debug, TypedBuilder)]
@@ -44,34 +45,41 @@ where
         AsyncQueue::builder().pool(pool).build()
     }
 
-    pub async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Row, AsyncQueueError> {
+    pub async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<u64, AsyncQueueError> {
         let json_task = serde_json::to_value(task).unwrap();
         let task_type = task.task_type();
 
-        self.execute_query_one(INSERT_TASK_QUERY, &[&json_task, &task_type])
+        self.execute_one(INSERT_TASK_QUERY, &[&json_task, &task_type])
             .await
     }
 
-    async fn execute_query_one(
+    async fn execute_one(
         &mut self,
         query: &str,
         params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Row, AsyncQueueError> {
+    ) -> Result<u64, AsyncQueueError> {
         let mut connection = self.pool.get().await?;
 
-        if self.test {
+        let result = if self.test {
             let transaction = connection.transaction().await?;
 
-            let result = transaction.query_one(query, params).await?;
+            let result = transaction.execute(query, params).await?;
 
             transaction.rollback().await?;
 
-            Ok(result)
+            result
         } else {
-            let result = connection.query_one(query, params).await?;
+            connection.execute(query, params).await?
+        };
 
-            Ok(result)
+        if result != 1 {
+            return Err(AsyncQueueError::ResultError {
+                expected: 1,
+                found: result,
+            });
         }
+
+        Ok(result)
     }
 }
 
@@ -104,10 +112,9 @@ mod async_queue_tests {
     async fn insert_task_creates_new_task() {
         let mut queue = queue().await;
 
-        let result = queue.insert_task(&Job { number: 1 }).await;
-        eprintln!("{:?}", result);
+        let result = queue.insert_task(&Job { number: 1 }).await.unwrap();
 
-        log::error!("{:?}", result);
+        assert_eq!(1, result);
     }
 
     async fn queue() -> AsyncQueue<NoTls> {
