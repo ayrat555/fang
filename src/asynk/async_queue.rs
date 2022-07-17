@@ -1,17 +1,17 @@
 use crate::asynk::AsyncRunnable;
+use crate::{NewPeriodicTask, NewTask, PeriodicTask, Task};
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::bb8::RunError;
 use bb8_postgres::tokio_postgres::tls::MakeTlsConnect;
 use bb8_postgres::tokio_postgres::tls::TlsConnect;
 use bb8_postgres::tokio_postgres::types::ToSql;
 use bb8_postgres::tokio_postgres::Socket;
+use bb8_postgres::tokio_postgres::Transaction;
 use bb8_postgres::PostgresConnectionManager;
-use chrono::NaiveDateTime;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
-use uuid::Uuid;
 
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum AsyncQueueError {
     #[error(transparent)]
     PoolError(#[from] RunError<bb8_postgres::tokio_postgres::Error>),
@@ -19,19 +19,22 @@ pub enum AsyncQueueError {
     PgError(#[from] bb8_postgres::tokio_postgres::Error),
     #[error("returned invalid result (expected {expected:?}, found {found:?})")]
     ResultError { expected: u64, found: u64 },
+    #[error("Queue doesn't have a connection")]
+    PoolAndTransactionEmpty,
 }
 
-#[derive(Debug, TypedBuilder)]
-pub struct AsyncQueue<Tls>
+#[derive(TypedBuilder)]
+pub struct AsyncQueue<'a, Tls>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
-    pool: Pool<PostgresConnectionManager<Tls>>,
-    #[builder(default = false)]
-    test: bool,
+    #[builder(default, setter(into))]
+    pool: Option<Pool<PostgresConnectionManager<Tls>>>,
+    #[builder(default, setter(into))]
+    transaction: Option<Transaction<'a>>,
 }
 
 const INSERT_TASK_QUERY: &str = include_str!("queries/insert_task.sql");
@@ -40,9 +43,8 @@ const FAIL_TASK_QUERY: &str = include_str!("queries/fail_task.sql");
 const REMOVE_ALL_TASK_QUERY: &str = include_str!("queries/remove_all_tasks.sql");
 const REMOVE_TASK_QUERY: &str = include_str!("queries/remove_task.sql");
 const REMOVE_TASKS_TYPE_QUERY: &str = include_str!("queries/remove_tasks_type.sql");
-// const SCHEDULE_NEXT_TASK_QUERY: &str = include_str!("queries/schedule_next_task.sql");
 
-impl<Tls> AsyncQueue<Tls>
+impl<'a, Tls> AsyncQueue<'a, Tls>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
@@ -51,6 +53,10 @@ where
 {
     pub fn new(pool: Pool<PostgresConnectionManager<Tls>>) -> Self {
         AsyncQueue::builder().pool(pool).build()
+    }
+
+    pub fn new_with_transaction(transaction: Transaction<'a>) -> Self {
+        AsyncQueue::builder().transaction(transaction).build()
     }
 
     pub async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<u64, AsyncQueueError> {
@@ -62,53 +68,46 @@ where
     }
     pub async fn update_task_state(
         &mut self,
-        uuid: Uuid,
+        task: &Task,
         state: &str,
-        updated_at: NaiveDateTime,
     ) -> Result<u64, AsyncQueueError> {
-        self.execute_one(UPDATE_TASK_STATE_QUERY, &[&state, &updated_at, &uuid])
-            .await
+        self.execute_one(
+            UPDATE_TASK_STATE_QUERY,
+            &[&state, &task.updated_at, &task.id],
+        )
+        .await
     }
     pub async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
         self.execute_one(REMOVE_ALL_TASK_QUERY, &[]).await
     }
-    pub async fn remove_task(&mut self, uuid: Uuid) -> Result<u64, AsyncQueueError> {
-        self.execute_one(REMOVE_TASK_QUERY, &[&uuid]).await
+    pub async fn remove_task(&mut self, task: &Task) -> Result<u64, AsyncQueueError> {
+        self.execute_one(REMOVE_TASK_QUERY, &[&task.id]).await
     }
     pub async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
         self.execute_one(REMOVE_TASKS_TYPE_QUERY, &[&task_type])
             .await
     }
-    pub async fn fail_task(
-        &mut self,
-        uuid: Uuid,
-        state: &str,
-        error_message: &str,
-        updated_at: NaiveDateTime,
-    ) -> Result<u64, AsyncQueueError> {
+    pub async fn fail_task(&mut self, task: &Task, state: &str) -> Result<u64, AsyncQueueError> {
         self.execute_one(
             FAIL_TASK_QUERY,
-            &[&state, &error_message, &updated_at, &uuid],
+            &[&state, &task.error_message, &task.updated_at, &task.id],
         )
         .await
     }
+
     async fn execute_one(
         &mut self,
         query: &str,
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<u64, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
+        let result = if let Some(pool) = &self.pool {
+            let connection = pool.get().await?;
 
-        let result = if self.test {
-            let transaction = connection.transaction().await?;
-
-            let result = transaction.execute(query, params).await?;
-
-            transaction.rollback().await?;
-
-            result
-        } else {
             connection.execute(query, params).await?
+        } else if let Some(transaction) = &self.transaction {
+            transaction.execute(query, params).await?
+        } else {
+            return Err(AsyncQueueError::PoolAndTransactionEmpty);
         };
 
         if result != 1 {
@@ -149,22 +148,24 @@ mod async_queue_tests {
 
     #[tokio::test]
     async fn insert_task_creates_new_task() {
-        let mut queue = queue().await;
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
+        let mut queue = AsyncQueue::<NoTls>::new_with_transaction(transaction);
 
         let result = queue.insert_task(&Job { number: 1 }).await.unwrap();
 
         assert_eq!(1, result);
+        queue.transaction.unwrap().rollback().await.unwrap();
     }
 
-    async fn queue() -> AsyncQueue<NoTls> {
+    async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
         let pg_mgr = PostgresConnectionManager::new_from_stringlike(
             "postgres://postgres:postgres@localhost/fang",
             NoTls,
         )
         .unwrap();
 
-        let pool = Pool::builder().build(pg_mgr).await.unwrap();
-
-        AsyncQueue::builder().pool(pool).test(true).build()
+        Pool::builder().build(pg_mgr).await.unwrap()
     }
 }
