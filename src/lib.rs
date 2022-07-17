@@ -1,5 +1,5 @@
 // #![allow(clippy::nonstandard_macro_braces)]
-// #![allow(clippy::extra_unused_lifetimes)]
+#![allow(clippy::extra_unused_lifetimes)]
 
 // pub mod error;
 // pub mod executor;
