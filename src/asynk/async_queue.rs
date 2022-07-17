@@ -6,8 +6,10 @@ use bb8_postgres::tokio_postgres::tls::TlsConnect;
 use bb8_postgres::tokio_postgres::types::ToSql;
 use bb8_postgres::tokio_postgres::Socket;
 use bb8_postgres::PostgresConnectionManager;
+use chrono::NaiveDateTime;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
+use uuid::Uuid;
 
 #[derive(Error, Debug)]
 pub enum AsyncQueueError {
@@ -33,6 +35,12 @@ where
 }
 
 const INSERT_TASK_QUERY: &str = include_str!("queries/insert_task.sql");
+const UPDATE_TASK_STATE_QUERY: &str = include_str!("queries/update_task_state.sql");
+const FAIL_TASK_QUERY: &str = include_str!("queries/fail_task.sql");
+const REMOVE_ALL_TASK_QUERY: &str = include_str!("queries/remove_all_tasks.sql");
+const REMOVE_TASK_QUERY: &str = include_str!("queries/remove_task.sql");
+const REMOVE_TASKS_TYPE_QUERY: &str = include_str!("queries/remove_tasks_type.sql");
+// const SCHEDULE_NEXT_TASK_QUERY: &str = include_str!("queries/schedule_next_task.sql");
 
 impl<Tls> AsyncQueue<Tls>
 where
@@ -46,13 +54,44 @@ where
     }
 
     pub async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<u64, AsyncQueueError> {
-        let json_task = serde_json::to_value(task).unwrap();
+        let metadata = serde_json::to_value(task).unwrap();
         let task_type = task.task_type();
 
-        self.execute_one(INSERT_TASK_QUERY, &[&json_task, &task_type])
+        self.execute_one(INSERT_TASK_QUERY, &[&metadata, &task_type])
             .await
     }
-
+    pub async fn update_task_state(
+        &mut self,
+        uuid: Uuid,
+        state: &str,
+        updated_at: NaiveDateTime,
+    ) -> Result<u64, AsyncQueueError> {
+        self.execute_one(UPDATE_TASK_STATE_QUERY, &[&state, &updated_at, &uuid])
+            .await
+    }
+    pub async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
+        self.execute_one(REMOVE_ALL_TASK_QUERY, &[]).await
+    }
+    pub async fn remove_task(&mut self, uuid: Uuid) -> Result<u64, AsyncQueueError> {
+        self.execute_one(REMOVE_TASK_QUERY, &[&uuid]).await
+    }
+    pub async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
+        self.execute_one(REMOVE_TASKS_TYPE_QUERY, &[&task_type])
+            .await
+    }
+    pub async fn fail_task(
+        &mut self,
+        uuid: Uuid,
+        state: &str,
+        error_message: &str,
+        updated_at: NaiveDateTime,
+    ) -> Result<u64, AsyncQueueError> {
+        self.execute_one(
+            FAIL_TASK_QUERY,
+            &[&state, &error_message, &updated_at, &uuid],
+        )
+        .await
+    }
     async fn execute_one(
         &mut self,
         query: &str,
