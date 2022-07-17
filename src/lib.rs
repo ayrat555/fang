@@ -25,3 +25,5 @@ pub use typetag;
 
 pub mod sync;
 pub use sync::*;
+
+pub mod asynk;
