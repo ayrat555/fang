@@ -1,5 +1,5 @@
 use crate::asynk::AsyncRunnable;
-use crate::{NewPeriodicTask, NewTask, PeriodicTask, Task};
+use crate::Task;
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::bb8::RunError;
 use bb8_postgres::tokio_postgres::tls::MakeTlsConnect;
