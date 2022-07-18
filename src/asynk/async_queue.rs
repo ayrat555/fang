@@ -180,6 +180,7 @@ mod async_queue_tests {
         assert_eq!(2, result);
         queue.transaction.unwrap().rollback().await.unwrap();
     }
+
     async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
         let pg_mgr = PostgresConnectionManager::new_from_stringlike(
             "postgres://postgres:postgres@localhost/fang",
