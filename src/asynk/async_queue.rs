@@ -22,7 +22,7 @@ pub enum AsyncQueueError {
     ResultError { expected: u64, found: u64 },
     #[error("Queue doesn't have a connection")]
     PoolAndTransactionEmpty,
-    #[error("Need to create a transaction to this perform this operation")]
+    #[error("Need to create a transaction to perform this operation")]
     TransactionEmpty,
 }
 
