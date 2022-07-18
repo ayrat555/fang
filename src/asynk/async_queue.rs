@@ -108,13 +108,13 @@ where
         let created_at = row.get("created_at");
         let updated_at = row.get("updated_at");
         let task = Task {
-            id: id,
-            metadata: metadata,
-            error_message: error_message,
-            state: state,
-            task_type: task_type,
-            created_at: created_at,
-            updated_at: updated_at,
+            id,
+            metadata,
+            error_message,
+            state,
+            task_type,
+            created_at,
+            updated_at,
         };
         Ok(task)
     }
