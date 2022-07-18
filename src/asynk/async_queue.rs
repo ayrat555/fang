@@ -69,9 +69,7 @@ where
                 tr.rollback().await?;
                 Ok(self)
             }
-            None => {
-                return Err(AsyncQueueError::TransactionEmpty);
-            }
+            None => Err(AsyncQueueError::TransactionEmpty),
         }
     }
     pub async fn commit(mut self) -> Result<AsyncQueue<'a, Tls>, AsyncQueueError> {
@@ -82,9 +80,7 @@ where
                 tr.commit().await?;
                 Ok(self)
             }
-            None => {
-                return Err(AsyncQueueError::TransactionEmpty);
-            }
+            None => Err(AsyncQueueError::TransactionEmpty),
         }
     }
     pub async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<u64, AsyncQueueError> {
