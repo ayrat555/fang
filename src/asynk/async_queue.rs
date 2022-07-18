@@ -33,15 +33,15 @@ impl Default for FangTaskState {
 }
 #[derive(TypedBuilder, Debug, Eq, PartialEq, Clone)]
 pub struct Task {
-    #[builder(default, setter(into))]
+    #[builder(setter(into))]
     pub id: Uuid,
-    #[builder(default, setter(into))]
+    #[builder(setter(into))]
     pub metadata: serde_json::Value,
-    #[builder(default, setter(into))]
+    #[builder(setter(into))]
     pub error_message: Option<String>,
     #[builder(default, setter(into))]
     pub state: FangTaskState,
-    #[builder(default, setter(into))]
+    #[builder(setter(into))]
     pub task_type: String,
     #[builder(setter(into))]
     pub created_at: DateTime<Utc>,
@@ -49,25 +49,35 @@ pub struct Task {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(TypedBuilder, Debug, Eq, PartialEq, Clone)]
 pub struct PeriodicTask {
+    #[builder(setter(into))]
     pub id: Uuid,
+    #[builder(setter(into))]
     pub metadata: serde_json::Value,
+    #[builder(setter(into))]
     pub period_in_seconds: i32,
+    #[builder(setter(into))]
     pub scheduled_at: Option<DateTime<Utc>>,
+    #[builder(setter(into))]
     pub created_at: DateTime<Utc>,
+    #[builder(setter(into))]
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(TypedBuilder, Debug, Eq, PartialEq, Clone)]
 pub struct NewTask {
+    #[builder(setter(into))]
     pub metadata: serde_json::Value,
+    #[builder(setter(into))]
     pub task_type: String,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(TypedBuilder, Debug, Eq, PartialEq, Clone)]
 pub struct NewPeriodicTask {
+    #[builder(setter(into))]
     pub metadata: serde_json::Value,
+    #[builder(setter(into))]
     pub period_in_seconds: i32,
 }
 #[derive(Debug, Error)]
@@ -228,7 +238,12 @@ where
         let updated_at = Utc::now();
         self.execute(
             FAIL_TASK_QUERY,
-            &[&"failed", &task.error_message, &updated_at, &task.id],
+            &[
+                &FangTaskState::Failed,
+                &task.error_message,
+                &updated_at,
+                &task.id,
+            ],
             Some(1),
         )
         .await
