@@ -2,7 +2,6 @@ use crate::executor::Runnable;
 use crate::schema::fang_periodic_tasks;
 use crate::schema::fang_tasks;
 use crate::schema::FangTaskState;
-use crate::{NewPeriodicTask, NewTask, PeriodicTask, Task};
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
@@ -13,6 +12,43 @@ use diesel::result::Error;
 use dotenv::dotenv;
 use std::env;
 use uuid::Uuid;
+
+#[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone)]
+#[table_name = "fang_tasks"]
+pub struct Task {
+    pub id: Uuid,
+    pub metadata: serde_json::Value,
+    pub error_message: Option<String>,
+    pub state: FangTaskState,
+    pub task_type: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone)]
+#[table_name = "fang_periodic_tasks"]
+pub struct PeriodicTask {
+    pub id: Uuid,
+    pub metadata: serde_json::Value,
+    pub period_in_seconds: i32,
+    pub scheduled_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Insertable)]
+#[table_name = "fang_tasks"]
+pub struct NewTask {
+    pub metadata: serde_json::Value,
+    pub task_type: String,
+}
+
+#[derive(Insertable)]
+#[table_name = "fang_periodic_tasks"]
+pub struct NewPeriodicTask {
+    pub metadata: serde_json::Value,
+    pub period_in_seconds: i32,
+}
 
 pub struct Queue {
     pub connection: PgConnection,
@@ -483,7 +519,7 @@ mod queue_tests {
         let queue = Queue::new();
 
         queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = MyTask { number: 10 };
+            let task = PepeTask { number: 10 };
             let task = queue.push_task(&task).unwrap();
 
             let mut m = serde_json::value::Map::new();
@@ -493,7 +529,7 @@ mod queue_tests {
             );
             m.insert(
                 "type".to_string(),
-                serde_json::value::Value::String("MyTask".to_string()),
+                serde_json::value::Value::String("PepeTask".to_string()),
             );
 
             assert_eq!(task.metadata, serde_json::value::Value::Object(m));
@@ -507,7 +543,7 @@ mod queue_tests {
         let queue = Queue::new();
 
         queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = MyTask { number: 10 };
+            let task = PepeTask { number: 10 };
             let task2 = queue.push_task(&task).unwrap();
 
             let task1 = queue.push_task(&task).unwrap();
@@ -523,7 +559,7 @@ mod queue_tests {
         let queue = Queue::new();
 
         queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = MyTask { number: 10 };
+            let task = PepeTask { number: 10 };
             let task = queue.push_periodic_task(&task, 60).unwrap();
 
             assert_eq!(task.period_in_seconds, 60);
@@ -538,7 +574,7 @@ mod queue_tests {
         let queue = Queue::new();
 
         queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = MyTask { number: 10 };
+            let task = PepeTask { number: 10 };
             let task1 = queue.push_periodic_task(&task, 60).unwrap();
 
             let task2 = queue.push_periodic_task(&task, 60).unwrap();
@@ -554,7 +590,7 @@ mod queue_tests {
         let queue = Queue::new();
 
         queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = MyTask { number: 10 };
+            let task = PepeTask { number: 10 };
             let task = queue.push_periodic_task(&task, 60).unwrap();
 
             let schedule_in_future = Utc::now() + Duration::hours(100);
@@ -727,7 +763,7 @@ mod queue_tests {
         let timestamp1 = Utc::now() - Duration::hours(40);
 
         let task1 = insert_task(
-            serde_json::json!(MyTask { number: 12 }),
+            serde_json::json!(PepeTask { number: 12 }),
             timestamp1,
             &queue.connection,
         );
@@ -737,7 +773,7 @@ mod queue_tests {
         let timestamp2 = Utc::now() - Duration::hours(20);
 
         let task2 = insert_task(
-            serde_json::json!(MyTask { number: 11 }),
+            serde_json::json!(PepeTask { number: 11 }),
             timestamp2,
             &queue.connection,
         );
@@ -772,12 +808,12 @@ mod queue_tests {
     }
 
     #[derive(Serialize, Deserialize)]
-    struct MyTask {
+    struct PepeTask {
         pub number: u16,
     }
 
     #[typetag::serde]
-    impl Runnable for MyTask {
+    impl Runnable for PepeTask {
         fn run(&self, _connection: &PgConnection) -> Result<(), ExecutorError> {
             println!("the number is {}", self.number);
 

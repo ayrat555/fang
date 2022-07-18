@@ -1,6 +1,4 @@
 use crate::asynk::AsyncRunnable;
-use crate::sync::schema::FangTaskState;
-use crate::Task;
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::bb8::RunError;
 use bb8_postgres::tokio_postgres::row::Row;
@@ -10,10 +8,51 @@ use bb8_postgres::tokio_postgres::types::ToSql;
 use bb8_postgres::tokio_postgres::Socket;
 use bb8_postgres::tokio_postgres::Transaction;
 use bb8_postgres::PostgresConnectionManager;
+use chrono::DateTime;
 use chrono::Utc;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
+use uuid::Uuid;
 
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum FangTaskState {
+    New,
+    InProgress,
+    Failed,
+    Finished,
+}
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Task {
+    pub id: Uuid,
+    pub metadata: serde_json::Value,
+    pub error_message: Option<String>,
+    pub state: FangTaskState,
+    pub task_type: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct PeriodicTask {
+    pub id: Uuid,
+    pub metadata: serde_json::Value,
+    pub period_in_seconds: i32,
+    pub scheduled_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct NewTask {
+    pub metadata: serde_json::Value,
+    pub task_type: String,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct NewPeriodicTask {
+    pub metadata: serde_json::Value,
+    pub period_in_seconds: i32,
+}
 #[derive(Debug, Error)]
 pub enum AsyncQueueError {
     #[error(transparent)]

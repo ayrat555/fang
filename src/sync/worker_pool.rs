@@ -219,7 +219,7 @@ impl Drop for WorkerThread {
 }
 
 #[cfg(test)]
-mod job_pool_tests {
+mod task_pool_tests {
     use super::WorkerParams;
     use super::WorkerPool;
     use crate::executor::Error;
@@ -258,9 +258,9 @@ mod job_pool_tests {
         fn run(&self, connection: &PgConnection) -> Result<(), Error> {
             thread::sleep(Duration::from_secs(3));
 
-            let new_job = MyTask::new(self.number + 1);
+            let new_task = MyTask::new(self.number + 1);
 
-            Queue::push_task_query(connection, &new_job).unwrap();
+            Queue::push_task_query(connection, &new_task).unwrap();
 
             Ok(())
         }
@@ -293,9 +293,9 @@ mod job_pool_tests {
         fn run(&self, connection: &PgConnection) -> Result<(), Error> {
             thread::sleep(Duration::from_secs(3));
 
-            let new_job = MyTask::new(self.number + 1);
+            let new_task = MyTask::new(self.number + 1);
 
-            Queue::push_task_query(connection, &new_job).unwrap();
+            Queue::push_task_query(connection, &new_task).unwrap();
 
             Ok(())
         }
@@ -320,14 +320,14 @@ mod job_pool_tests {
 
         let mut worker_params = WorkerParams::new();
         worker_params.set_retention_mode(RetentionMode::KeepAll);
-        let mut job_pool = WorkerPool::new_with_params(2, worker_params);
+        let mut task_pool = WorkerPool::new_with_params(2, worker_params);
 
         queue.push_task(&ShutdownTask::new(100)).unwrap();
         queue.push_task(&ShutdownTask::new(200)).unwrap();
 
-        job_pool.start().unwrap();
+        task_pool.start().unwrap();
         thread::sleep(Duration::from_secs(1));
-        job_pool.shutdown().unwrap();
+        task_pool.shutdown().unwrap();
         thread::sleep(Duration::from_secs(5));
 
         let tasks = get_all_tasks(&queue.connection, "shutdown_test");
@@ -351,12 +351,12 @@ mod job_pool_tests {
 
         let mut worker_params = WorkerParams::new();
         worker_params.set_retention_mode(RetentionMode::KeepAll);
-        let mut job_pool = WorkerPool::new_with_params(2, worker_params);
+        let mut task_pool = WorkerPool::new_with_params(2, worker_params);
 
         queue.push_task(&MyTask::new(100)).unwrap();
         queue.push_task(&MyTask::new(200)).unwrap();
 
-        job_pool.start().unwrap();
+        task_pool.start().unwrap();
 
         thread::sleep(Duration::from_secs(100));
 
@@ -364,19 +364,19 @@ mod job_pool_tests {
 
         assert!(tasks.len() > 40);
 
-        let test_worker1_jobs = tasks.clone().into_iter().filter(|job| {
-            serde_json::to_string(&job.metadata)
+        let test_worker1_tasks = tasks.clone().into_iter().filter(|task| {
+            serde_json::to_string(&task.metadata)
                 .unwrap()
                 .contains("worker_1")
         });
 
-        let test_worker2_jobs = tasks.into_iter().filter(|job| {
-            serde_json::to_string(&job.metadata)
+        let test_worker2_tasks = tasks.into_iter().filter(|task| {
+            serde_json::to_string(&task.metadata)
                 .unwrap()
                 .contains("worker_2")
         });
 
-        assert!(test_worker1_jobs.count() > 20);
-        assert!(test_worker2_jobs.count() > 20);
+        assert!(test_worker1_tasks.count() > 20);
+        assert!(test_worker2_tasks.count() > 20);
     }
 }
