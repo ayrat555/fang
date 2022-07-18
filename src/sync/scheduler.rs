@@ -1,6 +1,6 @@
 use crate::executor::Runnable;
-use crate::queue::PeriodicTask;
 use crate::queue::Queue;
+use crate::PeriodicTask;
 use std::thread;
 use std::time::Duration;
 
@@ -82,9 +82,9 @@ mod job_scheduler_tests {
     use crate::executor::Error;
     use crate::executor::Runnable;
     use crate::queue::Queue;
-    use crate::queue::Task;
     use crate::schema::fang_tasks;
     use crate::typetag;
+    use crate::Task;
     use diesel::pg::PgConnection;
     use diesel::prelude::*;
     use serde::{Deserialize, Serialize};
