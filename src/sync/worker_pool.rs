@@ -236,12 +236,12 @@ mod job_pool_tests {
     use std::time::Duration;
 
     #[derive(Serialize, Deserialize)]
-    struct MyJob {
+    struct MyTask {
         pub number: u16,
         pub current_thread_name: String,
     }
 
-    impl MyJob {
+    impl MyTask {
         pub fn new(number: u16) -> Self {
             let handle = thread::current();
             let current_thread_name = handle.name().unwrap().to_string();
@@ -254,11 +254,11 @@ mod job_pool_tests {
     }
 
     #[typetag::serde]
-    impl Runnable for MyJob {
+    impl Runnable for MyTask {
         fn run(&self, connection: &PgConnection) -> Result<(), Error> {
             thread::sleep(Duration::from_secs(3));
 
-            let new_job = MyJob::new(self.number + 1);
+            let new_job = MyTask::new(self.number + 1);
 
             Queue::push_task_query(connection, &new_job).unwrap();
 
@@ -271,12 +271,12 @@ mod job_pool_tests {
     }
 
     #[derive(Serialize, Deserialize)]
-    struct ShutdownJob {
+    struct ShutdownTask {
         pub number: u16,
         pub current_thread_name: String,
     }
 
-    impl ShutdownJob {
+    impl ShutdownTask {
         pub fn new(number: u16) -> Self {
             let handle = thread::current();
             let current_thread_name = handle.name().unwrap().to_string();
@@ -289,11 +289,11 @@ mod job_pool_tests {
     }
 
     #[typetag::serde]
-    impl Runnable for ShutdownJob {
+    impl Runnable for ShutdownTask {
         fn run(&self, connection: &PgConnection) -> Result<(), Error> {
             thread::sleep(Duration::from_secs(3));
 
-            let new_job = MyJob::new(self.number + 1);
+            let new_job = MyTask::new(self.number + 1);
 
             Queue::push_task_query(connection, &new_job).unwrap();
 
@@ -322,8 +322,8 @@ mod job_pool_tests {
         worker_params.set_retention_mode(RetentionMode::KeepAll);
         let mut job_pool = WorkerPool::new_with_params(2, worker_params);
 
-        queue.push_task(&ShutdownJob::new(100)).unwrap();
-        queue.push_task(&ShutdownJob::new(200)).unwrap();
+        queue.push_task(&ShutdownTask::new(100)).unwrap();
+        queue.push_task(&ShutdownTask::new(200)).unwrap();
 
         job_pool.start().unwrap();
         thread::sleep(Duration::from_secs(1));
@@ -353,8 +353,8 @@ mod job_pool_tests {
         worker_params.set_retention_mode(RetentionMode::KeepAll);
         let mut job_pool = WorkerPool::new_with_params(2, worker_params);
 
-        queue.push_task(&MyJob::new(100)).unwrap();
-        queue.push_task(&MyJob::new(200)).unwrap();
+        queue.push_task(&MyTask::new(100)).unwrap();
+        queue.push_task(&MyTask::new(200)).unwrap();
 
         job_pool.start().unwrap();
 

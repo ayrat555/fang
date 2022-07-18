@@ -195,12 +195,12 @@ mod executor_tests {
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]
-    struct ExecutorJobTest {
+    struct ExecutorTaskTest {
         pub number: u16,
     }
 
     #[typetag::serde]
-    impl Runnable for ExecutorJobTest {
+    impl Runnable for ExecutorTaskTest {
         fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
             println!("the number is {}", self.number);
 
@@ -209,12 +209,12 @@ mod executor_tests {
     }
 
     #[derive(Serialize, Deserialize)]
-    struct FailedJob {
+    struct FailedTask {
         pub number: u16,
     }
 
     #[typetag::serde]
-    impl Runnable for FailedJob {
+    impl Runnable for FailedTask {
         fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
             let message = format!("the number is {}", self.number);
 
@@ -225,10 +225,10 @@ mod executor_tests {
     }
 
     #[derive(Serialize, Deserialize)]
-    struct JobType1 {}
+    struct TaskType1 {}
 
     #[typetag::serde]
-    impl Runnable for JobType1 {
+    impl Runnable for TaskType1 {
         fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
             Ok(())
         }
@@ -239,10 +239,10 @@ mod executor_tests {
     }
 
     #[derive(Serialize, Deserialize)]
-    struct JobType2 {}
+    struct TaskType2 {}
 
     #[typetag::serde]
-    impl Runnable for JobType2 {
+    impl Runnable for TaskType2 {
         fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
             Ok(())
         }
@@ -258,7 +258,7 @@ mod executor_tests {
 
     #[test]
     fn executes_and_finishes_task() {
-        let job = ExecutorJobTest { number: 10 };
+        let job = ExecutorTaskTest { number: 10 };
 
         let new_task = NewTask {
             metadata: serialize(&job),
@@ -289,16 +289,16 @@ mod executor_tests {
     #[test]
     #[ignore]
     fn executes_task_only_of_specific_type() {
-        let job1 = JobType1 {};
-        let job2 = JobType2 {};
+        let task1 = TaskType1 {};
+        let task2 = TaskType2 {};
 
         let new_task1 = NewTask {
-            metadata: serialize(&job1),
+            metadata: serialize(&task1),
             task_type: "type1".to_string(),
         };
 
         let new_task2 = NewTask {
-            metadata: serialize(&job2),
+            metadata: serialize(&task2),
             task_type: "type2".to_string(),
         };
 
@@ -331,10 +331,10 @@ mod executor_tests {
 
     #[test]
     fn saves_error_for_failed_task() {
-        let job = FailedJob { number: 10 };
+        let task = FailedTask { number: 10 };
 
         let new_task = NewTask {
-            metadata: serialize(&job),
+            metadata: serialize(&task),
             task_type: "common".to_string(),
         };
 

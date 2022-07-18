@@ -1,7 +1,9 @@
 use crate::asynk::AsyncRunnable;
+use crate::sync::schema::FangTaskState;
 use crate::Task;
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::bb8::RunError;
+use bb8_postgres::tokio_postgres::row::Row;
 use bb8_postgres::tokio_postgres::tls::MakeTlsConnect;
 use bb8_postgres::tokio_postgres::tls::TlsConnect;
 use bb8_postgres::tokio_postgres::types::ToSql;
@@ -46,6 +48,7 @@ const FAIL_TASK_QUERY: &str = include_str!("queries/fail_task.sql");
 const REMOVE_ALL_TASK_QUERY: &str = include_str!("queries/remove_all_tasks.sql");
 const REMOVE_TASK_QUERY: &str = include_str!("queries/remove_task.sql");
 const REMOVE_TASKS_TYPE_QUERY: &str = include_str!("queries/remove_tasks_type.sql");
+const FETCH_TASK_TYPE_QUERY: &str = include_str!("queries/fetch_task_type.sql");
 
 impl<'a, Tls> AsyncQueue<'a, Tls>
 where
@@ -82,6 +85,54 @@ where
             }
             None => Err(AsyncQueueError::TransactionEmpty),
         }
+    }
+    pub async fn fetch_task(
+        &mut self,
+        task_type: &Option<String>,
+    ) -> Result<Task, AsyncQueueError> {
+        match task_type {
+            None => self.get_task_type("common").await,
+            Some(task_type_str) => self.get_task_type(task_type_str).await,
+        }
+    }
+    pub async fn get_task_type(&mut self, task_type: &str) -> Result<Task, AsyncQueueError> {
+        let row: Row = self.get_row(FETCH_TASK_TYPE_QUERY, &[&task_type]).await?;
+        let id = row.get("id");
+        let metadata = row.get("metadata");
+        let error_message = match row.try_get("error_message") {
+            Ok(error_message) => Some(error_message),
+            Err(_) => None,
+        };
+        let state = FangTaskState::New;
+        let task_type = row.get("task_type");
+        let created_at = row.get("created_at");
+        let updated_at = row.get("updated_at");
+        let task = Task {
+            id: id,
+            metadata: metadata,
+            error_message: error_message,
+            state: state,
+            task_type: task_type,
+            created_at: created_at,
+            updated_at: updated_at,
+        };
+        Ok(task)
+    }
+    pub async fn get_row(
+        &mut self,
+        query: &str,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Row, AsyncQueueError> {
+        let row: Row = if let Some(pool) = &self.pool {
+            let connection = pool.get().await?;
+
+            connection.query_one(query, params).await?
+        } else if let Some(transaction) = &self.transaction {
+            transaction.query_one(query, params).await?
+        } else {
+            return Err(AsyncQueueError::PoolAndTransactionEmpty);
+        };
+        Ok(row)
     }
     pub async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<u64, AsyncQueueError> {
         let metadata = serde_json::to_value(task).unwrap();
@@ -163,13 +214,13 @@ mod async_queue_tests {
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]
-    struct Job {
+    struct AsyncTask {
         pub number: u16,
     }
 
     #[typetag::serde]
     #[async_trait]
-    impl AsyncRunnable for Job {
+    impl AsyncRunnable for AsyncTask {
         async fn run(&self, _connection: &Client) -> Result<(), Error> {
             Ok(())
         }
@@ -182,7 +233,7 @@ mod async_queue_tests {
         let transaction = connection.transaction().await.unwrap();
         let mut queue = AsyncQueue::<NoTls>::new_with_transaction(transaction);
 
-        let result = queue.insert_task(&Job { number: 1 }).await.unwrap();
+        let result = queue.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
         assert_eq!(1, result);
         queue.rollback().await.unwrap();
@@ -195,12 +246,32 @@ mod async_queue_tests {
         let transaction = connection.transaction().await.unwrap();
         let mut queue = AsyncQueue::<NoTls>::new_with_transaction(transaction);
 
-        let result = queue.insert_task(&Job { number: 1 }).await.unwrap();
+        let result = queue.insert_task(&AsyncTask { number: 1 }).await.unwrap();
         assert_eq!(1, result);
-        let result = queue.insert_task(&Job { number: 2 }).await.unwrap();
+        let result = queue.insert_task(&AsyncTask { number: 2 }).await.unwrap();
         assert_eq!(1, result);
         let result = queue.remove_all_tasks().await.unwrap();
         assert_eq!(2, result);
+        queue.rollback().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn fetch_test() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
+        let mut queue = AsyncQueue::<NoTls>::new_with_transaction(transaction);
+
+        let result = queue.insert_task(&AsyncTask { number: 1 }).await.unwrap();
+        assert_eq!(1, result);
+        let result = queue.insert_task(&AsyncTask { number: 2 }).await.unwrap();
+        assert_eq!(1, result);
+        // Should fetching the same task because we not change task number 1 of state new
+        // To see debug println! invoke test with this cargo test -- --nocapture async_queue_tests
+        let task = queue.fetch_task(&None).await.unwrap();
+        println!("{:?}", task);
+        let task = queue.fetch_task(&None).await.unwrap();
+        println!("{:?}", task);
         queue.rollback().await.unwrap();
     }
     #[tokio::test]
@@ -210,9 +281,9 @@ mod async_queue_tests {
         let transaction = connection.transaction().await.unwrap();
         let mut queue = AsyncQueue::<NoTls>::new_with_transaction(transaction);
 
-        let result = queue.insert_task(&Job { number: 1 }).await.unwrap();
+        let result = queue.insert_task(&AsyncTask { number: 1 }).await.unwrap();
         assert_eq!(1, result);
-        let result = queue.insert_task(&Job { number: 2 }).await.unwrap();
+        let result = queue.insert_task(&AsyncTask { number: 2 }).await.unwrap();
         assert_eq!(1, result);
         let result = queue.remove_tasks_type("common").await.unwrap();
         assert_eq!(2, result);

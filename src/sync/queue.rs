@@ -41,19 +41,19 @@ impl Queue {
         Self { connection }
     }
 
-    pub fn push_task(&self, job: &dyn Runnable) -> Result<Task, Error> {
-        Self::push_task_query(&self.connection, job)
+    pub fn push_task(&self, task: &dyn Runnable) -> Result<Task, Error> {
+        Self::push_task_query(&self.connection, task)
     }
 
-    pub fn push_task_query(connection: &PgConnection, job: &dyn Runnable) -> Result<Task, Error> {
-        let json_job = serde_json::to_value(job).unwrap();
+    pub fn push_task_query(connection: &PgConnection, task: &dyn Runnable) -> Result<Task, Error> {
+        let json_task = serde_json::to_value(task).unwrap();
 
-        match Self::find_task_by_metadata_query(connection, &json_job) {
+        match Self::find_task_by_metadata_query(connection, &json_task) {
             Some(task) => Ok(task),
             None => {
                 let new_task = NewTask {
-                    metadata: json_job.clone(),
-                    task_type: job.task_type(),
+                    metadata: json_task.clone(),
+                    task_type: task.task_type(),
                 };
                 Self::insert_query(connection, &new_task)
             }
@@ -62,24 +62,24 @@ impl Queue {
 
     pub fn push_periodic_task(
         &self,
-        job: &dyn Runnable,
+        task: &dyn Runnable,
         period: i32,
     ) -> Result<PeriodicTask, Error> {
-        Self::push_periodic_task_query(&self.connection, job, period)
+        Self::push_periodic_task_query(&self.connection, task, period)
     }
 
     pub fn push_periodic_task_query(
         connection: &PgConnection,
-        job: &dyn Runnable,
+        task: &dyn Runnable,
         period: i32,
     ) -> Result<PeriodicTask, Error> {
-        let json_job = serde_json::to_value(job).unwrap();
+        let json_task = serde_json::to_value(task).unwrap();
 
-        match Self::find_periodic_task_by_metadata_query(connection, &json_job) {
+        match Self::find_periodic_task_by_metadata_query(connection, &json_task) {
             Some(task) => Ok(task),
             None => {
                 let new_task = NewPeriodicTask {
-                    metadata: json_job,
+                    metadata: json_task,
                     period_in_seconds: period,
                 };
 
@@ -90,8 +90,8 @@ impl Queue {
         }
     }
 
-    pub fn enqueue_task(job: &dyn Runnable) -> Result<Task, Error> {
-        Self::new().push_task(job)
+    pub fn enqueue_task(task: &dyn Runnable) -> Result<Task, Error> {
+        Self::new().push_task(task)
     }
 
     pub fn insert(&self, params: &NewTask) -> Result<Task, Error> {
@@ -404,11 +404,11 @@ mod queue_tests {
         queue.connection.test_transaction::<(), Error, _>(|| {
             let timestamp1 = Utc::now() - Duration::hours(40);
 
-            let task1 = insert_job(serde_json::json!(true), timestamp1, &queue.connection);
+            let task1 = insert_task(serde_json::json!(true), timestamp1, &queue.connection);
 
             let timestamp2 = Utc::now() - Duration::hours(20);
 
-            insert_job(serde_json::json!(false), timestamp2, &queue.connection);
+            insert_task(serde_json::json!(false), timestamp2, &queue.connection);
 
             let found_task = queue.fetch_task(&None).unwrap();
 
@@ -423,7 +423,7 @@ mod queue_tests {
         let queue = Queue::new();
 
         queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = insert_new_job(&queue.connection);
+            let task = insert_new_task(&queue.connection);
 
             let updated_task = queue.finish_task(&task).unwrap();
 
@@ -438,7 +438,7 @@ mod queue_tests {
         let queue = Queue::new();
 
         queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = insert_new_job(&queue.connection);
+            let task = insert_new_task(&queue.connection);
             let error = "Failed".to_string();
 
             let updated_task = queue.fail_task(&task, error.clone()).unwrap();
@@ -455,7 +455,7 @@ mod queue_tests {
         let queue = Queue::new();
 
         queue.connection.test_transaction::<(), Error, _>(|| {
-            let _task = insert_new_job(&queue.connection);
+            let _task = insert_new_task(&queue.connection);
 
             let updated_task = queue.fetch_and_touch(&None).unwrap().unwrap();
 
@@ -483,8 +483,8 @@ mod queue_tests {
         let queue = Queue::new();
 
         queue.connection.test_transaction::<(), Error, _>(|| {
-            let job = Job { number: 10 };
-            let task = queue.push_task(&job).unwrap();
+            let task = MyTask { number: 10 };
+            let task = queue.push_task(&task).unwrap();
 
             let mut m = serde_json::value::Map::new();
             m.insert(
@@ -493,7 +493,7 @@ mod queue_tests {
             );
             m.insert(
                 "type".to_string(),
-                serde_json::value::Value::String("Job".to_string()),
+                serde_json::value::Value::String("MyTask".to_string()),
             );
 
             assert_eq!(task.metadata, serde_json::value::Value::Object(m));
@@ -507,10 +507,10 @@ mod queue_tests {
         let queue = Queue::new();
 
         queue.connection.test_transaction::<(), Error, _>(|| {
-            let job = Job { number: 10 };
-            let task2 = queue.push_task(&job).unwrap();
+            let task = MyTask { number: 10 };
+            let task2 = queue.push_task(&task).unwrap();
 
-            let task1 = queue.push_task(&job).unwrap();
+            let task1 = queue.push_task(&task).unwrap();
 
             assert_eq!(task1.id, task2.id);
 
@@ -523,8 +523,8 @@ mod queue_tests {
         let queue = Queue::new();
 
         queue.connection.test_transaction::<(), Error, _>(|| {
-            let job = Job { number: 10 };
-            let task = queue.push_periodic_task(&job, 60).unwrap();
+            let task = MyTask { number: 10 };
+            let task = queue.push_periodic_task(&task, 60).unwrap();
 
             assert_eq!(task.period_in_seconds, 60);
             assert!(queue.find_periodic_task_by_id(task.id).is_some());
@@ -534,14 +534,14 @@ mod queue_tests {
     }
 
     #[test]
-    fn push_periodic_task_returns_existing_job() {
+    fn push_periodic_task_returns_existing_task() {
         let queue = Queue::new();
 
         queue.connection.test_transaction::<(), Error, _>(|| {
-            let job = Job { number: 10 };
-            let task1 = queue.push_periodic_task(&job, 60).unwrap();
+            let task = MyTask { number: 10 };
+            let task1 = queue.push_periodic_task(&task, 60).unwrap();
 
-            let task2 = queue.push_periodic_task(&job, 60).unwrap();
+            let task2 = queue.push_periodic_task(&task, 60).unwrap();
 
             assert_eq!(task1.id, task2.id);
 
@@ -554,12 +554,12 @@ mod queue_tests {
         let queue = Queue::new();
 
         queue.connection.test_transaction::<(), Error, _>(|| {
-            let job = Job { number: 10 };
-            let task = queue.push_periodic_task(&job, 60).unwrap();
+            let task = MyTask { number: 10 };
+            let task = queue.push_periodic_task(&task, 60).unwrap();
 
             let schedule_in_future = Utc::now() + Duration::hours(100);
 
-            insert_periodic_job(
+            insert_periodic_task(
                 serde_json::json!(true),
                 schedule_in_future,
                 100,
@@ -581,7 +581,7 @@ mod queue_tests {
 
         queue.connection.test_transaction::<(), Error, _>(|| {
             let task =
-                insert_periodic_job(serde_json::json!(true), Utc::now(), 100, &queue.connection);
+                insert_periodic_task(serde_json::json!(true), Utc::now(), 100, &queue.connection);
 
             let updated_task = queue.schedule_next_task_execution(&task).unwrap();
 
@@ -604,7 +604,7 @@ mod queue_tests {
 
         queue.connection.test_transaction::<(), Error, _>(|| {
             let task =
-                insert_periodic_job(serde_json::json!(true), Utc::now(), 100, &queue.connection);
+                insert_periodic_task(serde_json::json!(true), Utc::now(), 100, &queue.connection);
 
             let result = queue.remove_all_periodic_tasks().unwrap();
 
@@ -621,7 +621,7 @@ mod queue_tests {
         let queue = Queue::new();
 
         queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = insert_job(serde_json::json!(true), Utc::now(), &queue.connection);
+            let task = insert_task(serde_json::json!(true), Utc::now(), &queue.connection);
             let result = queue.remove_all_tasks().unwrap();
 
             assert_eq!(1, result);
@@ -639,7 +639,7 @@ mod queue_tests {
         queue.connection.test_transaction::<(), Error, _>(|| {
             let schedule_in_future = Utc::now() + Duration::hours(100);
 
-            insert_periodic_job(
+            insert_periodic_task(
                 serde_json::json!(true),
                 schedule_in_future,
                 100,
@@ -647,7 +647,7 @@ mod queue_tests {
             );
 
             let task =
-                insert_periodic_job(serde_json::json!(true), Utc::now(), 100, &queue.connection);
+                insert_periodic_task(serde_json::json!(true), Utc::now(), 100, &queue.connection);
 
             let tasks = queue.fetch_periodic_tasks(100).unwrap();
 
@@ -726,8 +726,8 @@ mod queue_tests {
         let queue = Queue::new();
         let timestamp1 = Utc::now() - Duration::hours(40);
 
-        let task1 = insert_job(
-            serde_json::json!(Job { number: 12 }),
+        let task1 = insert_task(
+            serde_json::json!(MyTask { number: 12 }),
             timestamp1,
             &queue.connection,
         );
@@ -736,8 +736,8 @@ mod queue_tests {
 
         let timestamp2 = Utc::now() - Duration::hours(20);
 
-        let task2 = insert_job(
-            serde_json::json!(Job { number: 11 }),
+        let task2 = insert_task(
+            serde_json::json!(MyTask { number: 11 }),
             timestamp2,
             &queue.connection,
         );
@@ -772,12 +772,12 @@ mod queue_tests {
     }
 
     #[derive(Serialize, Deserialize)]
-    struct Job {
+    struct MyTask {
         pub number: u16,
     }
 
     #[typetag::serde]
-    impl Runnable for Job {
+    impl Runnable for MyTask {
         fn run(&self, _connection: &PgConnection) -> Result<(), ExecutorError> {
             println!("the number is {}", self.number);
 
@@ -785,7 +785,7 @@ mod queue_tests {
         }
     }
 
-    fn insert_job(
+    fn insert_task(
         metadata: serde_json::Value,
         timestamp: DateTime<Utc>,
         connection: &PgConnection,
@@ -799,7 +799,7 @@ mod queue_tests {
             .unwrap()
     }
 
-    fn insert_periodic_job(
+    fn insert_periodic_task(
         metadata: serde_json::Value,
         timestamp: DateTime<Utc>,
         period_in_seconds: i32,
@@ -815,7 +815,7 @@ mod queue_tests {
             .unwrap()
     }
 
-    fn insert_new_job(connection: &PgConnection) -> Task {
+    fn insert_new_task(connection: &PgConnection) -> Task {
         diesel::insert_into(fang_tasks::table)
             .values(&vec![(fang_tasks::metadata.eq(serde_json::json!(true)),)])
             .get_result::<Task>(connection)
