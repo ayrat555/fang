@@ -21,14 +21,26 @@ pub enum FangTaskState {
     Failed,
     Finished,
 }
-#[derive(Debug, Eq, PartialEq, Clone, ToSql, FromSql)]
+impl Default for FangTaskState {
+    fn default() -> Self {
+        FangTaskState::New
+    }
+}
+#[derive(TypedBuilder, Debug, Eq, PartialEq, Clone, ToSql, FromSql)]
 pub struct Task {
+    #[builder(default, setter(into))]
     pub id: Uuid,
+    #[builder(default, setter(into))]
     pub metadata: serde_json::Value,
+    #[builder(default, setter(into))]
     pub error_message: Option<String>,
+    #[builder(default, setter(into))]
     pub state: FangTaskState,
+    #[builder(default, setter(into))]
     pub task_type: String,
+    #[builder(setter(into))]
     pub created_at: DateTime<Utc>,
+    #[builder(setter(into))]
     pub updated_at: DateTime<Utc>,
 }
 
@@ -140,25 +152,25 @@ where
     }
     pub async fn get_task_type(&mut self, task_type: &str) -> Result<Task, AsyncQueueError> {
         let row: Row = self.get_row(FETCH_TASK_TYPE_QUERY, &[&task_type]).await?;
-        let id = row.get("id");
-        let metadata = row.get("metadata");
-        let error_message = match row.try_get("error_message") {
+        let id: Uuid = row.get("id");
+        let metadata: serde_json::Value = row.get("metadata");
+        let error_message: Option<String> = match row.try_get("error_message") {
             Ok(error_message) => Some(error_message),
             Err(_) => None,
         };
-        let state = FangTaskState::New;
-        let task_type = row.get("task_type");
-        let created_at = row.get("created_at");
-        let updated_at = row.get("updated_at");
-        let task = Task {
-            id,
-            metadata,
-            error_message,
-            state,
-            task_type,
-            created_at,
-            updated_at,
-        };
+        let state: FangTaskState = FangTaskState::New;
+        let task_type: String = row.get("task_type");
+        let created_at: DateTime<Utc> = row.get("created_at");
+        let updated_at: DateTime<Utc> = row.get("updated_at");
+        let task = Task::builder()
+            .id(id)
+            .metadata(metadata)
+            .error_message(error_message)
+            .state(state)
+            .task_type(task_type)
+            .created_at(created_at)
+            .updated_at(updated_at)
+            .build();
         Ok(task)
     }
     pub async fn get_row(
