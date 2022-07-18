@@ -87,10 +87,10 @@ where
         self.execute_one(REMOVE_TASKS_TYPE_QUERY, &[&task_type])
             .await
     }
-    pub async fn fail_task(&mut self, task: &Task, state: &str) -> Result<u64, AsyncQueueError> {
+    pub async fn fail_task(&mut self, task: &Task) -> Result<u64, AsyncQueueError> {
         self.execute_one(
             FAIL_TASK_QUERY,
-            &[&state, &task.error_message, &task.updated_at, &task.id],
+            &[&"failed", &task.error_message, &task.updated_at, &task.id],
         )
         .await
     }
@@ -109,13 +109,6 @@ where
         } else {
             return Err(AsyncQueueError::PoolAndTransactionEmpty);
         };
-
-        if result != 1 {
-            return Err(AsyncQueueError::ResultError {
-                expected: 1,
-                found: result,
-            });
-        }
 
         Ok(result)
     }
@@ -159,6 +152,36 @@ mod async_queue_tests {
         queue.transaction.unwrap().rollback().await.unwrap();
     }
 
+    #[tokio::test]
+    async fn remove_all_tasks_test() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
+        let mut queue = AsyncQueue::<NoTls>::new_with_transaction(transaction);
+
+        let result = queue.insert_task(&Job { number: 1 }).await.unwrap();
+        assert_eq!(1, result);
+        let result = queue.insert_task(&Job { number: 2 }).await.unwrap();
+        assert_eq!(1, result);
+        let result = queue.remove_all_tasks().await.unwrap();
+        assert_eq!(2, result);
+        queue.transaction.unwrap().rollback().await.unwrap();
+    }
+    #[tokio::test]
+    async fn remove_tasks_type_test() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
+        let mut queue = AsyncQueue::<NoTls>::new_with_transaction(transaction);
+
+        let result = queue.insert_task(&Job { number: 1 }).await.unwrap();
+        assert_eq!(1, result);
+        let result = queue.insert_task(&Job { number: 2 }).await.unwrap();
+        assert_eq!(1, result);
+        let result = queue.remove_tasks_type("common").await.unwrap();
+        assert_eq!(2, result);
+        queue.transaction.unwrap().rollback().await.unwrap();
+    }
     async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
         let pg_mgr = PostgresConnectionManager::new_from_stringlike(
             "postgres://postgres:postgres@localhost/fang",
