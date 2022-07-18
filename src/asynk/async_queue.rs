@@ -4,24 +4,24 @@ use bb8_postgres::bb8::RunError;
 use bb8_postgres::tokio_postgres::row::Row;
 use bb8_postgres::tokio_postgres::tls::MakeTlsConnect;
 use bb8_postgres::tokio_postgres::tls::TlsConnect;
-use bb8_postgres::tokio_postgres::types::ToSql;
 use bb8_postgres::tokio_postgres::Socket;
 use bb8_postgres::tokio_postgres::Transaction;
 use bb8_postgres::PostgresConnectionManager;
 use chrono::DateTime;
 use chrono::Utc;
+use postgres_types::{FromSql, ToSql};
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, ToSql, FromSql)]
 pub enum FangTaskState {
     New,
     InProgress,
     Failed,
     Finished,
 }
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, ToSql, FromSql)]
 pub struct Task {
     pub id: Uuid,
     pub metadata: serde_json::Value,
@@ -129,10 +129,14 @@ where
         &mut self,
         task_type: &Option<String>,
     ) -> Result<Task, AsyncQueueError> {
-        match task_type {
-            None => self.get_task_type("common").await,
-            Some(task_type_str) => self.get_task_type(task_type_str).await,
-        }
+        let mut task = match task_type {
+            None => self.get_task_type("common").await?,
+            Some(task_type_str) => self.get_task_type(task_type_str).await?,
+        };
+        self.update_task_state(&task, FangTaskState::InProgress)
+            .await?;
+        task.state = FangTaskState::InProgress;
+        Ok(task)
     }
     pub async fn get_task_type(&mut self, task_type: &str) -> Result<Task, AsyncQueueError> {
         let row: Row = self.get_row(FETCH_TASK_TYPE_QUERY, &[&task_type]).await?;
@@ -183,7 +187,7 @@ where
     pub async fn update_task_state(
         &mut self,
         task: &Task,
-        state: &str,
+        state: FangTaskState,
     ) -> Result<u64, AsyncQueueError> {
         let updated_at = Utc::now();
         self.execute(
@@ -305,12 +309,7 @@ mod async_queue_tests {
         assert_eq!(1, result);
         let result = queue.insert_task(&AsyncTask { number: 2 }).await.unwrap();
         assert_eq!(1, result);
-        // Should fetching the same task because we not change task number 1 of state new
-        // To see debug println! invoke test with this cargo test -- --nocapture async_queue_tests
-        let task = queue.fetch_task(&None).await.unwrap();
-        println!("{:?}", task);
-        let task = queue.fetch_task(&None).await.unwrap();
-        println!("{:?}", task);
+        let _task = queue.fetch_task(&None).await.unwrap();
         queue.rollback().await.unwrap();
     }
     #[tokio::test]
