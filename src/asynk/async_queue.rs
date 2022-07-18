@@ -8,6 +8,7 @@ use bb8_postgres::tokio_postgres::types::ToSql;
 use bb8_postgres::tokio_postgres::Socket;
 use bb8_postgres::tokio_postgres::Transaction;
 use bb8_postgres::PostgresConnectionManager;
+use chrono::Utc;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 
@@ -63,7 +64,7 @@ where
         let metadata = serde_json::to_value(task).unwrap();
         let task_type = task.task_type();
 
-        self.execute_one(INSERT_TASK_QUERY, &[&metadata, &task_type])
+        self.execute(INSERT_TASK_QUERY, &[&metadata, &task_type])
             .await
     }
     pub async fn update_task_state(
@@ -71,31 +72,29 @@ where
         task: &Task,
         state: &str,
     ) -> Result<u64, AsyncQueueError> {
-        self.execute_one(
-            UPDATE_TASK_STATE_QUERY,
-            &[&state, &task.updated_at, &task.id],
-        )
-        .await
-    }
-    pub async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
-        self.execute_one(REMOVE_ALL_TASK_QUERY, &[]).await
-    }
-    pub async fn remove_task(&mut self, task: &Task) -> Result<u64, AsyncQueueError> {
-        self.execute_one(REMOVE_TASK_QUERY, &[&task.id]).await
-    }
-    pub async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
-        self.execute_one(REMOVE_TASKS_TYPE_QUERY, &[&task_type])
+        let updated_at = Utc::now();
+        self.execute(UPDATE_TASK_STATE_QUERY, &[&state, &updated_at, &task.id])
             .await
     }
+    pub async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
+        self.execute(REMOVE_ALL_TASK_QUERY, &[]).await
+    }
+    pub async fn remove_task(&mut self, task: &Task) -> Result<u64, AsyncQueueError> {
+        self.execute(REMOVE_TASK_QUERY, &[&task.id]).await
+    }
+    pub async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
+        self.execute(REMOVE_TASKS_TYPE_QUERY, &[&task_type]).await
+    }
     pub async fn fail_task(&mut self, task: &Task) -> Result<u64, AsyncQueueError> {
-        self.execute_one(
+        let updated_at = Utc::now();
+        self.execute(
             FAIL_TASK_QUERY,
-            &[&"failed", &task.error_message, &task.updated_at, &task.id],
+            &[&"failed", &task.error_message, &updated_at, &task.id],
         )
         .await
     }
 
-    async fn execute_one(
+    async fn execute(
         &mut self,
         query: &str,
         params: &[&(dyn ToSql + Sync)],
@@ -109,7 +108,6 @@ where
         } else {
             return Err(AsyncQueueError::PoolAndTransactionEmpty);
         };
-
         Ok(result)
     }
 }
