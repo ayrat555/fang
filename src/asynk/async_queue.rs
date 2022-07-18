@@ -326,7 +326,18 @@ mod async_queue_tests {
         assert_eq!(1, result);
         let result = queue.insert_task(&AsyncTask { number: 2 }).await.unwrap();
         assert_eq!(1, result);
-        let _task = queue.fetch_task(&None).await.unwrap();
+        let task = queue.fetch_task(&None).await.unwrap();
+        let metadata = task.metadata.as_object().unwrap();
+        let number = metadata["number"].as_u64();
+        let type_task = metadata["type"].as_str();
+        assert_eq!(Some(1), number);
+        assert_eq!(Some("AsyncTask"), type_task);
+        let task = queue.fetch_task(&None).await.unwrap();
+        let metadata = task.metadata.as_object().unwrap();
+        let number = metadata["number"].as_u64();
+        let type_task = metadata["type"].as_str();
+        assert_eq!(Some(2), number);
+        assert_eq!(Some("AsyncTask"), type_task);
         queue.rollback().await.unwrap();
     }
     #[tokio::test]
