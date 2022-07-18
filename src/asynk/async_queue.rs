@@ -31,7 +31,7 @@ impl Default for FangTaskState {
         FangTaskState::New
     }
 }
-#[derive(TypedBuilder, Debug, Eq, PartialEq, Clone, ToSql, FromSql)]
+#[derive(TypedBuilder, Debug, Eq, PartialEq, Clone)]
 pub struct Task {
     #[builder(default, setter(into))]
     pub id: Uuid,
