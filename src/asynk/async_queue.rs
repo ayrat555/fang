@@ -15,10 +15,15 @@ use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 #[derive(Debug, Eq, PartialEq, Clone, ToSql, FromSql)]
+#[postgres(name = "fang_task_state")]
 pub enum FangTaskState {
+    #[postgres(name = "new")]
     New,
+    #[postgres(name = "in_progress")]
     InProgress,
+    #[postgres(name = "failed")]
     Failed,
+    #[postgres(name = "finished")]
     Finished,
 }
 impl Default for FangTaskState {
