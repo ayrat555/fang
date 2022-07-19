@@ -77,7 +77,7 @@ impl Scheduler {
 }
 
 #[cfg(test)]
-mod job_scheduler_tests {
+mod task_scheduler_tests {
     use super::Scheduler;
     use crate::executor::Error;
     use crate::executor::Runnable;
@@ -92,10 +92,10 @@ mod job_scheduler_tests {
     use std::time::Duration;
 
     #[derive(Serialize, Deserialize)]
-    struct ScheduledJob {}
+    struct ScheduledTask {}
 
     #[typetag::serde]
-    impl Runnable for ScheduledJob {
+    impl Runnable for ScheduledTask {
         fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
             Ok(())
         }
@@ -107,10 +107,10 @@ mod job_scheduler_tests {
 
     #[test]
     #[ignore]
-    fn schedules_jobs() {
+    fn schedules_tasks() {
         let queue = Queue::new();
 
-        queue.push_periodic_task(&ScheduledJob {}, 10).unwrap();
+        queue.push_periodic_task(&ScheduledTask {}, 10).unwrap();
         Scheduler::start(1, 2);
 
         let sleep_duration = Duration::from_secs(15);
