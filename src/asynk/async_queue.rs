@@ -98,27 +98,19 @@ pub enum AsyncQueueError {
     PgError(#[from] bb8_postgres::tokio_postgres::Error),
     #[error("returned invalid result (expected {expected:?}, found {found:?})")]
     ResultError { expected: u64, found: u64 },
-    #[error("Queue doesn't have a connection")]
-    PoolAndTransactionEmpty,
-    #[error("Need to create a transaction to perform this operation")]
-    TransactionEmpty,
 }
 
-#[derive(TypedBuilder)]
-pub struct AsyncQueue<'a, Tls>
+pub struct AsyncQueue<Tls>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
-    #[builder(default, setter(into))]
-    pool: Option<Pool<PostgresConnectionManager<Tls>>>,
-    #[builder(default, setter(into))]
-    transaction: Option<Transaction<'a>>,
+    pool: Pool<PostgresConnectionManager<Tls>>,
 }
 
-impl<'a, Tls> AsyncQueue<'a, Tls>
+impl<Tls> AsyncQueue<Tls>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
@@ -126,64 +118,24 @@ where
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
     pub fn new(pool: Pool<PostgresConnectionManager<Tls>>) -> Self {
-        AsyncQueue::builder().pool(pool).build()
+        AsyncQueue { pool }
     }
 
-    pub fn new_with_transaction(transaction: Transaction<'a>) -> Self {
-        AsyncQueue::builder().transaction(transaction).build()
-    }
-
-    pub async fn rollback(mut self) -> Result<AsyncQueue<'a, Tls>, AsyncQueueError> {
-        let transaction = self.transaction;
-        self.transaction = None;
-        match transaction {
-            Some(tr) => {
-                tr.rollback().await?;
-                Ok(self)
-            }
-            None => Err(AsyncQueueError::TransactionEmpty),
-        }
-    }
-
-    pub async fn commit(mut self) -> Result<AsyncQueue<'a, Tls>, AsyncQueueError> {
-        let transaction = self.transaction;
-        self.transaction = None;
-        match transaction {
-            Some(tr) => {
-                tr.commit().await?;
-                Ok(self)
-            }
-            None => Err(AsyncQueueError::TransactionEmpty),
-        }
-    }
-
-    async fn fetch_and_touch_task(
+    pub async fn fetch_and_touch_task(
         &mut self,
         task_type: &Option<String>,
     ) -> Result<Task, AsyncQueueError> {
-        if let Some(pool) = &self.pool {
-            let mut connection = pool.get().await?;
-            let mut transaction = connection.transaction().await?;
+        let mut connection = self.pool.get().await?;
+        let mut transaction = connection.transaction().await?;
 
-            let task = Self::fetch_and_touch(&mut transaction, task_type).await?;
+        let task = Self::fetch_and_touch(&mut transaction, task_type).await?;
 
-            transaction.commit().await?;
+        transaction.commit().await?;
 
-            Ok(task)
-        } else if let Some(transaction) = &mut self.transaction {
-            let mut nested_transaction = transaction.transaction().await?;
-
-            let task = Self::fetch_and_touch(&mut nested_transaction, task_type).await?;
-
-            nested_transaction.commit().await?;
-
-            Ok(task)
-        } else {
-            return Err(AsyncQueueError::PoolAndTransactionEmpty);
-        }
+        Ok(task)
     }
 
-    async fn fetch_and_touch(
+    pub async fn fetch_and_touch(
         transaction: &mut Transaction<'_>,
         task_type: &Option<String>,
     ) -> Result<Task, AsyncQueueError> {
@@ -217,15 +169,10 @@ where
         query: &str,
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Row, AsyncQueueError> {
-        let row: Row = if let Some(pool) = &self.pool {
-            let connection = pool.get().await?;
+        let connection = self.pool.get().await?;
 
-            connection.query_one(query, params).await?
-        } else if let Some(transaction) = &self.transaction {
-            transaction.query_one(query, params).await?
-        } else {
-            return Err(AsyncQueueError::PoolAndTransactionEmpty);
-        };
+        let row = connection.query_one(query, params).await?;
+
         Ok(row)
     }
 
@@ -285,15 +232,9 @@ where
         params: &[&(dyn ToSql + Sync)],
         expected_result_count: Option<u64>,
     ) -> Result<u64, AsyncQueueError> {
-        let result = if let Some(pool) = &self.pool {
-            let connection = pool.get().await?;
+        let connection = self.pool.get().await?;
 
-            connection.execute(query, params).await?
-        } else if let Some(transaction) = &self.transaction {
-            transaction.execute(query, params).await?
-        } else {
-            return Err(AsyncQueueError::PoolAndTransactionEmpty);
-        };
+        let result = connection.execute(query, params).await?;
         if let Some(expected_result) = expected_result_count {
             if result != expected_result {
                 return Err(AsyncQueueError::ResultError {
