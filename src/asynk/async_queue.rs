@@ -331,18 +331,20 @@ mod async_queue_tests {
         }
     }
 
-    // #[tokio::test]
-    // async fn insert_task_creates_new_task() {
-    //     let pool = pool().await;
-    //     let mut connection = pool.get().await.unwrap();
-    //     let transaction = connection.transaction().await.unwrap();
-    //     let mut queue = AsyncQueue::<NoTls>::new_with_transaction(transaction);
+    #[tokio::test]
+    async fn insert_task_creates_new_task() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let mut transaction = connection.transaction().await.unwrap();
 
-    //     let result = queue.insert_task(&AsyncTask { number: 1 }).await.unwrap();
+        let result =
+            AsyncQueue::<NoTls>::insert_task_query(&mut transaction, &AsyncTask { number: 1 })
+                .await
+                .unwrap();
 
-    //     assert_eq!(1, result);
-    //     queue.rollback().await.unwrap();
-    // }
+        assert_eq!(1, result);
+        transaction.rollback().await.unwrap();
+    }
 
     // #[tokio::test]
     // async fn remove_all_tasks_test() {
@@ -424,7 +426,7 @@ mod async_queue_tests {
 
     async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
         let pg_mgr = PostgresConnectionManager::new_from_stringlike(
-            "postgres://postgres:mypassword1@localhost/fang",
+            "postgres://postgres:postgres@localhost/fang",
             NoTls,
         )
         .unwrap();
