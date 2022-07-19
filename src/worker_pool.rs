@@ -226,9 +226,9 @@ mod task_pool_tests {
     use crate::executor::RetentionMode;
     use crate::executor::Runnable;
     use crate::queue::Queue;
+    use crate::queue::Task;
     use crate::schema::{fang_tasks, FangTaskState};
     use crate::typetag;
-    use crate::Task;
     use diesel::pg::PgConnection;
     use diesel::prelude::*;
     use serde::{Deserialize, Serialize};

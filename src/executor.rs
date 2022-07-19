@@ -1,7 +1,7 @@
 use crate::error::FangError;
 use crate::queue::Queue;
+use crate::queue::Task;
 use crate::worker_pool::{SharedState, WorkerState};
-use crate::Task;
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use log::error;
@@ -185,10 +185,10 @@ mod executor_tests {
     use super::Executor;
     use super::RetentionMode;
     use super::Runnable;
+    use crate::queue::NewTask;
     use crate::queue::Queue;
     use crate::schema::FangTaskState;
     use crate::typetag;
-    use crate::NewTask;
     use diesel::connection::Connection;
     use diesel::pg::PgConnection;
     use diesel::r2d2::{ConnectionManager, PooledConnection};
