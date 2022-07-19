@@ -14,6 +14,16 @@ use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
+const INSERT_TASK_QUERY: &str = include_str!("queries/insert_task.sql");
+const UPDATE_TASK_STATE_QUERY: &str = include_str!("queries/update_task_state.sql");
+const FAIL_TASK_QUERY: &str = include_str!("queries/fail_task.sql");
+const REMOVE_ALL_TASK_QUERY: &str = include_str!("queries/remove_all_tasks.sql");
+const REMOVE_TASK_QUERY: &str = include_str!("queries/remove_task.sql");
+const REMOVE_TASKS_TYPE_QUERY: &str = include_str!("queries/remove_tasks_type.sql");
+const FETCH_TASK_TYPE_QUERY: &str = include_str!("queries/fetch_task_type.sql");
+
+const DEFAULT_TASK_TYPE: &str = "common";
+
 #[derive(Debug, Eq, PartialEq, Clone, ToSql, FromSql)]
 #[postgres(name = "fang_task_state")]
 pub enum FangTaskState {
@@ -108,14 +118,6 @@ where
     transaction: Option<Transaction<'a>>,
 }
 
-const INSERT_TASK_QUERY: &str = include_str!("queries/insert_task.sql");
-const UPDATE_TASK_STATE_QUERY: &str = include_str!("queries/update_task_state.sql");
-const FAIL_TASK_QUERY: &str = include_str!("queries/fail_task.sql");
-const REMOVE_ALL_TASK_QUERY: &str = include_str!("queries/remove_all_tasks.sql");
-const REMOVE_TASK_QUERY: &str = include_str!("queries/remove_task.sql");
-const REMOVE_TASKS_TYPE_QUERY: &str = include_str!("queries/remove_tasks_type.sql");
-const FETCH_TASK_TYPE_QUERY: &str = include_str!("queries/fetch_task_type.sql");
-
 impl<'a, Tls> AsyncQueue<'a, Tls>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
@@ -130,6 +132,7 @@ where
     pub fn new_with_transaction(transaction: Transaction<'a>) -> Self {
         AsyncQueue::builder().transaction(transaction).build()
     }
+
     pub async fn rollback(mut self) -> Result<AsyncQueue<'a, Tls>, AsyncQueueError> {
         let transaction = self.transaction;
         self.transaction = None;
@@ -141,6 +144,7 @@ where
             None => Err(AsyncQueueError::TransactionEmpty),
         }
     }
+
     pub async fn commit(mut self) -> Result<AsyncQueue<'a, Tls>, AsyncQueueError> {
         let transaction = self.transaction;
         self.transaction = None;
@@ -152,42 +156,62 @@ where
             None => Err(AsyncQueueError::TransactionEmpty),
         }
     }
-    pub async fn fetch_task(
+
+    async fn fetch_and_touch_task(
         &mut self,
         task_type: &Option<String>,
     ) -> Result<Task, AsyncQueueError> {
+        if let Some(pool) = &self.pool {
+            let mut connection = pool.get().await?;
+            let mut transaction = connection.transaction().await?;
+
+            let task = Self::fetch_and_touch(&mut transaction, task_type).await?;
+
+            transaction.commit().await?;
+
+            Ok(task)
+        } else if let Some(transaction) = &mut self.transaction {
+            let mut nested_transaction = transaction.transaction().await?;
+
+            let task = Self::fetch_and_touch(&mut nested_transaction, task_type).await?;
+
+            nested_transaction.commit().await?;
+
+            Ok(task)
+        } else {
+            return Err(AsyncQueueError::PoolAndTransactionEmpty);
+        }
+    }
+
+    async fn fetch_and_touch(
+        transaction: &mut Transaction<'_>,
+        task_type: &Option<String>,
+    ) -> Result<Task, AsyncQueueError> {
         let mut task = match task_type {
-            None => self.get_task_type("common").await?,
-            Some(task_type_str) => self.get_task_type(task_type_str).await?,
+            None => Self::get_task_type(transaction, DEFAULT_TASK_TYPE).await?,
+            Some(task_type_str) => Self::get_task_type(transaction, task_type_str).await?,
         };
-        self.update_task_state(&task, FangTaskState::InProgress)
-            .await?;
+
+        Self::update_task_state(transaction, &task, FangTaskState::InProgress).await?;
+
         task.state = FangTaskState::InProgress;
+
         Ok(task)
     }
-    pub async fn get_task_type(&mut self, task_type: &str) -> Result<Task, AsyncQueueError> {
-        let row: Row = self.get_row(FETCH_TASK_TYPE_QUERY, &[&task_type]).await?;
-        let id: Uuid = row.get("id");
-        let metadata: serde_json::Value = row.get("metadata");
-        let error_message: Option<String> = match row.try_get("error_message") {
-            Ok(error_message) => Some(error_message),
-            Err(_) => None,
-        };
-        let state: FangTaskState = FangTaskState::New;
-        let task_type: String = row.get("task_type");
-        let created_at: DateTime<Utc> = row.get("created_at");
-        let updated_at: DateTime<Utc> = row.get("updated_at");
-        let task = Task::builder()
-            .id(id)
-            .metadata(metadata)
-            .error_message(error_message)
-            .state(state)
-            .task_type(task_type)
-            .created_at(created_at)
-            .updated_at(updated_at)
-            .build();
+
+    async fn get_task_type(
+        transaction: &mut Transaction<'_>,
+        task_type: &str,
+    ) -> Result<Task, AsyncQueueError> {
+        let row: Row = transaction
+            .query_one(FETCH_TASK_TYPE_QUERY, &[&task_type])
+            .await?;
+
+        let task = Self::row_to_task(row);
+
         Ok(task)
     }
+
     pub async fn get_row(
         &mut self,
         query: &str,
@@ -204,6 +228,7 @@ where
         };
         Ok(row)
     }
+
     pub async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<u64, AsyncQueueError> {
         let metadata = serde_json::to_value(task).unwrap();
         let task_type = task.task_type();
@@ -211,29 +236,34 @@ where
         self.execute(INSERT_TASK_QUERY, &[&metadata, &task_type], Some(1))
             .await
     }
+
     pub async fn update_task_state(
-        &mut self,
+        transaction: &mut Transaction<'_>,
         task: &Task,
         state: FangTaskState,
     ) -> Result<u64, AsyncQueueError> {
         let updated_at = Utc::now();
-        self.execute(
-            UPDATE_TASK_STATE_QUERY,
-            &[&state, &updated_at, &task.id],
-            Some(1),
-        )
-        .await
+
+        let count = transaction
+            .execute(UPDATE_TASK_STATE_QUERY, &[&state, &updated_at, &task.id])
+            .await?;
+
+        Ok(count)
     }
+
     pub async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
         self.execute(REMOVE_ALL_TASK_QUERY, &[], None).await
     }
+
     pub async fn remove_task(&mut self, task: &Task) -> Result<u64, AsyncQueueError> {
         self.execute(REMOVE_TASK_QUERY, &[&task.id], Some(1)).await
     }
+
     pub async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
         self.execute(REMOVE_TASKS_TYPE_QUERY, &[&task_type], None)
             .await
     }
+
     pub async fn fail_task(&mut self, task: &Task) -> Result<u64, AsyncQueueError> {
         let updated_at = Utc::now();
         self.execute(
@@ -273,6 +303,29 @@ where
             }
         }
         Ok(result)
+    }
+
+    fn row_to_task(row: Row) -> Task {
+        let id: Uuid = row.get("id");
+        let metadata: serde_json::Value = row.get("metadata");
+        let error_message: Option<String> = match row.try_get("error_message") {
+            Ok(error_message) => Some(error_message),
+            Err(_) => None,
+        };
+        let state: FangTaskState = FangTaskState::New;
+        let task_type: String = row.get("task_type");
+        let created_at: DateTime<Utc> = row.get("created_at");
+        let updated_at: DateTime<Utc> = row.get("updated_at");
+
+        Task::builder()
+            .id(id)
+            .metadata(metadata)
+            .error_message(error_message)
+            .state(state)
+            .task_type(task_type)
+            .created_at(created_at)
+            .updated_at(updated_at)
+            .build()
     }
 }
 
@@ -323,10 +376,13 @@ mod async_queue_tests {
 
         let result = queue.insert_task(&AsyncTask { number: 1 }).await.unwrap();
         assert_eq!(1, result);
+
         let result = queue.insert_task(&AsyncTask { number: 2 }).await.unwrap();
         assert_eq!(1, result);
+
         let result = queue.remove_all_tasks().await.unwrap();
         assert_eq!(2, result);
+
         queue.rollback().await.unwrap();
     }
 
@@ -339,20 +395,26 @@ mod async_queue_tests {
 
         let result = queue.insert_task(&AsyncTask { number: 1 }).await.unwrap();
         assert_eq!(1, result);
+
         let result = queue.insert_task(&AsyncTask { number: 2 }).await.unwrap();
         assert_eq!(1, result);
-        let task = queue.fetch_task(&None).await.unwrap();
+
+        let task = queue.fetch_and_touch_task(&None).await.unwrap();
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
+
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
-        let task = queue.fetch_task(&None).await.unwrap();
+
+        let task = queue.fetch_and_touch_task(&None).await.unwrap();
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
+
         assert_eq!(Some(2), number);
         assert_eq!(Some("AsyncTask"), type_task);
+
         queue.rollback().await.unwrap();
     }
     #[tokio::test]
@@ -364,16 +426,19 @@ mod async_queue_tests {
 
         let result = queue.insert_task(&AsyncTask { number: 1 }).await.unwrap();
         assert_eq!(1, result);
+
         let result = queue.insert_task(&AsyncTask { number: 2 }).await.unwrap();
         assert_eq!(1, result);
+
         let result = queue.remove_tasks_type("common").await.unwrap();
         assert_eq!(2, result);
+
         queue.rollback().await.unwrap();
     }
 
     async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
         let pg_mgr = PostgresConnectionManager::new_from_stringlike(
-            "postgres://postgres:postgres@localhost/fang",
+            "postgres://postgres:mypassword1@localhost/fang",
             NoTls,
         )
         .unwrap();
