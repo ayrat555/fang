@@ -2,7 +2,6 @@ use crate::executor::Runnable;
 use crate::schema::fang_periodic_tasks;
 use crate::schema::fang_tasks;
 use crate::schema::FangTaskState;
-use crate::{NewPeriodicTask, NewTask, PeriodicTask, Task};
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
@@ -13,6 +12,43 @@ use diesel::result::Error;
 use dotenv::dotenv;
 use std::env;
 use uuid::Uuid;
+
+#[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone)]
+#[table_name = "fang_tasks"]
+pub struct Task {
+    pub id: Uuid,
+    pub metadata: serde_json::Value,
+    pub error_message: Option<String>,
+    pub state: FangTaskState,
+    pub task_type: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone)]
+#[table_name = "fang_periodic_tasks"]
+pub struct PeriodicTask {
+    pub id: Uuid,
+    pub metadata: serde_json::Value,
+    pub period_in_seconds: i32,
+    pub scheduled_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Insertable)]
+#[table_name = "fang_tasks"]
+pub struct NewTask {
+    pub metadata: serde_json::Value,
+    pub task_type: String,
+}
+
+#[derive(Insertable)]
+#[table_name = "fang_periodic_tasks"]
+pub struct NewPeriodicTask {
+    pub metadata: serde_json::Value,
+    pub period_in_seconds: i32,
+}
 
 pub struct Queue {
     pub connection: PgConnection,
