@@ -126,7 +126,7 @@ where
         {
             Ok(Some(task)) => {
                 self.sleep_params.maybe_reset_sleep_period();
-                //          self.run(task).await;
+                self.run(task).await;
             }
             Ok(None) => {
                 self.sleep();
