@@ -181,16 +181,16 @@ where
 
     pub async fn fail_task(
         &mut self,
-        task: &Task,
+        task: Task,
         error_message: &str,
-    ) -> Result<u64, AsyncQueueError> {
+    ) -> Result<Task, AsyncQueueError> {
         let mut connection = self.pool.get().await?;
         let mut transaction = connection.transaction().await?;
 
-        let result = Self::fail_task_query(&mut transaction, task, error_message).await?;
+        let task = Self::fail_task_query(&mut transaction, task, error_message).await?;
         transaction.commit().await?;
 
-        Ok(result)
+        Ok(task)
     }
 
     pub async fn remove_all_tasks_query(
@@ -215,23 +215,24 @@ where
 
     pub async fn fail_task_query(
         transaction: &mut Transaction<'_>,
-        task: &Task,
+        task: Task,
         error_message: &str,
-    ) -> Result<u64, AsyncQueueError> {
+    ) -> Result<Task, AsyncQueueError> {
         let updated_at = Utc::now();
 
-        Self::execute_query(
-            transaction,
-            FAIL_TASK_QUERY,
-            &[
-                &FangTaskState::Failed,
-                &error_message,
-                &updated_at,
-                &task.id,
-            ],
-            Some(1),
-        )
-        .await
+        let row: Row = transaction
+            .query_one(
+                FAIL_TASK_QUERY,
+                &[
+                    &FangTaskState::Failed,
+                    &error_message,
+                    &updated_at,
+                    &task.id,
+                ],
+            )
+            .await?;
+        let failed_task = Self::row_to_task(row);
+        Ok(failed_task)
     }
 
     pub async fn fetch_and_touch_task_query(
@@ -379,6 +380,30 @@ mod async_queue_tests {
 
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
+        transaction.rollback().await.unwrap();
+    }
+    #[tokio::test]
+    async fn failed_task_query_test() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let mut transaction = connection.transaction().await.unwrap();
+
+        let task =
+            AsyncQueue::<NoTls>::insert_task_query(&mut transaction, &AsyncTask { number: 1 })
+                .await
+                .unwrap();
+        let metadata = task.metadata.as_object().unwrap();
+        let number = metadata["number"].as_u64();
+        let type_task = metadata["type"].as_str();
+        let id = task.id.clone();
+        assert_eq!(Some(1), number);
+        assert_eq!(Some("AsyncTask"), type_task);
+        let failed_task =
+            AsyncQueue::<NoTls>::fail_task_query(&mut transaction, task, "Some error")
+                .await
+                .unwrap();
+        assert_eq!(id, failed_task.id);
+        assert_eq!(Some("Some error"), failed_task.error_message.as_deref());
         transaction.rollback().await.unwrap();
     }
 
