@@ -7,8 +7,8 @@ use bb8_postgres::tokio_postgres::tls::MakeTlsConnect;
 use bb8_postgres::tokio_postgres::tls::TlsConnect;
 use bb8_postgres::tokio_postgres::Socket;
 use log::error;
-use std::thread;
 use std::time::Duration;
+use tokio::time::sleep;
 use typed_builder::TypedBuilder;
 #[derive(Clone, Debug)]
 pub enum RetentionMode {
@@ -78,7 +78,6 @@ where
         let actual_task: Box<dyn AsyncRunnable> =
             serde_json::from_value(task.metadata.clone()).unwrap();
         let task_result = actual_task.run(&self.queue.pool).await;
-
         match task_result {
             Ok(()) => Ok(task),
             Err(error) => Err((task, error.description)),
@@ -115,7 +114,7 @@ where
     pub fn sleep(&mut self) {
         self.sleep_params.maybe_increase_sleep_period();
 
-        thread::sleep(Duration::from_secs(self.sleep_params.sleep_period));
+        sleep(Duration::from_secs(self.sleep_params.sleep_period));
     }
     pub async fn run_tasks(&mut self) -> Result<(), Error> {
         //loop {}
@@ -127,7 +126,7 @@ where
         {
             Ok(Some(task)) => {
                 self.sleep_params.maybe_reset_sleep_period();
-                self.run(task).await;
+                //          self.run(task).await;
             }
             Ok(None) => {
                 self.sleep();

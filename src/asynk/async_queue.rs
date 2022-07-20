@@ -402,6 +402,34 @@ mod async_queue_tests {
         transaction.rollback().await.unwrap();
     }
     #[tokio::test]
+    async fn update_task_state_test() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let mut transaction = connection.transaction().await.unwrap();
+
+        let task =
+            AsyncQueue::<NoTls>::insert_task_query(&mut transaction, &AsyncTask { number: 1 })
+                .await
+                .unwrap();
+        let metadata = task.metadata.as_object().unwrap();
+        let number = metadata["number"].as_u64();
+        let type_task = metadata["type"].as_str();
+        let id = task.id;
+        assert_eq!(Some(1), number);
+        assert_eq!(Some("AsyncTask"), type_task);
+        let finished_task = AsyncQueue::<NoTls>::update_task_state_query(
+            &mut transaction,
+            task,
+            FangTaskState::Finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(id, finished_task.id);
+        assert_eq!(FangTaskState::Finished, finished_task.state);
+        transaction.rollback().await.unwrap();
+    }
+
+    #[tokio::test]
     async fn failed_task_query_test() {
         let pool = pool().await;
         let mut connection = pool.get().await.unwrap();
@@ -494,6 +522,7 @@ mod async_queue_tests {
 
         let task = AsyncQueue::<NoTls>::fetch_and_touch_task_query(&mut transaction, &None)
             .await
+            .unwrap()
             .unwrap();
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -504,6 +533,7 @@ mod async_queue_tests {
 
         let task = AsyncQueue::<NoTls>::fetch_and_touch_task_query(&mut transaction, &None)
             .await
+            .unwrap()
             .unwrap();
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
