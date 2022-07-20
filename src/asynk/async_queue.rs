@@ -172,7 +172,7 @@ where
         let mut connection = self.pool.get().await?;
         let mut transaction = connection.transaction().await?;
 
-        let result = Self::remove_tasks_type_query(&mut transaction, &task_type).await?;
+        let result = Self::remove_tasks_type_query(&mut transaction, task_type).await?;
 
         transaction.commit().await?;
 
