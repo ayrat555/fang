@@ -322,7 +322,7 @@ where
             Ok(error_message) => Some(error_message),
             Err(_) => None,
         };
-        let state: FangTaskState = FangTaskState::New;
+        let state: FangTaskState = row.get("state");
         let task_type: String = row.get("task_type");
         let created_at: DateTime<Utc> = row.get("created_at");
         let updated_at: DateTime<Utc> = row.get("updated_at");
@@ -342,6 +342,7 @@ where
 #[cfg(test)]
 mod async_queue_tests {
     use super::AsyncQueue;
+    use super::FangTaskState;
     use crate::asynk::AsyncRunnable;
     use crate::asynk::Error;
     use async_trait::async_trait;
@@ -404,6 +405,7 @@ mod async_queue_tests {
                 .unwrap();
         assert_eq!(id, failed_task.id);
         assert_eq!(Some("Some error"), failed_task.error_message.as_deref());
+        assert_eq!(FangTaskState::Failed, failed_task.state);
         transaction.rollback().await.unwrap();
     }
 
