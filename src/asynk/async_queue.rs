@@ -100,6 +100,7 @@ pub enum AsyncQueueError {
     ResultError { expected: u64, found: u64 },
 }
 
+#[derive(Debug)]
 pub struct AsyncQueue<Tls>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
@@ -124,7 +125,7 @@ where
     pub async fn fetch_and_touch_task(
         &mut self,
         task_type: &Option<String>,
-    ) -> Result<Task, AsyncQueueError> {
+    ) -> Result<Option<Task>, AsyncQueueError> {
         let mut connection = self.pool.get().await?;
         let mut transaction = connection.transaction().await?;
 
@@ -157,7 +158,7 @@ where
         Ok(result)
     }
 
-    pub async fn remove_task(&mut self, task: &Task) -> Result<u64, AsyncQueueError> {
+    pub async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError> {
         let mut connection = self.pool.get().await?;
         let mut transaction = connection.transaction().await?;
 
@@ -192,6 +193,19 @@ where
 
         Ok(task)
     }
+    pub async fn update_task_state(
+        &mut self,
+        task: Task,
+        state: FangTaskState,
+    ) -> Result<Task, AsyncQueueError> {
+        let mut connection = self.pool.get().await?;
+        let mut transaction = connection.transaction().await?;
+
+        let task = Self::update_task_state_query(&mut transaction, task, state).await?;
+        transaction.commit().await?;
+
+        Ok(task)
+    }
 
     pub async fn remove_all_tasks_query(
         transaction: &mut Transaction<'_>,
@@ -201,7 +215,7 @@ where
 
     pub async fn remove_task_query(
         transaction: &mut Transaction<'_>,
-        task: &Task,
+        task: Task,
     ) -> Result<u64, AsyncQueueError> {
         Self::execute_query(transaction, REMOVE_TASK_QUERY, &[&task.id], Some(1)).await
     }
@@ -238,19 +252,25 @@ where
     pub async fn fetch_and_touch_task_query(
         transaction: &mut Transaction<'_>,
         task_type: &Option<String>,
-    ) -> Result<Task, AsyncQueueError> {
+    ) -> Result<Option<Task>, AsyncQueueError> {
         let task_type = match task_type {
             Some(passed_task_type) => passed_task_type,
             None => DEFAULT_TASK_TYPE,
         };
 
-        let mut task = Self::get_task_type_query(transaction, task_type).await?;
-
-        Self::update_task_state_query(transaction, &task, FangTaskState::InProgress).await?;
-
-        task.state = FangTaskState::InProgress;
-
-        Ok(task)
+        let task = match Self::get_task_type_query(transaction, task_type).await {
+            Ok(some_task) => Some(some_task),
+            Err(_) => None,
+        };
+        let result_task = if let Some(some_task) = task {
+            Some(
+                Self::update_task_state_query(transaction, some_task, FangTaskState::InProgress)
+                    .await?,
+            )
+        } else {
+            None
+        };
+        Ok(result_task)
     }
 
     pub async fn get_task_type_query(
@@ -268,18 +288,16 @@ where
 
     pub async fn update_task_state_query(
         transaction: &mut Transaction<'_>,
-        task: &Task,
+        task: Task,
         state: FangTaskState,
-    ) -> Result<u64, AsyncQueueError> {
+    ) -> Result<Task, AsyncQueueError> {
         let updated_at = Utc::now();
 
-        Self::execute_query(
-            transaction,
-            UPDATE_TASK_STATE_QUERY,
-            &[&state, &updated_at, &task.id],
-            Some(1),
-        )
-        .await
+        let row: Row = transaction
+            .query_one(UPDATE_TASK_STATE_QUERY, &[&state, &updated_at, &task.id])
+            .await?;
+        let task = Self::row_to_task(row);
+        Ok(task)
     }
 
     pub async fn insert_task_query(
