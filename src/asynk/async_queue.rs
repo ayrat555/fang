@@ -395,7 +395,7 @@ mod async_queue_tests {
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
-        let id = task.id.clone();
+        let id = task.id;
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
         let failed_task =
