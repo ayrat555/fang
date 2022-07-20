@@ -11,19 +11,53 @@ rust-version = "1.62"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+blocking = ["diesel", "diesel-derive-enum", "dotenv"]
+asynk = ["bb8-postgres", "postgres-types", "tokio", "async-trait", "typed-builder"]
+
 [dependencies]
-diesel = { version = "1.4", features = ["postgres", "serde_json", "chrono", "uuidv07", "r2d2"] }
-diesel-derive-enum = { version = "1", features = ["postgres"] }
-dotenv = "0.15"
-uuid = { version = "0.8", features = ["v4"] }
 chrono = "0.4"
-serde_json = "1"
-typetag = "0.2"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 thiserror = "1.0"
-bb8-postgres = {version = "0.8", features = ["with-serde_json-1" , "with-uuid-0_8" , "with-chrono-0_4" ]}
-postgres-types = { version = "0.X.X", features = ["derive"] }
-tokio = { version = "1.20", features = ["full"] }
-async-trait = "0.1"
-typed-builder = "0.10"
+typetag = "0.2"
+uuid = { version = "0.8", features = ["v4"] }
+
+
+[dependencies.diesel]
+version = "1.4"
+features = ["postgres", "serde_json", "chrono", "uuidv07", "r2d2"]
+optional = true
+
+[dependencies.diesel-derive-enum]
+version = "1"
+features = ["postgres"]
+optional = true
+
+[dependencies.dotenv]
+version = "0.15"
+optional = true
+
+[dependencies.bb8-postgres]
+version = "0.8"
+features = ["with-serde_json-1" , "with-uuid-0_8" , "with-chrono-0_4"]
+optional = true
+
+[dependencies.postgres-types]
+version = "0.X.X"
+features = ["derive"]
+optional = true
+
+[dependencies.tokio]
+version = "1.20"
+features = ["full"]
+optional = true
+
+[dependencies.async-trait]
+version = "0.1"
+optional = true
+
+[dependencies.typed-builder]
+version = "0.10"
+optional = true
