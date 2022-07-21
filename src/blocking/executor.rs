@@ -1,7 +1,8 @@
 use crate::error::FangError;
 use crate::queue::Queue;
+use crate::queue::Task;
 use crate::worker_pool::{SharedState, WorkerState};
-use crate::Task;
+use crate::{RetentionMode, SleepParams};
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use log::error;
@@ -15,47 +16,6 @@ pub struct Executor {
     pub retention_mode: RetentionMode,
     shared_state: Option<SharedState>,
 }
-
-#[derive(Clone)]
-pub enum RetentionMode {
-    KeepAll,
-    RemoveAll,
-    RemoveFinished,
-}
-
-#[derive(Clone)]
-pub struct SleepParams {
-    pub sleep_period: u64,
-    pub max_sleep_period: u64,
-    pub min_sleep_period: u64,
-    pub sleep_step: u64,
-}
-
-impl SleepParams {
-    pub fn maybe_reset_sleep_period(&mut self) {
-        if self.sleep_period != self.min_sleep_period {
-            self.sleep_period = self.min_sleep_period;
-        }
-    }
-
-    pub fn maybe_increase_sleep_period(&mut self) {
-        if self.sleep_period < self.max_sleep_period {
-            self.sleep_period += self.sleep_step;
-        }
-    }
-}
-
-impl Default for SleepParams {
-    fn default() -> Self {
-        SleepParams {
-            sleep_period: 5,
-            max_sleep_period: 15,
-            min_sleep_period: 5,
-            sleep_step: 5,
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Error {
     pub description: String,

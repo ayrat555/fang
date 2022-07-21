@@ -3,6 +3,7 @@ use crate::asynk::async_queue::FangTaskState;
 use crate::asynk::async_queue::Task;
 use crate::asynk::async_runnable::AsyncRunnable;
 use crate::asynk::Error;
+use crate::{RetentionMode, SleepParams};
 use bb8_postgres::tokio_postgres::tls::MakeTlsConnect;
 use bb8_postgres::tokio_postgres::tls::TlsConnect;
 use bb8_postgres::tokio_postgres::Socket;
@@ -10,42 +11,7 @@ use log::error;
 use std::time::Duration;
 use tokio::time::sleep;
 use typed_builder::TypedBuilder;
-#[derive(Clone, Debug)]
-pub enum RetentionMode {
-    KeepAll,
-    RemoveAll,
-    RemoveFinished,
-}
-#[derive(Clone, Debug)]
-pub struct SleepParams {
-    pub sleep_period: u64,
-    pub max_sleep_period: u64,
-    pub min_sleep_period: u64,
-    pub sleep_step: u64,
-}
-impl SleepParams {
-    pub fn maybe_reset_sleep_period(&mut self) {
-        if self.sleep_period != self.min_sleep_period {
-            self.sleep_period = self.min_sleep_period;
-        }
-    }
 
-    pub fn maybe_increase_sleep_period(&mut self) {
-        if self.sleep_period < self.max_sleep_period {
-            self.sleep_period += self.sleep_step;
-        }
-    }
-}
-impl Default for SleepParams {
-    fn default() -> Self {
-        SleepParams {
-            sleep_period: 5,
-            max_sleep_period: 15,
-            min_sleep_period: 5,
-            sleep_step: 5,
-        }
-    }
-}
 #[derive(TypedBuilder, Debug)]
 pub struct AsyncWorker<Tls>
 where
@@ -117,27 +83,26 @@ where
         sleep(Duration::from_secs(self.sleep_params.sleep_period));
     }
     pub async fn run_tasks(&mut self) -> Result<(), Error> {
-        //loop {}
-        // Not sure how to do the loop here
-        match self
-            .queue
-            .fetch_and_touch_task(&self.task_type.clone())
-            .await
-        {
-            Ok(Some(task)) => {
-                self.sleep_params.maybe_reset_sleep_period();
-                self.run(task).await;
-            }
-            Ok(None) => {
-                self.sleep();
-            }
+        loop {
+            match self
+                .queue
+                .fetch_and_touch_task(&self.task_type.clone())
+                .await
+            {
+                Ok(Some(task)) => {
+                    self.sleep_params.maybe_reset_sleep_period();
+                    self.run(task).await;
+                }
+                Ok(None) => {
+                    self.sleep();
+                }
 
-            Err(error) => {
-                error!("Failed to fetch a task {:?}", error);
+                Err(error) => {
+                    error!("Failed to fetch a task {:?}", error);
 
-                self.sleep();
-            }
-        };
-        Ok(())
+                    self.sleep();
+                }
+            };
+        }
     }
 }
