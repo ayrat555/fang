@@ -399,6 +399,7 @@ mod async_queue_tests {
 
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
+
         transaction.rollback().await.unwrap();
     }
     #[tokio::test]
@@ -415,8 +416,10 @@ mod async_queue_tests {
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
         let id = task.id;
+
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
+
         let finished_task = AsyncQueue::<NoTls>::update_task_state_query(
             &mut transaction,
             task,
@@ -424,8 +427,10 @@ mod async_queue_tests {
         )
         .await
         .unwrap();
+
         assert_eq!(id, finished_task.id);
         assert_eq!(FangTaskState::Finished, finished_task.state);
+
         transaction.rollback().await.unwrap();
     }
 
@@ -443,15 +448,19 @@ mod async_queue_tests {
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
         let id = task.id;
+
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
+
         let failed_task =
             AsyncQueue::<NoTls>::fail_task_query(&mut transaction, task, "Some error")
                 .await
                 .unwrap();
+
         assert_eq!(id, failed_task.id);
         assert_eq!(Some("Some error"), failed_task.error_message.as_deref());
         assert_eq!(FangTaskState::Failed, failed_task.state);
+
         transaction.rollback().await.unwrap();
     }
 
@@ -487,6 +496,7 @@ mod async_queue_tests {
         let result = AsyncQueue::<NoTls>::remove_all_tasks_query(&mut transaction)
             .await
             .unwrap();
+
         assert_eq!(2, result);
 
         transaction.rollback().await.unwrap();
@@ -576,11 +586,13 @@ mod async_queue_tests {
         let result = AsyncQueue::<NoTls>::remove_tasks_type_query(&mut transaction, "mytype")
             .await
             .unwrap();
+
         assert_eq!(0, result);
 
         let result = AsyncQueue::<NoTls>::remove_tasks_type_query(&mut transaction, "common")
             .await
             .unwrap();
+
         assert_eq!(2, result);
 
         transaction.rollback().await.unwrap();
