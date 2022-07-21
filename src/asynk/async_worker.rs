@@ -7,6 +7,7 @@ use crate::{RetentionMode, SleepParams};
 use bb8_postgres::tokio_postgres::tls::MakeTlsConnect;
 use bb8_postgres::tokio_postgres::tls::TlsConnect;
 use bb8_postgres::tokio_postgres::Socket;
+use futures::future::BoxFuture;
 use log::error;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -43,7 +44,7 @@ where
     async fn execute_task(&mut self, task: Task) -> Result<Task, (Task, String)> {
         let actual_task: Box<dyn AsyncRunnable> =
             serde_json::from_value(task.metadata.clone()).unwrap();
-        let task_result = actual_task.run(&self.queue.pool).await;
+        let task_result = actual_task.run(self.queue.clone()).await;
         match task_result {
             Ok(()) => Ok(task),
             Err(error) => Err((task, error.description)),
