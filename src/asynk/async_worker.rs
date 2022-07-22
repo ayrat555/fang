@@ -4,8 +4,8 @@ use crate::asynk::async_queue::Task;
 use crate::asynk::async_runnable::AsyncRunnable;
 use crate::asynk::Error;
 use crate::{RetentionMode, SleepParams};
+use bb8_postgres::tokio_postgres::tls::MakeTlsConnect;
 use bb8_postgres::tokio_postgres::tls::TlsConnect;
-use bb8_postgres::tokio_postgres::tls::{MakeTlsConnect, NoTls};
 use bb8_postgres::tokio_postgres::Socket;
 use log::error;
 use std::time::Duration;
@@ -13,15 +13,15 @@ use tokio::time::sleep;
 use typed_builder::TypedBuilder;
 
 #[derive(TypedBuilder, Debug)]
-pub struct AsyncWorker // <Tls>
-/*where
+pub struct AsyncWorker<Tls>
+where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
-*/ {
+{
     #[builder(setter(into))]
-    pub queue: AsyncQueue<NoTls>,
+    pub queue: AsyncQueue<Tls>,
     #[builder(setter(into))]
     pub task_type: Option<String>,
     #[builder(setter(into))]
@@ -29,14 +29,12 @@ pub struct AsyncWorker // <Tls>
     #[builder(setter(into))]
     pub retention_mode: RetentionMode,
 }
-impl AsyncWorker
-//<Tls>
-/*where
+impl<Tls> AsyncWorker<Tls>
+where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
-*/
 {
     pub async fn run(&mut self, task: Task) {
         let result = self.execute_task(task).await;
@@ -45,7 +43,7 @@ impl AsyncWorker
     async fn execute_task(&mut self, task: Task) -> Result<Task, (Task, String)> {
         let actual_task: Box<dyn AsyncRunnable> =
             serde_json::from_value(task.metadata.clone()).unwrap();
-        let task_result = actual_task.run(&mut self.queue).await;
+        let task_result = actual_task.run(&self.queue.pool).await;
         match task_result {
             Ok(()) => Ok(task),
             Err(error) => Err((task, error.description)),
@@ -79,10 +77,10 @@ impl AsyncWorker
             },
         }
     }
-    pub async fn sleep(&mut self) {
+    pub fn sleep(&mut self) {
         self.sleep_params.maybe_increase_sleep_period();
 
-        sleep(Duration::from_secs(self.sleep_params.sleep_period)).await;
+        sleep(Duration::from_secs(self.sleep_params.sleep_period));
     }
     pub async fn run_tasks(&mut self) -> Result<(), Error> {
         loop {
@@ -96,13 +94,13 @@ impl AsyncWorker
                     self.run(task).await;
                 }
                 Ok(None) => {
-                    self.sleep().await;
+                    self.sleep();
                 }
 
                 Err(error) => {
                     error!("Failed to fetch a task {:?}", error);
 
-                    self.sleep().await;
+                    self.sleep();
                 }
             };
         }
