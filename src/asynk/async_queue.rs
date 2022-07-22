@@ -437,7 +437,7 @@ mod async_queue_tests {
         let mut transaction = connection.transaction().await.unwrap();
 
         let task = AsyncTask { number: 1 };
-        let metadata = serde_json::to_value(&task).unwrap();
+        let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
 
         let task =
             AsyncQueue::<NoTls>::insert_task_query(&mut transaction, metadata, &task.task_type())
@@ -449,7 +449,7 @@ mod async_queue_tests {
         let type_task = metadata["type"].as_str();
 
         assert_eq!(Some(1), number);
-        assert_eq!(Some("common"), type_task);
+        assert_eq!(Some("AsyncTask"), type_task);
         transaction.rollback().await.unwrap();
     }
 

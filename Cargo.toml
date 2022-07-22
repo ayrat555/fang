@@ -14,7 +14,7 @@ rust-version = "1.62"
 [features]
 default = ["blocking", "asynk"]
 blocking = ["diesel", "diesel-derive-enum", "dotenv"]
-asynk = ["bb8-postgres", "postgres-types", "tokio", "async-trait",  "typed-builder"]
+asynk = ["bb8-postgres", "postgres-types", "tokio", "async-trait", "typed-builder"]
 
 [dependencies]
 chrono = "0.4"
