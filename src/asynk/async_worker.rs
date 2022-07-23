@@ -1,27 +1,18 @@
-use crate::asynk::async_queue::AsyncQueue;
+//use crate::asynk::async_queue::AsyncQueue;
 use crate::asynk::async_queue::AsyncQueueable;
 use crate::asynk::async_queue::FangTaskState;
 use crate::asynk::async_queue::Task;
 use crate::asynk::async_runnable::AsyncRunnable;
 use crate::asynk::Error;
 use crate::{RetentionMode, SleepParams};
-use bb8_postgres::tokio_postgres::tls::MakeTlsConnect;
-use bb8_postgres::tokio_postgres::tls::TlsConnect;
-use bb8_postgres::tokio_postgres::Socket;
 use log::error;
 use std::time::Duration;
 use typed_builder::TypedBuilder;
 
 #[derive(TypedBuilder, Debug)]
-pub struct AsyncWorker<Tls>
-where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
-    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
-    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
-    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
-{
+pub struct AsyncWorker<'a> {
     #[builder(setter(into))]
-    pub queue: AsyncQueue<Tls>,
+    pub queue: &'a mut dyn AsyncQueueable,
     #[builder(setter(into))]
     pub task_type: Option<String>,
     #[builder(setter(into))]
@@ -29,13 +20,7 @@ where
     #[builder(setter(into))]
     pub retention_mode: RetentionMode,
 }
-impl<Tls> AsyncWorker<Tls>
-where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
-    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
-    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
-    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
-{
+impl<'a> AsyncWorker<'a> {
     pub async fn run(&mut self, task: Task) {
         let result = self.execute_task(task).await;
         self.finalize_task(result).await
@@ -44,7 +29,7 @@ where
         let actual_task: Box<dyn AsyncRunnable> =
             serde_json::from_value(task.metadata.clone()).unwrap();
 
-        let task_result = actual_task.run(&mut self.queue).await;
+        let task_result = actual_task.run(self.queue).await;
         match task_result {
             Ok(()) => Ok(task),
             Err(error) => Err((task, error.description)),
