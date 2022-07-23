@@ -1,4 +1,5 @@
 use crate::asynk::async_queue::AsyncQueue;
+use crate::asynk::async_queue::AsyncQueueable;
 use crate::asynk::async_queue::FangTaskState;
 use crate::asynk::async_queue::Task;
 use crate::asynk::async_runnable::AsyncRunnable;
@@ -9,7 +10,6 @@ use bb8_postgres::tokio_postgres::tls::TlsConnect;
 use bb8_postgres::tokio_postgres::Socket;
 use log::error;
 use std::time::Duration;
-use tokio::time::sleep;
 use typed_builder::TypedBuilder;
 
 #[derive(TypedBuilder, Debug)]
@@ -43,7 +43,8 @@ where
     async fn execute_task(&mut self, task: Task) -> Result<Task, (Task, String)> {
         let actual_task: Box<dyn AsyncRunnable> =
             serde_json::from_value(task.metadata.clone()).unwrap();
-        let task_result = actual_task.run(&self.queue.pool).await;
+
+        let task_result = actual_task.run(&mut self.queue).await;
         match task_result {
             Ok(()) => Ok(task),
             Err(error) => Err((task, error.description)),
@@ -77,10 +78,10 @@ where
             },
         }
     }
-    pub fn sleep(&mut self) {
+    pub async fn sleep(&mut self) {
         self.sleep_params.maybe_increase_sleep_period();
 
-        sleep(Duration::from_secs(self.sleep_params.sleep_period));
+        tokio::time::sleep(Duration::from_secs(self.sleep_params.sleep_period)).await;
     }
     pub async fn run_tasks(&mut self) -> Result<(), Error> {
         loop {
@@ -94,13 +95,13 @@ where
                     self.run(task).await;
                 }
                 Ok(None) => {
-                    self.sleep();
+                    self.sleep().await;
                 }
 
                 Err(error) => {
                     error!("Failed to fetch a task {:?}", error);
 
-                    self.sleep();
+                    self.sleep().await;
                 }
             };
         }

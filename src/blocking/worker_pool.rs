@@ -222,11 +222,11 @@ mod task_pool_tests {
     use super::WorkerParams;
     use super::WorkerPool;
     use crate::executor::Error;
-    use crate::executor::RetentionMode;
     use crate::executor::Runnable;
     use crate::queue::Queue;
     use crate::schema::{fang_tasks, FangTaskState};
     use crate::typetag;
+    use crate::RetentionMode;
     use crate::Task;
     use diesel::pg::PgConnection;
     use diesel::prelude::*;
