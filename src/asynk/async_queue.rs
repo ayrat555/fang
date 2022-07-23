@@ -1,4 +1,4 @@
-use crate::asynk::AsyncRunnable;
+use async_trait::async_trait;
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::bb8::RunError;
 use bb8_postgres::tokio_postgres::row::Row;
@@ -90,6 +90,7 @@ pub struct NewPeriodicTask {
     #[builder(setter(into))]
     pub period_in_seconds: i32,
 }
+
 #[derive(Debug, Error)]
 pub enum AsyncQueueError {
     #[error(transparent)]
@@ -100,6 +101,36 @@ pub enum AsyncQueueError {
     ResultError { expected: u64, found: u64 },
 }
 
+#[async_trait]
+pub trait AsyncQueueable {
+    async fn fetch_and_touch_task(
+        &mut self,
+        task_type: &Option<String>,
+    ) -> Result<Option<Task>, AsyncQueueError>;
+
+    async fn insert_task(
+        &mut self,
+        task: serde_json::Value,
+        task_type: &str,
+    ) -> Result<Task, AsyncQueueError>;
+
+    async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError>;
+
+    async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError>;
+
+    async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError>;
+
+    async fn update_task_state(
+        &mut self,
+        task: Task,
+        state: FangTaskState,
+    ) -> Result<Task, AsyncQueueError>;
+
+    async fn fail_task(&mut self, task: Task, error_message: &str)
+        -> Result<Task, AsyncQueueError>;
+}
+
+#[derive(Debug, Clone)]
 pub struct AsyncQueue<Tls>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
@@ -117,80 +148,11 @@ where
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
-    pub fn new(pool: Pool<PostgresConnectionManager<Tls>>) -> Self {
-        AsyncQueue { pool }
-    }
+    pub async fn connect(uri: impl ToString, tls: Tls) -> Result<Self, AsyncQueueError> {
+        let manager = PostgresConnectionManager::new_from_stringlike(uri, tls)?;
+        let pool = Pool::builder().build(manager).await?;
 
-    pub async fn fetch_and_touch_task(
-        &mut self,
-        task_type: &Option<String>,
-    ) -> Result<Task, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
-
-        let task = Self::fetch_and_touch_task_query(&mut transaction, task_type).await?;
-
-        transaction.commit().await?;
-
-        Ok(task)
-    }
-
-    pub async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
-
-        let task = Self::insert_task_query(&mut transaction, task).await?;
-
-        transaction.commit().await?;
-
-        Ok(task)
-    }
-
-    pub async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
-
-        let result = Self::remove_all_tasks_query(&mut transaction).await?;
-
-        transaction.commit().await?;
-
-        Ok(result)
-    }
-
-    pub async fn remove_task(&mut self, task: &Task) -> Result<u64, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
-
-        let result = Self::remove_task_query(&mut transaction, task).await?;
-
-        transaction.commit().await?;
-
-        Ok(result)
-    }
-
-    pub async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
-
-        let result = Self::remove_tasks_type_query(&mut transaction, task_type).await?;
-
-        transaction.commit().await?;
-
-        Ok(result)
-    }
-
-    pub async fn fail_task(
-        &mut self,
-        task: Task,
-        error_message: &str,
-    ) -> Result<Task, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
-
-        let task = Self::fail_task_query(&mut transaction, task, error_message).await?;
-        transaction.commit().await?;
-
-        Ok(task)
+        Ok(Self { pool })
     }
 
     pub async fn remove_all_tasks_query(
@@ -201,7 +163,7 @@ where
 
     pub async fn remove_task_query(
         transaction: &mut Transaction<'_>,
-        task: &Task,
+        task: Task,
     ) -> Result<u64, AsyncQueueError> {
         Self::execute_query(transaction, REMOVE_TASK_QUERY, &[&task.id], Some(1)).await
     }
@@ -238,19 +200,25 @@ where
     pub async fn fetch_and_touch_task_query(
         transaction: &mut Transaction<'_>,
         task_type: &Option<String>,
-    ) -> Result<Task, AsyncQueueError> {
+    ) -> Result<Option<Task>, AsyncQueueError> {
         let task_type = match task_type {
             Some(passed_task_type) => passed_task_type,
             None => DEFAULT_TASK_TYPE,
         };
 
-        let mut task = Self::get_task_type_query(transaction, task_type).await?;
-
-        Self::update_task_state_query(transaction, &task, FangTaskState::InProgress).await?;
-
-        task.state = FangTaskState::InProgress;
-
-        Ok(task)
+        let task = match Self::get_task_type_query(transaction, task_type).await {
+            Ok(some_task) => Some(some_task),
+            Err(_) => None,
+        };
+        let result_task = if let Some(some_task) = task {
+            Some(
+                Self::update_task_state_query(transaction, some_task, FangTaskState::InProgress)
+                    .await?,
+            )
+        } else {
+            None
+        };
+        Ok(result_task)
     }
 
     pub async fn get_task_type_query(
@@ -268,27 +236,23 @@ where
 
     pub async fn update_task_state_query(
         transaction: &mut Transaction<'_>,
-        task: &Task,
+        task: Task,
         state: FangTaskState,
-    ) -> Result<u64, AsyncQueueError> {
+    ) -> Result<Task, AsyncQueueError> {
         let updated_at = Utc::now();
 
-        Self::execute_query(
-            transaction,
-            UPDATE_TASK_STATE_QUERY,
-            &[&state, &updated_at, &task.id],
-            Some(1),
-        )
-        .await
+        let row: Row = transaction
+            .query_one(UPDATE_TASK_STATE_QUERY, &[&state, &updated_at, &task.id])
+            .await?;
+        let task = Self::row_to_task(row);
+        Ok(task)
     }
 
     pub async fn insert_task_query(
         transaction: &mut Transaction<'_>,
-        task: &dyn AsyncRunnable,
+        metadata: serde_json::Value,
+        task_type: &str,
     ) -> Result<Task, AsyncQueueError> {
-        let metadata = serde_json::to_value(task).unwrap();
-        let task_type = task.task_type();
-
         let row: Row = transaction
             .query_one(INSERT_TASK_QUERY, &[&metadata, &task_type])
             .await?;
@@ -339,16 +303,117 @@ where
     }
 }
 
+#[async_trait]
+impl<Tls> AsyncQueueable for AsyncQueue<Tls>
+where
+    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
+    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
+    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
+    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
+{
+    async fn fetch_and_touch_task(
+        &mut self,
+        task_type: &Option<String>,
+    ) -> Result<Option<Task>, AsyncQueueError> {
+        let mut connection = self.pool.get().await?;
+        let mut transaction = connection.transaction().await?;
+
+        let task = Self::fetch_and_touch_task_query(&mut transaction, task_type).await?;
+
+        transaction.commit().await?;
+
+        Ok(task)
+    }
+
+    async fn insert_task(
+        &mut self,
+        metadata: serde_json::Value,
+        task_type: &str,
+    ) -> Result<Task, AsyncQueueError> {
+        let mut connection = self.pool.get().await?;
+        let mut transaction = connection.transaction().await?;
+
+        let task = Self::insert_task_query(&mut transaction, metadata, task_type).await?;
+
+        transaction.commit().await?;
+
+        Ok(task)
+    }
+
+    async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
+        let mut connection = self.pool.get().await?;
+        let mut transaction = connection.transaction().await?;
+
+        let result = Self::remove_all_tasks_query(&mut transaction).await?;
+
+        transaction.commit().await?;
+
+        Ok(result)
+    }
+
+    async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError> {
+        let mut connection = self.pool.get().await?;
+        let mut transaction = connection.transaction().await?;
+
+        let result = Self::remove_task_query(&mut transaction, task).await?;
+
+        transaction.commit().await?;
+
+        Ok(result)
+    }
+
+    async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
+        let mut connection = self.pool.get().await?;
+        let mut transaction = connection.transaction().await?;
+
+        let result = Self::remove_tasks_type_query(&mut transaction, task_type).await?;
+
+        transaction.commit().await?;
+
+        Ok(result)
+    }
+
+    async fn update_task_state(
+        &mut self,
+        task: Task,
+        state: FangTaskState,
+    ) -> Result<Task, AsyncQueueError> {
+        let mut connection = self.pool.get().await?;
+        let mut transaction = connection.transaction().await?;
+
+        let task = Self::update_task_state_query(&mut transaction, task, state).await?;
+        transaction.commit().await?;
+
+        Ok(task)
+    }
+
+    async fn fail_task(
+        &mut self,
+        task: Task,
+        error_message: &str,
+    ) -> Result<Task, AsyncQueueError> {
+        let mut connection = self.pool.get().await?;
+        let mut transaction = connection.transaction().await?;
+
+        let task = Self::fail_task_query(&mut transaction, task, error_message).await?;
+        transaction.commit().await?;
+
+        Ok(task)
+    }
+}
+
 #[cfg(test)]
 mod async_queue_tests {
     use super::AsyncQueue;
+    use super::AsyncQueueable;
     use super::FangTaskState;
+    use super::Task;
     use crate::asynk::AsyncRunnable;
     use crate::asynk::Error;
     use async_trait::async_trait;
     use bb8_postgres::bb8::Pool;
-    use bb8_postgres::tokio_postgres::Client;
     use bb8_postgres::tokio_postgres::NoTls;
+    use bb8_postgres::tokio_postgres::Transaction;
     use bb8_postgres::PostgresConnectionManager;
     use serde::{Deserialize, Serialize};
 
@@ -358,9 +423,9 @@ mod async_queue_tests {
     }
 
     #[typetag::serde]
-    #[async_trait]
+    #[async_trait(?Send)]
     impl AsyncRunnable for AsyncTask {
-        async fn run(&self, _connection: &Client) -> Result<(), Error> {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
             Ok(())
         }
     }
@@ -371,10 +436,14 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let mut transaction = connection.transaction().await.unwrap();
 
+        let task = AsyncTask { number: 1 };
+        let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
+
         let task =
-            AsyncQueue::<NoTls>::insert_task_query(&mut transaction, &AsyncTask { number: 1 })
+            AsyncQueue::<NoTls>::insert_task_query(&mut transaction, metadata, &task.task_type())
                 .await
                 .unwrap();
+
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
@@ -383,29 +452,62 @@ mod async_queue_tests {
         assert_eq!(Some("AsyncTask"), type_task);
         transaction.rollback().await.unwrap();
     }
+
+    #[tokio::test]
+    async fn update_task_state_test() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let mut transaction = connection.transaction().await.unwrap();
+
+        let task = insert_task(&mut transaction, &AsyncTask { number: 1 }).await;
+
+        let metadata = task.metadata.as_object().unwrap();
+        let number = metadata["number"].as_u64();
+        let type_task = metadata["type"].as_str();
+        let id = task.id;
+
+        assert_eq!(Some(1), number);
+        assert_eq!(Some("AsyncTask"), type_task);
+
+        let finished_task = AsyncQueue::<NoTls>::update_task_state_query(
+            &mut transaction,
+            task,
+            FangTaskState::Finished,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(id, finished_task.id);
+        assert_eq!(FangTaskState::Finished, finished_task.state);
+
+        transaction.rollback().await.unwrap();
+    }
+
     #[tokio::test]
     async fn failed_task_query_test() {
         let pool = pool().await;
         let mut connection = pool.get().await.unwrap();
         let mut transaction = connection.transaction().await.unwrap();
 
-        let task =
-            AsyncQueue::<NoTls>::insert_task_query(&mut transaction, &AsyncTask { number: 1 })
-                .await
-                .unwrap();
+        let task = insert_task(&mut transaction, &AsyncTask { number: 1 }).await;
+
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
         let id = task.id;
+
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
+
         let failed_task =
             AsyncQueue::<NoTls>::fail_task_query(&mut transaction, task, "Some error")
                 .await
                 .unwrap();
+
         assert_eq!(id, failed_task.id);
         assert_eq!(Some("Some error"), failed_task.error_message.as_deref());
         assert_eq!(FangTaskState::Failed, failed_task.state);
+
         transaction.rollback().await.unwrap();
     }
 
@@ -415,10 +517,7 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let mut transaction = connection.transaction().await.unwrap();
 
-        let task =
-            AsyncQueue::<NoTls>::insert_task_query(&mut transaction, &AsyncTask { number: 1 })
-                .await
-                .unwrap();
+        let task = insert_task(&mut transaction, &AsyncTask { number: 1 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -427,10 +526,8 @@ mod async_queue_tests {
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        let task =
-            AsyncQueue::<NoTls>::insert_task_query(&mut transaction, &AsyncTask { number: 2 })
-                .await
-                .unwrap();
+        let task = insert_task(&mut transaction, &AsyncTask { number: 2 }).await;
+
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
@@ -452,10 +549,8 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let mut transaction = connection.transaction().await.unwrap();
 
-        let task =
-            AsyncQueue::<NoTls>::insert_task_query(&mut transaction, &AsyncTask { number: 1 })
-                .await
-                .unwrap();
+        let task = insert_task(&mut transaction, &AsyncTask { number: 1 }).await;
+
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
@@ -463,10 +558,8 @@ mod async_queue_tests {
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        let task =
-            AsyncQueue::<NoTls>::insert_task_query(&mut transaction, &AsyncTask { number: 2 })
-                .await
-                .unwrap();
+        let task = insert_task(&mut transaction, &AsyncTask { number: 2 }).await;
+
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
@@ -476,7 +569,9 @@ mod async_queue_tests {
 
         let task = AsyncQueue::<NoTls>::fetch_and_touch_task_query(&mut transaction, &None)
             .await
+            .unwrap()
             .unwrap();
+
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
@@ -486,6 +581,7 @@ mod async_queue_tests {
 
         let task = AsyncQueue::<NoTls>::fetch_and_touch_task_query(&mut transaction, &None)
             .await
+            .unwrap()
             .unwrap();
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -503,10 +599,8 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let mut transaction = connection.transaction().await.unwrap();
 
-        let task =
-            AsyncQueue::<NoTls>::insert_task_query(&mut transaction, &AsyncTask { number: 1 })
-                .await
-                .unwrap();
+        let task = insert_task(&mut transaction, &AsyncTask { number: 1 }).await;
+
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
@@ -514,10 +608,8 @@ mod async_queue_tests {
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        let task =
-            AsyncQueue::<NoTls>::insert_task_query(&mut transaction, &AsyncTask { number: 2 })
-                .await
-                .unwrap();
+        let task = insert_task(&mut transaction, &AsyncTask { number: 2 }).await;
+
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
@@ -546,5 +638,13 @@ mod async_queue_tests {
         .unwrap();
 
         Pool::builder().build(pg_mgr).await.unwrap()
+    }
+
+    async fn insert_task(transaction: &mut Transaction<'_>, task: &dyn AsyncRunnable) -> Task {
+        let metadata = serde_json::to_value(task).unwrap();
+
+        AsyncQueue::<NoTls>::insert_task_query(transaction, metadata, &task.task_type())
+            .await
+            .unwrap()
     }
 }
