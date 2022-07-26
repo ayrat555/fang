@@ -13,13 +13,13 @@ pub enum SomeValue {
     SomeNumber(u64),
 }
 impl SomeValue {
-    fn get_task(&self) -> Task {
+    fn _get_task(&self) -> Task {
         match self {
             Self::SomeTask(task) => task.clone(),
             Self::SomeNumber(_) => panic!("try to get a task and it was a number"),
         }
     }
-    fn get_number(&self) -> u64 {
+    fn _get_number(&self) -> u64 {
         match self {
             Self::SomeNumber(number) => *number,
             Self::SomeTask(_) => panic!("try to get a number and it was a task"),
@@ -159,7 +159,7 @@ mod async_worker_tests {
             .task_type(Some("common".to_string()))
             .retention_mode(RetentionMode::KeepAll)
             .build();
-        let task_finished = worker.run(task).await.get_task();
+        let task_finished = worker.run(task).await._get_task();
         assert_eq!(id, task_finished.id);
         assert_eq!(FangTaskState::Finished, task_finished.state);
         test.transaction.unwrap().rollback().await.unwrap();

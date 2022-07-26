@@ -9,7 +9,6 @@ use bb8_postgres::PostgresConnectionManager;
 use chrono::DateTime;
 use chrono::Utc;
 use postgres_types::{FromSql, ToSql};
-use std::fmt::Debug;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -133,7 +132,7 @@ pub trait AsyncQueueable {
 #[derive(Debug, Clone)]
 pub struct AsyncQueue<Tls>
 where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static + Debug,
+    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
@@ -219,7 +218,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
 }
 impl<Tls> AsyncQueue<Tls>
 where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static + Debug,
+    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
@@ -382,7 +381,7 @@ where
 #[async_trait]
 impl<Tls> AsyncQueueable for AsyncQueue<Tls>
 where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static + Debug,
+    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
     <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
