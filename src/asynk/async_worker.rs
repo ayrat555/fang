@@ -112,13 +112,13 @@ impl<'a> AsyncWorker<'a> {
 #[cfg(test)]
 mod async_worker_tests {
     use super::AsyncWorker;
-    use super::SomeValue;
     use crate::asynk::async_queue::AsyncQueueTest;
     use crate::asynk::async_queue::AsyncQueueable;
     use crate::asynk::async_queue::FangTaskState;
     use crate::asynk::AsyncRunnable;
     use crate::asynk::Error;
-    use crate::{RetentionMode, SleepParams};
+    use crate::RetentionMode;
+    //use crate::SleepParams;
     use async_trait::async_trait;
     use bb8_postgres::bb8::Pool;
     use bb8_postgres::tokio_postgres::NoTls;
