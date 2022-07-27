@@ -25,7 +25,7 @@ const FETCH_TASK_TYPE_QUERY: &str = include_str!("queries/fetch_task_type.sql");
 #[cfg(test)]
 const GET_TASK_BY_ID_QUERY: &str = include_str!("queries/get_task_by_id.sql");
 
-const DEFAULT_TASK_TYPE: &str = "common";
+pub const DEFAULT_TASK_TYPE: &str = "common";
 
 #[derive(Debug, Eq, PartialEq, Clone, ToSql, FromSql)]
 #[postgres(name = "fang_task_state")]

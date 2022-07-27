@@ -1,6 +1,7 @@
 use crate::asynk::async_queue::AsyncQueueable;
 use crate::asynk::async_queue::FangTaskState;
 use crate::asynk::async_queue::Task;
+use crate::asynk::async_queue::DEFAULT_TASK_TYPE;
 use crate::asynk::async_runnable::AsyncRunnable;
 use crate::asynk::Error;
 use crate::{RetentionMode, SleepParams};
@@ -12,11 +13,11 @@ use typed_builder::TypedBuilder;
 pub struct AsyncWorker<'a> {
     #[builder(setter(into))]
     pub queue: &'a mut dyn AsyncQueueable,
-    #[builder(setter(into))]
+    #[builder(default=Some(DEFAULT_TASK_TYPE.to_string()) , setter(into))]
     pub task_type: Option<String>,
     #[builder(default, setter(into))]
     pub sleep_params: SleepParams,
-    #[builder(setter(into))]
+    #[builder(default, setter(into))]
     pub retention_mode: RetentionMode,
 }
 impl<'a> AsyncWorker<'a> {
@@ -148,7 +149,6 @@ mod async_worker_tests {
 
         let mut worker = AsyncWorker::builder()
             .queue(&mut test as &mut dyn AsyncQueueable)
-            .task_type(Some("common".to_string()))
             .retention_mode(RetentionMode::KeepAll)
             .build();
 
