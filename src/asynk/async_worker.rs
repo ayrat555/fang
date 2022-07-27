@@ -130,6 +130,7 @@ mod async_worker_tests {
     use crate::asynk::async_queue::AsyncQueueTest;
     use crate::asynk::async_queue::AsyncQueueable;
     use crate::asynk::async_queue::FangTaskState;
+    use crate::asynk::async_worker::Task;
     use crate::asynk::AsyncRunnable;
     use crate::asynk::Error;
     use crate::RetentionMode;
@@ -205,10 +206,7 @@ mod async_worker_tests {
 
         let mut test = AsyncQueueTest { transaction };
 
-        let task = WorkerAsyncTask { number: 1 };
-        let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
-
-        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
+        let task = insert_task(&mut test, &WorkerAsyncTask { number: 1 }).await;
         let id = task.id;
 
         let mut worker = AsyncWorker::builder()
@@ -230,10 +228,7 @@ mod async_worker_tests {
 
         let mut test = AsyncQueueTest { transaction };
 
-        let task = AsyncFailedTask { number: 1 };
-        let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
-
-        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
+        let task = insert_task(&mut test, &AsyncFailedTask { number: 1 }).await;
         let id = task.id;
 
         let mut worker = AsyncWorker::builder()
@@ -243,6 +238,7 @@ mod async_worker_tests {
 
         worker.run(task).await.unwrap();
         let task_finished = test.get_task_by_id(id).await.unwrap();
+
         assert_eq!(id, task_finished.id);
         assert_eq!(FangTaskState::Failed, task_finished.state);
         assert_eq!(
@@ -259,26 +255,9 @@ mod async_worker_tests {
 
         let mut test = AsyncQueueTest { transaction };
 
-        let task1 = AsyncTaskType1 {};
-        let metadata = serde_json::to_value(&task1 as &dyn AsyncRunnable).unwrap();
-        let task1 = test
-            .insert_task(metadata, &task1.task_type())
-            .await
-            .unwrap();
-
-        let task12 = AsyncTaskType1 {};
-        let metadata = serde_json::to_value(&task12 as &dyn AsyncRunnable).unwrap();
-        let task12 = test
-            .insert_task(metadata, &task12.task_type())
-            .await
-            .unwrap();
-
-        let task2 = AsyncTaskType2 {};
-        let metadata = serde_json::to_value(&task2 as &dyn AsyncRunnable).unwrap();
-        let task2 = test
-            .insert_task(metadata, &task2.task_type())
-            .await
-            .unwrap();
+        let task1 = insert_task(&mut test, &AsyncTaskType1 {}).await;
+        let task12 = insert_task(&mut test, &AsyncTaskType1 {}).await;
+        let task2 = insert_task(&mut test, &AsyncTaskType2 {}).await;
 
         let id1 = task1.id;
         let id12 = task12.id;
@@ -294,6 +273,7 @@ mod async_worker_tests {
         let task1 = test.get_task_by_id(id1).await.unwrap();
         let task12 = test.get_task_by_id(id12).await.unwrap();
         let task2 = test.get_task_by_id(id2).await.unwrap();
+
         assert_eq!(id1, task1.id);
         assert_eq!(id12, task12.id);
         assert_eq!(id2, task2.id);
@@ -301,6 +281,11 @@ mod async_worker_tests {
         assert_eq!(FangTaskState::Finished, task12.state);
         assert_eq!(FangTaskState::New, task2.state);
         test.transaction.rollback().await.unwrap();
+    }
+    async fn insert_task(test: &mut AsyncQueueTest<'_>, task: &dyn AsyncRunnable) -> Task {
+        let metadata = serde_json::to_value(task).unwrap();
+        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
+        task
     }
     async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
         let pg_mgr = PostgresConnectionManager::new_from_stringlike(

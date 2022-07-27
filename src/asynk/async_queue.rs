@@ -510,6 +510,7 @@ mod async_queue_tests {
     use super::AsyncQueueTest;
     use super::AsyncQueueable;
     use super::FangTaskState;
+    use super::Task;
     use crate::asynk::AsyncRunnable;
     use crate::asynk::Error;
     use async_trait::async_trait;
@@ -539,10 +540,7 @@ mod async_queue_tests {
 
         let mut test = AsyncQueueTest { transaction };
 
-        let task = AsyncTask { number: 1 };
-        let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
-
-        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
+        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -561,10 +559,7 @@ mod async_queue_tests {
 
         let mut test = AsyncQueueTest { transaction };
 
-        let task = AsyncTask { number: 1 };
-        let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
-
-        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
+        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -593,10 +588,7 @@ mod async_queue_tests {
 
         let mut test = AsyncQueueTest { transaction };
 
-        let task = AsyncTask { number: 1 };
-        let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
-
-        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
+        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -623,9 +615,7 @@ mod async_queue_tests {
 
         let mut test = AsyncQueueTest { transaction };
 
-        let task = AsyncTask { number: 1 };
-        let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
-        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
+        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -634,10 +624,7 @@ mod async_queue_tests {
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        let task = AsyncTask { number: 2 };
-        let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
-
-        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
+        let task = insert_task(&mut test, &AsyncTask { number: 2 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -660,9 +647,7 @@ mod async_queue_tests {
 
         let mut test = AsyncQueueTest { transaction };
 
-        let task = AsyncTask { number: 1 };
-        let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
-        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
+        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -671,9 +656,7 @@ mod async_queue_tests {
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        let task = AsyncTask { number: 2 };
-        let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
-        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
+        let task = insert_task(&mut test, &AsyncTask { number: 2 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -710,9 +693,7 @@ mod async_queue_tests {
 
         let mut test = AsyncQueueTest { transaction };
 
-        let task = AsyncTask { number: 1 };
-        let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
-        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
+        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -721,9 +702,7 @@ mod async_queue_tests {
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        let task = AsyncTask { number: 2 };
-        let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
-        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
+        let task = insert_task(&mut test, &AsyncTask { number: 2 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -739,6 +718,12 @@ mod async_queue_tests {
         assert_eq!(2, result);
 
         test.transaction.rollback().await.unwrap();
+    }
+
+    async fn insert_task(test: &mut AsyncQueueTest<'_>, task: &dyn AsyncRunnable) -> Task {
+        let metadata = serde_json::to_value(task).unwrap();
+        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
+        task
     }
 
     async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
