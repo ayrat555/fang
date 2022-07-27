@@ -8,24 +8,6 @@ use log::error;
 use std::time::Duration;
 use typed_builder::TypedBuilder;
 
-pub enum SomeValue {
-    SomeTask(Task),
-    SomeNumber(u64),
-}
-impl SomeValue {
-    fn _get_task(&self) -> Task {
-        match self {
-            Self::SomeTask(task) => task.clone(),
-            Self::SomeNumber(_) => panic!("try to get a task and it was a number"),
-        }
-    }
-    fn _get_number(&self) -> u64 {
-        match self {
-            Self::SomeNumber(number) => *number,
-            Self::SomeTask(_) => panic!("try to get a number and it was a task"),
-        }
-    }
-}
 #[derive(TypedBuilder)]
 pub struct AsyncWorker<'a> {
     #[builder(setter(into))]
@@ -38,7 +20,7 @@ pub struct AsyncWorker<'a> {
     pub retention_mode: RetentionMode,
 }
 impl<'a> AsyncWorker<'a> {
-    pub async fn run(&mut self, task: Task) -> SomeValue {
+    pub async fn run(&mut self, task: Task) -> Result<(), Error> {
         let result = self.execute_task(task).await;
         self.finalize_task(result).await
     }
@@ -52,29 +34,39 @@ impl<'a> AsyncWorker<'a> {
             Err(error) => Err((task, error.description)),
         }
     }
-    async fn finalize_task(&mut self, result: Result<Task, (Task, String)>) -> SomeValue {
+    async fn finalize_task(&mut self, result: Result<Task, (Task, String)>) -> Result<(), Error> {
         match self.retention_mode {
             RetentionMode::KeepAll => match result {
-                Ok(task) => SomeValue::SomeTask(
+                Ok(task) => {
                     self.queue
                         .update_task_state(task, FangTaskState::Finished)
                         .await
-                        .unwrap(),
-                ),
+                        .unwrap();
+                    Ok(())
+                }
                 Err((task, error)) => {
-                    SomeValue::SomeTask(self.queue.fail_task(task, &error).await.unwrap())
+                    self.queue.fail_task(task, &error).await.unwrap();
+                    Ok(())
                 }
             },
             RetentionMode::RemoveAll => match result {
-                Ok(task) => SomeValue::SomeNumber(self.queue.remove_task(task).await.unwrap()),
+                Ok(task) => {
+                    self.queue.remove_task(task).await.unwrap();
+                    Ok(())
+                }
                 Err((task, _error)) => {
-                    SomeValue::SomeNumber(self.queue.remove_task(task).await.unwrap())
+                    self.queue.remove_task(task).await.unwrap();
+                    Ok(())
                 }
             },
             RetentionMode::RemoveFinished => match result {
-                Ok(task) => SomeValue::SomeNumber(self.queue.remove_task(task).await.unwrap()),
+                Ok(task) => {
+                    self.queue.remove_task(task).await.unwrap();
+                    Ok(())
+                }
                 Err((task, error)) => {
-                    SomeValue::SomeTask(self.queue.fail_task(task, &error).await.unwrap())
+                    self.queue.fail_task(task, &error).await.unwrap();
+                    Ok(())
                 }
             },
         }
@@ -93,7 +85,7 @@ impl<'a> AsyncWorker<'a> {
             {
                 Ok(Some(task)) => {
                     self.sleep_params.maybe_reset_sleep_period();
-                    self.run(task).await;
+                    self.run(task).await?
                 }
                 Ok(None) => {
                     self.sleep().await;
@@ -159,7 +151,9 @@ mod async_worker_tests {
             .task_type(Some("common".to_string()))
             .retention_mode(RetentionMode::KeepAll)
             .build();
-        let task_finished = worker.run(task).await._get_task();
+
+        worker.run(task).await.unwrap();
+        let task_finished = test.get_task_by_id(id).await.unwrap();
         assert_eq!(id, task_finished.id);
         assert_eq!(FangTaskState::Finished, task_finished.state);
         test.transaction.unwrap().rollback().await.unwrap();
