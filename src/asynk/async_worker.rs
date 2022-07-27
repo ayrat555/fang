@@ -89,6 +89,9 @@ impl<'a> AsyncWorker<'a> {
                     self.run(task).await?
                 }
                 Ok(None) => {
+                    // for tests i have done this
+                    // return Ok(());
+                    // and comment this sleep
                     self.sleep().await;
                 }
 
@@ -130,7 +133,52 @@ mod async_worker_tests {
             Ok(())
         }
     }
+    #[derive(Serialize, Deserialize)]
+    struct AsyncFailedTask {
+        pub number: u16,
+    }
 
+    #[typetag::serde]
+    #[async_trait(?Send)]
+    impl AsyncRunnable for AsyncFailedTask {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+            let message = format!("number {} is wrong :(", self.number);
+
+            Err(Error {
+                description: message,
+            })
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct AsyncTaskType1 {}
+
+    #[typetag::serde]
+    #[async_trait(?Send)]
+    impl AsyncRunnable for AsyncTaskType1 {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+            Ok(())
+        }
+
+        fn task_type(&self) -> String {
+            "type1".to_string()
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct AsyncTaskType2 {}
+
+    #[typetag::serde]
+    #[async_trait(?Send)]
+    impl AsyncRunnable for AsyncTaskType2 {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+            Ok(())
+        }
+
+        fn task_type(&self) -> String {
+            "type2".to_string()
+        }
+    }
     #[tokio::test]
     async fn execute_and_finishes_task() {
         let pool = pool().await;
@@ -158,7 +206,80 @@ mod async_worker_tests {
         assert_eq!(FangTaskState::Finished, task_finished.state);
         test.transaction.unwrap().rollback().await.unwrap();
     }
+    #[tokio::test]
+    async fn saves_error_for_failed_task() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
 
+        let mut test = AsyncQueueTest {
+            transaction: Some(transaction),
+        };
+
+        let task = AsyncFailedTask { number: 1 };
+        let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
+
+        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
+        let id = task.id;
+
+        let mut worker = AsyncWorker::builder()
+            .queue(&mut test as &mut dyn AsyncQueueable)
+            .retention_mode(RetentionMode::KeepAll)
+            .build();
+
+        worker.run(task).await.unwrap();
+        let task_finished = test.get_task_by_id(id).await.unwrap();
+        assert_eq!(id, task_finished.id);
+        assert_eq!(FangTaskState::Failed, task_finished.state);
+        assert_eq!(
+            "number 1 is wrong :(".to_string(),
+            task_finished.error_message.unwrap()
+        );
+        test.transaction.unwrap().rollback().await.unwrap();
+    }
+    #[tokio::test]
+    #[ignore]
+    async fn executes_task_only_of_specific_type() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
+
+        let mut test = AsyncQueueTest {
+            transaction: Some(transaction),
+        };
+
+        let task1 = AsyncTaskType1 {};
+        let metadata = serde_json::to_value(&task1 as &dyn AsyncRunnable).unwrap();
+        let task1 = test
+            .insert_task(metadata, &task1.task_type())
+            .await
+            .unwrap();
+
+        let task2 = AsyncTaskType2 {};
+        let metadata = serde_json::to_value(&task2 as &dyn AsyncRunnable).unwrap();
+        let task2 = test
+            .insert_task(metadata, &task2.task_type())
+            .await
+            .unwrap();
+
+        let id1 = task1.id;
+        let id2 = task2.id;
+
+        let mut worker = AsyncWorker::builder()
+            .queue(&mut test as &mut dyn AsyncQueueable)
+            .task_type(Some("type1".to_string()))
+            .retention_mode(RetentionMode::KeepAll)
+            .build();
+
+        worker.run_tasks().await.unwrap();
+        let task1 = test.get_task_by_id(id1).await.unwrap();
+        let task2 = test.get_task_by_id(id2).await.unwrap();
+        assert_eq!(id1, task1.id);
+        assert_eq!(id2, task2.id);
+        assert_eq!(FangTaskState::Finished, task1.state);
+        assert_eq!(FangTaskState::New, task2.state);
+        test.transaction.unwrap().rollback().await.unwrap();
+    }
     async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
         let pg_mgr = PostgresConnectionManager::new_from_stringlike(
             "postgres://postgres:postgres@localhost/fang",
