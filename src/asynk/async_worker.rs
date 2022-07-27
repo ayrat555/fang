@@ -13,8 +13,8 @@ use typed_builder::TypedBuilder;
 pub struct AsyncWorker<'a> {
     #[builder(setter(into))]
     pub queue: &'a mut dyn AsyncQueueable,
-    #[builder(default=Some(DEFAULT_TASK_TYPE.to_string()) , setter(into))]
-    pub task_type: Option<String>,
+    #[builder(default=DEFAULT_TASK_TYPE.to_string() , setter(into))]
+    pub task_type: String,
     #[builder(default, setter(into))]
     pub sleep_params: SleepParams,
     #[builder(default, setter(into))]
@@ -41,32 +41,31 @@ impl<'a> AsyncWorker<'a> {
                 Ok(task) => {
                     self.queue
                         .update_task_state(task, FangTaskState::Finished)
-                        .await
-                        .unwrap();
+                        .await?;
                     Ok(())
                 }
                 Err((task, error)) => {
-                    self.queue.fail_task(task, &error).await.unwrap();
+                    self.queue.fail_task(task, &error).await?;
                     Ok(())
                 }
             },
             RetentionMode::RemoveAll => match result {
                 Ok(task) => {
-                    self.queue.remove_task(task).await.unwrap();
+                    self.queue.remove_task(task).await?;
                     Ok(())
                 }
                 Err((task, _error)) => {
-                    self.queue.remove_task(task).await.unwrap();
+                    self.queue.remove_task(task).await?;
                     Ok(())
                 }
             },
             RetentionMode::RemoveFinished => match result {
                 Ok(task) => {
-                    self.queue.remove_task(task).await.unwrap();
+                    self.queue.remove_task(task).await?;
                     Ok(())
                 }
                 Err((task, error)) => {
-                    self.queue.fail_task(task, &error).await.unwrap();
+                    self.queue.fail_task(task, &error).await?;
                     Ok(())
                 }
             },
@@ -81,7 +80,7 @@ impl<'a> AsyncWorker<'a> {
         loop {
             match self
                 .queue
-                .fetch_and_touch_task(&self.task_type.clone())
+                .fetch_and_touch_task(&Some(self.task_type.clone()))
                 .await
             {
                 Ok(Some(task)) => {
@@ -105,7 +104,7 @@ impl<'a> AsyncWorker<'a> {
         loop {
             match self
                 .queue
-                .fetch_and_touch_task(&self.task_type.clone())
+                .fetch_and_touch_task(&Some(self.task_type.clone()))
                 .await
             {
                 Ok(Some(task)) => {
@@ -134,7 +133,6 @@ mod async_worker_tests {
     use crate::asynk::AsyncRunnable;
     use crate::asynk::Error;
     use crate::RetentionMode;
-    //use crate::SleepParams;
     use async_trait::async_trait;
     use bb8_postgres::bb8::Pool;
     use bb8_postgres::tokio_postgres::NoTls;
@@ -205,9 +203,7 @@ mod async_worker_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest {
-            transaction: Some(transaction),
-        };
+        let mut test = AsyncQueueTest { transaction };
 
         let task = WorkerAsyncTask { number: 1 };
         let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
@@ -224,7 +220,7 @@ mod async_worker_tests {
         let task_finished = test.get_task_by_id(id).await.unwrap();
         assert_eq!(id, task_finished.id);
         assert_eq!(FangTaskState::Finished, task_finished.state);
-        test.transaction.unwrap().rollback().await.unwrap();
+        test.transaction.rollback().await.unwrap();
     }
     #[tokio::test]
     async fn saves_error_for_failed_task() {
@@ -232,9 +228,7 @@ mod async_worker_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest {
-            transaction: Some(transaction),
-        };
+        let mut test = AsyncQueueTest { transaction };
 
         let task = AsyncFailedTask { number: 1 };
         let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
@@ -255,7 +249,7 @@ mod async_worker_tests {
             "number 1 is wrong :(".to_string(),
             task_finished.error_message.unwrap()
         );
-        test.transaction.unwrap().rollback().await.unwrap();
+        test.transaction.rollback().await.unwrap();
     }
     #[tokio::test]
     async fn executes_task_only_of_specific_type() {
@@ -263,9 +257,7 @@ mod async_worker_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest {
-            transaction: Some(transaction),
-        };
+        let mut test = AsyncQueueTest { transaction };
 
         let task1 = AsyncTaskType1 {};
         let metadata = serde_json::to_value(&task1 as &dyn AsyncRunnable).unwrap();
@@ -294,7 +286,7 @@ mod async_worker_tests {
 
         let mut worker = AsyncWorker::builder()
             .queue(&mut test as &mut dyn AsyncQueueable)
-            .task_type(Some("type1".to_string()))
+            .task_type("type1".to_string())
             .retention_mode(RetentionMode::KeepAll)
             .build();
 
@@ -308,7 +300,7 @@ mod async_worker_tests {
         assert_eq!(FangTaskState::Finished, task1.state);
         assert_eq!(FangTaskState::Finished, task12.state);
         assert_eq!(FangTaskState::New, task2.state);
-        test.transaction.unwrap().rollback().await.unwrap();
+        test.transaction.rollback().await.unwrap();
     }
     async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
         let pg_mgr = PostgresConnectionManager::new_from_stringlike(

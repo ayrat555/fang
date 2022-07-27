@@ -1,3 +1,4 @@
+use crate::asynk::async_runnable::Error as FangError;
 use async_trait::async_trait;
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::bb8::RunError;
@@ -103,7 +104,14 @@ pub enum AsyncQueueError {
     #[error("returned invalid result (expected {expected:?}, found {found:?})")]
     ResultError { expected: u64, found: u64 },
 }
-
+impl From<AsyncQueueError> for FangError {
+    fn from(error: AsyncQueueError) -> Self {
+        let message = format!("{:?}", error);
+        FangError {
+            description: message,
+        }
+    }
+}
 #[async_trait]
 pub trait AsyncQueueable {
     async fn fetch_and_touch_task(
@@ -146,7 +154,7 @@ where
 
 #[cfg(test)]
 pub struct AsyncQueueTest<'a> {
-    pub transaction: Option<Transaction<'a>>,
+    pub transaction: Transaction<'a>,
 }
 
 #[cfg(test)]
@@ -154,8 +162,6 @@ impl<'a> AsyncQueueTest<'a> {
     pub async fn get_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError> {
         let row: Row = self
             .transaction
-            .as_mut()
-            .unwrap()
             .query_one(GET_TASK_BY_ID_QUERY, &[&id])
             .await?;
 
@@ -171,7 +177,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         &mut self,
         task_type: &Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError> {
-        let transaction = self.transaction.as_mut().unwrap();
+        let transaction = &mut self.transaction;
 
         let task = AsyncQueue::<NoTls>::fetch_and_touch_task_query(transaction, task_type).await?;
 
@@ -183,7 +189,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         metadata: serde_json::Value,
         task_type: &str,
     ) -> Result<Task, AsyncQueueError> {
-        let transaction = self.transaction.as_mut().unwrap();
+        let transaction = &mut self.transaction;
 
         let task = AsyncQueue::<NoTls>::insert_task_query(transaction, metadata, task_type).await?;
 
@@ -191,7 +197,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
     }
 
     async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
-        let transaction = self.transaction.as_mut().unwrap();
+        let transaction = &mut self.transaction;
 
         let result = AsyncQueue::<NoTls>::remove_all_tasks_query(transaction).await?;
 
@@ -199,7 +205,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
     }
 
     async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError> {
-        let transaction = self.transaction.as_mut().unwrap();
+        let transaction = &mut self.transaction;
 
         let result = AsyncQueue::<NoTls>::remove_task_query(transaction, task).await?;
 
@@ -207,7 +213,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
     }
 
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
-        let transaction = self.transaction.as_mut().unwrap();
+        let transaction = &mut self.transaction;
 
         let result = AsyncQueue::<NoTls>::remove_tasks_type_query(transaction, task_type).await?;
 
@@ -219,7 +225,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         task: Task,
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError> {
-        let transaction = self.transaction.as_mut().unwrap();
+        let transaction = &mut self.transaction;
 
         let task = AsyncQueue::<NoTls>::update_task_state_query(transaction, task, state).await?;
 
@@ -231,7 +237,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         task: Task,
         error_message: &str,
     ) -> Result<Task, AsyncQueueError> {
-        let transaction = self.transaction.as_mut().unwrap();
+        let transaction = &mut self.transaction;
 
         let task = AsyncQueue::<NoTls>::fail_task_query(transaction, task, error_message).await?;
 
@@ -531,9 +537,7 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest {
-            transaction: Some(transaction),
-        };
+        let mut test = AsyncQueueTest { transaction };
 
         let task = AsyncTask { number: 1 };
         let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
@@ -546,7 +550,7 @@ mod async_queue_tests {
 
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
-        test.transaction.unwrap().rollback().await.unwrap();
+        test.transaction.rollback().await.unwrap();
     }
 
     #[tokio::test]
@@ -555,9 +559,7 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest {
-            transaction: Some(transaction),
-        };
+        let mut test = AsyncQueueTest { transaction };
 
         let task = AsyncTask { number: 1 };
         let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
@@ -580,7 +582,7 @@ mod async_queue_tests {
         assert_eq!(id, finished_task.id);
         assert_eq!(FangTaskState::Finished, finished_task.state);
 
-        test.transaction.unwrap().rollback().await.unwrap();
+        test.transaction.rollback().await.unwrap();
     }
 
     #[tokio::test]
@@ -589,9 +591,7 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest {
-            transaction: Some(transaction),
-        };
+        let mut test = AsyncQueueTest { transaction };
 
         let task = AsyncTask { number: 1 };
         let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
@@ -612,7 +612,7 @@ mod async_queue_tests {
         assert_eq!(Some("Some error"), failed_task.error_message.as_deref());
         assert_eq!(FangTaskState::Failed, failed_task.state);
 
-        test.transaction.unwrap().rollback().await.unwrap();
+        test.transaction.rollback().await.unwrap();
     }
 
     #[tokio::test]
@@ -621,9 +621,7 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest {
-            transaction: Some(transaction),
-        };
+        let mut test = AsyncQueueTest { transaction };
 
         let task = AsyncTask { number: 1 };
         let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
@@ -651,7 +649,7 @@ mod async_queue_tests {
         let result = test.remove_all_tasks().await.unwrap();
         assert_eq!(2, result);
 
-        test.transaction.unwrap().rollback().await.unwrap();
+        test.transaction.rollback().await.unwrap();
     }
 
     #[tokio::test]
@@ -660,9 +658,7 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest {
-            transaction: Some(transaction),
-        };
+        let mut test = AsyncQueueTest { transaction };
 
         let task = AsyncTask { number: 1 };
         let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
@@ -703,7 +699,7 @@ mod async_queue_tests {
         assert_eq!(Some(2), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        test.transaction.unwrap().rollback().await.unwrap();
+        test.transaction.rollback().await.unwrap();
     }
 
     #[tokio::test]
@@ -712,9 +708,7 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest {
-            transaction: Some(transaction),
-        };
+        let mut test = AsyncQueueTest { transaction };
 
         let task = AsyncTask { number: 1 };
         let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
@@ -744,7 +738,7 @@ mod async_queue_tests {
         let result = test.remove_tasks_type("common").await.unwrap();
         assert_eq!(2, result);
 
-        test.transaction.unwrap().rollback().await.unwrap();
+        test.transaction.rollback().await.unwrap();
     }
 
     async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
