@@ -5,6 +5,11 @@ pub enum RetentionMode {
     RemoveAll,
     RemoveFinished,
 }
+impl Default for RetentionMode {
+    fn default() -> Self {
+        RetentionMode::RemoveAll
+    }
+}
 #[derive(Clone, Debug)]
 pub struct SleepParams {
     pub sleep_period: u64,

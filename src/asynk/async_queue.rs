@@ -1,9 +1,11 @@
+use crate::asynk::async_runnable::Error as FangError;
 use async_trait::async_trait;
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::bb8::RunError;
 use bb8_postgres::tokio_postgres::row::Row;
-use bb8_postgres::tokio_postgres::tls::MakeTlsConnect;
-use bb8_postgres::tokio_postgres::tls::TlsConnect;
+#[cfg(test)]
+use bb8_postgres::tokio_postgres::tls::NoTls;
+use bb8_postgres::tokio_postgres::tls::{MakeTlsConnect, TlsConnect};
 use bb8_postgres::tokio_postgres::Socket;
 use bb8_postgres::tokio_postgres::Transaction;
 use bb8_postgres::PostgresConnectionManager;
@@ -21,8 +23,10 @@ const REMOVE_ALL_TASK_QUERY: &str = include_str!("queries/remove_all_tasks.sql")
 const REMOVE_TASK_QUERY: &str = include_str!("queries/remove_task.sql");
 const REMOVE_TASKS_TYPE_QUERY: &str = include_str!("queries/remove_tasks_type.sql");
 const FETCH_TASK_TYPE_QUERY: &str = include_str!("queries/fetch_task_type.sql");
+#[cfg(test)]
+const GET_TASK_BY_ID_QUERY: &str = include_str!("queries/get_task_by_id.sql");
 
-const DEFAULT_TASK_TYPE: &str = "common";
+pub const DEFAULT_TASK_TYPE: &str = "common";
 
 #[derive(Debug, Eq, PartialEq, Clone, ToSql, FromSql)]
 #[postgres(name = "fang_task_state")]
@@ -100,7 +104,14 @@ pub enum AsyncQueueError {
     #[error("returned invalid result (expected {expected:?}, found {found:?})")]
     ResultError { expected: u64, found: u64 },
 }
-
+impl From<AsyncQueueError> for FangError {
+    fn from(error: AsyncQueueError) -> Self {
+        let message = format!("{:?}", error);
+        FangError {
+            description: message,
+        }
+    }
+}
 #[async_trait]
 pub trait AsyncQueueable {
     async fn fetch_and_touch_task(
@@ -141,6 +152,98 @@ where
     pool: Pool<PostgresConnectionManager<Tls>>,
 }
 
+#[cfg(test)]
+pub struct AsyncQueueTest<'a> {
+    pub transaction: Transaction<'a>,
+}
+
+#[cfg(test)]
+impl<'a> AsyncQueueTest<'a> {
+    pub async fn get_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError> {
+        let row: Row = self
+            .transaction
+            .query_one(GET_TASK_BY_ID_QUERY, &[&id])
+            .await?;
+
+        let task = AsyncQueue::<NoTls>::row_to_task(row);
+        Ok(task)
+    }
+}
+
+#[cfg(test)]
+#[async_trait]
+impl AsyncQueueable for AsyncQueueTest<'_> {
+    async fn fetch_and_touch_task(
+        &mut self,
+        task_type: &Option<String>,
+    ) -> Result<Option<Task>, AsyncQueueError> {
+        let transaction = &mut self.transaction;
+
+        let task = AsyncQueue::<NoTls>::fetch_and_touch_task_query(transaction, task_type).await?;
+
+        Ok(task)
+    }
+
+    async fn insert_task(
+        &mut self,
+        metadata: serde_json::Value,
+        task_type: &str,
+    ) -> Result<Task, AsyncQueueError> {
+        let transaction = &mut self.transaction;
+
+        let task = AsyncQueue::<NoTls>::insert_task_query(transaction, metadata, task_type).await?;
+
+        Ok(task)
+    }
+
+    async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
+        let transaction = &mut self.transaction;
+
+        let result = AsyncQueue::<NoTls>::remove_all_tasks_query(transaction).await?;
+
+        Ok(result)
+    }
+
+    async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError> {
+        let transaction = &mut self.transaction;
+
+        let result = AsyncQueue::<NoTls>::remove_task_query(transaction, task).await?;
+
+        Ok(result)
+    }
+
+    async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
+        let transaction = &mut self.transaction;
+
+        let result = AsyncQueue::<NoTls>::remove_tasks_type_query(transaction, task_type).await?;
+
+        Ok(result)
+    }
+
+    async fn update_task_state(
+        &mut self,
+        task: Task,
+        state: FangTaskState,
+    ) -> Result<Task, AsyncQueueError> {
+        let transaction = &mut self.transaction;
+
+        let task = AsyncQueue::<NoTls>::update_task_state_query(transaction, task, state).await?;
+
+        Ok(task)
+    }
+
+    async fn fail_task(
+        &mut self,
+        task: Task,
+        error_message: &str,
+    ) -> Result<Task, AsyncQueueError> {
+        let transaction = &mut self.transaction;
+
+        let task = AsyncQueue::<NoTls>::fail_task_query(transaction, task, error_message).await?;
+
+        Ok(task)
+    }
+}
 impl<Tls> AsyncQueue<Tls>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
@@ -404,7 +507,7 @@ where
 
 #[cfg(test)]
 mod async_queue_tests {
-    use super::AsyncQueue;
+    use super::AsyncQueueTest;
     use super::AsyncQueueable;
     use super::FangTaskState;
     use super::Task;
@@ -413,7 +516,6 @@ mod async_queue_tests {
     use async_trait::async_trait;
     use bb8_postgres::bb8::Pool;
     use bb8_postgres::tokio_postgres::NoTls;
-    use bb8_postgres::tokio_postgres::Transaction;
     use bb8_postgres::PostgresConnectionManager;
     use serde::{Deserialize, Serialize};
 
@@ -434,15 +536,11 @@ mod async_queue_tests {
     async fn insert_task_creates_new_task() {
         let pool = pool().await;
         let mut connection = pool.get().await.unwrap();
-        let mut transaction = connection.transaction().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
 
-        let task = AsyncTask { number: 1 };
-        let metadata = serde_json::to_value(&task as &dyn AsyncRunnable).unwrap();
+        let mut test = AsyncQueueTest { transaction };
 
-        let task =
-            AsyncQueue::<NoTls>::insert_task_query(&mut transaction, metadata, &task.task_type())
-                .await
-                .unwrap();
+        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -450,16 +548,18 @@ mod async_queue_tests {
 
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
-        transaction.rollback().await.unwrap();
+        test.transaction.rollback().await.unwrap();
     }
 
     #[tokio::test]
     async fn update_task_state_test() {
         let pool = pool().await;
         let mut connection = pool.get().await.unwrap();
-        let mut transaction = connection.transaction().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
 
-        let task = insert_task(&mut transaction, &AsyncTask { number: 1 }).await;
+        let mut test = AsyncQueueTest { transaction };
+
+        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -469,27 +569,26 @@ mod async_queue_tests {
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        let finished_task = AsyncQueue::<NoTls>::update_task_state_query(
-            &mut transaction,
-            task,
-            FangTaskState::Finished,
-        )
-        .await
-        .unwrap();
+        let finished_task = test
+            .update_task_state(task, FangTaskState::Finished)
+            .await
+            .unwrap();
 
         assert_eq!(id, finished_task.id);
         assert_eq!(FangTaskState::Finished, finished_task.state);
 
-        transaction.rollback().await.unwrap();
+        test.transaction.rollback().await.unwrap();
     }
 
     #[tokio::test]
     async fn failed_task_query_test() {
         let pool = pool().await;
         let mut connection = pool.get().await.unwrap();
-        let mut transaction = connection.transaction().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
 
-        let task = insert_task(&mut transaction, &AsyncTask { number: 1 }).await;
+        let mut test = AsyncQueueTest { transaction };
+
+        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -499,25 +598,24 @@ mod async_queue_tests {
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        let failed_task =
-            AsyncQueue::<NoTls>::fail_task_query(&mut transaction, task, "Some error")
-                .await
-                .unwrap();
+        let failed_task = test.fail_task(task, "Some error").await.unwrap();
 
         assert_eq!(id, failed_task.id);
         assert_eq!(Some("Some error"), failed_task.error_message.as_deref());
         assert_eq!(FangTaskState::Failed, failed_task.state);
 
-        transaction.rollback().await.unwrap();
+        test.transaction.rollback().await.unwrap();
     }
 
     #[tokio::test]
     async fn remove_all_tasks_test() {
         let pool = pool().await;
         let mut connection = pool.get().await.unwrap();
-        let mut transaction = connection.transaction().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
 
-        let task = insert_task(&mut transaction, &AsyncTask { number: 1 }).await;
+        let mut test = AsyncQueueTest { transaction };
+
+        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -526,7 +624,7 @@ mod async_queue_tests {
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        let task = insert_task(&mut transaction, &AsyncTask { number: 2 }).await;
+        let task = insert_task(&mut test, &AsyncTask { number: 2 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -535,42 +633,21 @@ mod async_queue_tests {
         assert_eq!(Some(2), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        let result = AsyncQueue::<NoTls>::remove_all_tasks_query(&mut transaction)
-            .await
-            .unwrap();
+        let result = test.remove_all_tasks().await.unwrap();
         assert_eq!(2, result);
 
-        transaction.rollback().await.unwrap();
+        test.transaction.rollback().await.unwrap();
     }
 
     #[tokio::test]
     async fn fetch_and_touch_test() {
         let pool = pool().await;
         let mut connection = pool.get().await.unwrap();
-        let mut transaction = connection.transaction().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
 
-        let task = insert_task(&mut transaction, &AsyncTask { number: 1 }).await;
+        let mut test = AsyncQueueTest { transaction };
 
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-
-        assert_eq!(Some(1), number);
-        assert_eq!(Some("AsyncTask"), type_task);
-
-        let task = insert_task(&mut transaction, &AsyncTask { number: 2 }).await;
-
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-
-        assert_eq!(Some(2), number);
-        assert_eq!(Some("AsyncTask"), type_task);
-
-        let task = AsyncQueue::<NoTls>::fetch_and_touch_task_query(&mut transaction, &None)
-            .await
-            .unwrap()
-            .unwrap();
+        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -579,10 +656,8 @@ mod async_queue_tests {
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        let task = AsyncQueue::<NoTls>::fetch_and_touch_task_query(&mut transaction, &None)
-            .await
-            .unwrap()
-            .unwrap();
+        let task = insert_task(&mut test, &AsyncTask { number: 2 }).await;
+
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
@@ -590,16 +665,35 @@ mod async_queue_tests {
         assert_eq!(Some(2), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        transaction.rollback().await.unwrap();
+        let task = test.fetch_and_touch_task(&None).await.unwrap().unwrap();
+
+        let metadata = task.metadata.as_object().unwrap();
+        let number = metadata["number"].as_u64();
+        let type_task = metadata["type"].as_str();
+
+        assert_eq!(Some(1), number);
+        assert_eq!(Some("AsyncTask"), type_task);
+
+        let task = test.fetch_and_touch_task(&None).await.unwrap().unwrap();
+        let metadata = task.metadata.as_object().unwrap();
+        let number = metadata["number"].as_u64();
+        let type_task = metadata["type"].as_str();
+
+        assert_eq!(Some(2), number);
+        assert_eq!(Some("AsyncTask"), type_task);
+
+        test.transaction.rollback().await.unwrap();
     }
 
     #[tokio::test]
     async fn remove_tasks_type_test() {
         let pool = pool().await;
         let mut connection = pool.get().await.unwrap();
-        let mut transaction = connection.transaction().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
 
-        let task = insert_task(&mut transaction, &AsyncTask { number: 1 }).await;
+        let mut test = AsyncQueueTest { transaction };
+
+        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -608,7 +702,7 @@ mod async_queue_tests {
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        let task = insert_task(&mut transaction, &AsyncTask { number: 2 }).await;
+        let task = insert_task(&mut test, &AsyncTask { number: 2 }).await;
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -617,17 +711,18 @@ mod async_queue_tests {
         assert_eq!(Some(2), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        let result = AsyncQueue::<NoTls>::remove_tasks_type_query(&mut transaction, "mytype")
-            .await
-            .unwrap();
+        let result = test.remove_tasks_type("mytype").await.unwrap();
         assert_eq!(0, result);
 
-        let result = AsyncQueue::<NoTls>::remove_tasks_type_query(&mut transaction, "common")
-            .await
-            .unwrap();
+        let result = test.remove_tasks_type("common").await.unwrap();
         assert_eq!(2, result);
 
-        transaction.rollback().await.unwrap();
+        test.transaction.rollback().await.unwrap();
+    }
+
+    async fn insert_task(test: &mut AsyncQueueTest<'_>, task: &dyn AsyncRunnable) -> Task {
+        let metadata = serde_json::to_value(task).unwrap();
+        test.insert_task(metadata, &task.task_type()).await.unwrap()
     }
 
     async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
@@ -638,13 +733,5 @@ mod async_queue_tests {
         .unwrap();
 
         Pool::builder().build(pg_mgr).await.unwrap()
-    }
-
-    async fn insert_task(transaction: &mut Transaction<'_>, task: &dyn AsyncRunnable) -> Task {
-        let metadata = serde_json::to_value(task).unwrap();
-
-        AsyncQueue::<NoTls>::insert_task_query(transaction, metadata, &task.task_type())
-            .await
-            .unwrap()
     }
 }
