@@ -722,8 +722,7 @@ mod async_queue_tests {
 
     async fn insert_task(test: &mut AsyncQueueTest<'_>, task: &dyn AsyncRunnable) -> Task {
         let metadata = serde_json::to_value(task).unwrap();
-        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
-        task
+        test.insert_task(metadata, &task.task_type()).await.unwrap()
     }
 
     async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {

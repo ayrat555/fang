@@ -282,10 +282,46 @@ mod async_worker_tests {
         assert_eq!(FangTaskState::New, task2.state);
         test.transaction.rollback().await.unwrap();
     }
+    #[tokio::test]
+    async fn remove_when_finished() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
+
+        let mut test = AsyncQueueTest { transaction };
+
+        let task1 = insert_task(&mut test, &AsyncTaskType1 {}).await;
+        let task12 = insert_task(&mut test, &AsyncTaskType1 {}).await;
+        let task2 = insert_task(&mut test, &AsyncTaskType2 {}).await;
+
+        let _id1 = task1.id;
+        let _id12 = task12.id;
+        let id2 = task2.id;
+
+        let mut worker = AsyncWorker::builder()
+            .queue(&mut test as &mut dyn AsyncQueueable)
+            .task_type("type1".to_string())
+            .build();
+
+        worker.run_tasks_until_none().await.unwrap();
+        let task = test
+            .fetch_and_touch_task(&Some("type1".to_string()))
+            .await
+            .unwrap();
+        assert_eq!(None, task);
+
+        let task2 = test
+            .fetch_and_touch_task(&Some("type2".to_string()))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(id2, task2.id);
+
+        test.transaction.rollback().await.unwrap();
+    }
     async fn insert_task(test: &mut AsyncQueueTest<'_>, task: &dyn AsyncRunnable) -> Task {
         let metadata = serde_json::to_value(task).unwrap();
-        let task = test.insert_task(metadata, &task.task_type()).await.unwrap();
-        task
+        test.insert_task(metadata, &task.task_type()).await.unwrap()
     }
     async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
         let pg_mgr = PostgresConnectionManager::new_from_stringlike(
