@@ -89,12 +89,32 @@ impl<'a> AsyncWorker<'a> {
                     self.run(task).await?
                 }
                 Ok(None) => {
-                    // for tests i have done this
-                    // return Ok(());
-                    // and comment this sleep
                     self.sleep().await;
                 }
 
+                Err(error) => {
+                    error!("Failed to fetch a task {:?}", error);
+
+                    self.sleep().await;
+                }
+            };
+        }
+    }
+    #[cfg(test)]
+    pub async fn run_tasks_until_none(&mut self) -> Result<(), Error> {
+        loop {
+            match self
+                .queue
+                .fetch_and_touch_task(&self.task_type.clone())
+                .await
+            {
+                Ok(Some(task)) => {
+                    self.sleep_params.maybe_reset_sleep_period();
+                    self.run(task).await?
+                }
+                Ok(None) => {
+                    return Ok(());
+                }
                 Err(error) => {
                     error!("Failed to fetch a task {:?}", error);
 
@@ -238,7 +258,6 @@ mod async_worker_tests {
         test.transaction.unwrap().rollback().await.unwrap();
     }
     #[tokio::test]
-    #[ignore]
     async fn executes_task_only_of_specific_type() {
         let pool = pool().await;
         let mut connection = pool.get().await.unwrap();
@@ -255,6 +274,13 @@ mod async_worker_tests {
             .await
             .unwrap();
 
+        let task12 = AsyncTaskType1 {};
+        let metadata = serde_json::to_value(&task12 as &dyn AsyncRunnable).unwrap();
+        let task12 = test
+            .insert_task(metadata, &task12.task_type())
+            .await
+            .unwrap();
+
         let task2 = AsyncTaskType2 {};
         let metadata = serde_json::to_value(&task2 as &dyn AsyncRunnable).unwrap();
         let task2 = test
@@ -263,6 +289,7 @@ mod async_worker_tests {
             .unwrap();
 
         let id1 = task1.id;
+        let id12 = task12.id;
         let id2 = task2.id;
 
         let mut worker = AsyncWorker::builder()
@@ -271,12 +298,15 @@ mod async_worker_tests {
             .retention_mode(RetentionMode::KeepAll)
             .build();
 
-        worker.run_tasks().await.unwrap();
+        worker.run_tasks_until_none().await.unwrap();
         let task1 = test.get_task_by_id(id1).await.unwrap();
+        let task12 = test.get_task_by_id(id12).await.unwrap();
         let task2 = test.get_task_by_id(id2).await.unwrap();
         assert_eq!(id1, task1.id);
+        assert_eq!(id12, task12.id);
         assert_eq!(id2, task2.id);
         assert_eq!(FangTaskState::Finished, task1.state);
+        assert_eq!(FangTaskState::Finished, task12.state);
         assert_eq!(FangTaskState::New, task2.state);
         test.transaction.unwrap().rollback().await.unwrap();
     }
