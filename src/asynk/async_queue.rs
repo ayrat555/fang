@@ -31,6 +31,8 @@ const FIND_PERIODIC_TASK_BY_METADATA_QUERY: &str =
     include_str!("queries/find_periodic_task_by_metadata.sql");
 #[cfg(test)]
 const FIND_TASK_BY_ID_QUERY: &str = include_str!("queries/find_task_by_id.sql");
+#[cfg(test)]
+const FIND_PERIODIC_TASK_BY_ID_QUERY: &str = include_str!("queries/find_periodic_task_by_id.sql");
 
 pub const DEFAULT_TASK_TYPE: &str = "common";
 
@@ -142,7 +144,7 @@ pub trait AsyncQueueable {
     ) -> Result<PeriodicTask, AsyncQueueError>;
 
     async fn schedule_next_task(
-        &self,
+        &mut self,
         periodic_task: PeriodicTask,
     ) -> Result<PeriodicTask, AsyncQueueError>;
 }
@@ -178,6 +180,13 @@ impl<'a> AsyncQueueTest<'a> {
         &mut self,
         id: Uuid,
     ) -> Result<PeriodicTask, AsyncQueueError> {
+        let row: Row = self
+            .transaction
+            .query_one(FIND_PERIODIC_TASK_BY_ID_QUERY, &[&id])
+            .await?;
+
+        let task = AsyncQueue::<NoTls>::row_to_periodic_task(row);
+        Ok(task)
     }
 }
 
@@ -208,13 +217,13 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
     }
 
     async fn schedule_next_task(
-        &self,
+        &mut self,
         periodic_task: PeriodicTask,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
         let periodic_task =
-            AsyncQueue::<NoTls>::schedule_next_task_query(&mut transaction, periodic_task).await?;
+            AsyncQueue::<NoTls>::schedule_next_task_query(transaction, periodic_task).await?;
 
         Ok(periodic_task)
     }
@@ -226,8 +235,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         let transaction = &mut self.transaction;
 
         let periodic_task =
-            AsyncQueue::<NoTls>::insert_periodic_task_query(&mut transaction, metadata, period)
-                .await?;
+            AsyncQueue::<NoTls>::insert_periodic_task_query(transaction, metadata, period).await?;
 
         Ok(periodic_task)
     }
@@ -453,7 +461,7 @@ where
             .map(|row| Self::row_to_periodic_task(row))
             .collect();
 
-        if periodic_tasks.len() == 0 {
+        if periodic_tasks.is_empty() {
             Ok(None)
         } else {
             Ok(Some(periodic_tasks))
@@ -585,7 +593,7 @@ where
     }
 
     async fn schedule_next_task(
-        &self,
+        &mut self,
         periodic_task: PeriodicTask,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         let mut connection = self.pool.get().await?;
