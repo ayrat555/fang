@@ -104,8 +104,9 @@ impl From<AsyncQueueError> for FangError {
         }
     }
 }
+
 #[async_trait]
-pub trait AsyncQueueable {
+pub trait AsyncQueueable: Send + Sync {
     async fn fetch_and_touch_task(
         &mut self,
         task_type: &Option<String>,
@@ -605,6 +606,7 @@ where
 
         Ok(periodic_task)
     }
+
     async fn fetch_periodic_tasks(
         &mut self,
         error_margin_seconds: i64,
