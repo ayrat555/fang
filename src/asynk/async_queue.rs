@@ -244,7 +244,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         &mut self,
         error_margin_seconds: i64,
     ) -> Result<Option<Vec<PeriodicTask>>, AsyncQueueError> {
-        let mut transaction = &mut self.transaction;
+        let transaction = &mut self.transaction;
 
         let periodic_task =
             AsyncQueue::<NoTls>::fetch_periodic_tasks_query(transaction, error_margin_seconds)
