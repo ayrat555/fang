@@ -215,7 +215,7 @@ mod async_worker_tests {
             .build();
 
         worker.run(task).await.unwrap();
-        let task_finished = test.get_task_by_id(id).await.unwrap();
+        let task_finished = test.find_task_by_id(id).await.unwrap();
         assert_eq!(id, task_finished.id);
         assert_eq!(FangTaskState::Finished, task_finished.state);
         test.transaction.rollback().await.unwrap();
@@ -237,7 +237,7 @@ mod async_worker_tests {
             .build();
 
         worker.run(task).await.unwrap();
-        let task_finished = test.get_task_by_id(id).await.unwrap();
+        let task_finished = test.find_task_by_id(id).await.unwrap();
 
         assert_eq!(id, task_finished.id);
         assert_eq!(FangTaskState::Failed, task_finished.state);
@@ -270,9 +270,9 @@ mod async_worker_tests {
             .build();
 
         worker.run_tasks_until_none().await.unwrap();
-        let task1 = test.get_task_by_id(id1).await.unwrap();
-        let task12 = test.get_task_by_id(id12).await.unwrap();
-        let task2 = test.get_task_by_id(id2).await.unwrap();
+        let task1 = test.find_task_by_id(id1).await.unwrap();
+        let task12 = test.find_task_by_id(id12).await.unwrap();
+        let task2 = test.find_task_by_id(id2).await.unwrap();
 
         assert_eq!(id1, task1.id);
         assert_eq!(id12, task12.id);
