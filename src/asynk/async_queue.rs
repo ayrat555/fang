@@ -247,7 +247,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         let mut transaction = &mut self.transaction;
 
         let periodic_task =
-            AsyncQueue::<NoTls>::fetch_periodic_tasks_query(&mut transaction, error_margin_seconds)
+            AsyncQueue::<NoTls>::fetch_periodic_tasks_query(transaction, error_margin_seconds)
                 .await?;
 
         Ok(periodic_task)
