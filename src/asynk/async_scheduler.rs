@@ -1,43 +1,63 @@
+use crate::asynk::async_queue::AsyncQueue;
 use crate::asynk::async_queue::AsyncQueueError;
 use crate::asynk::async_queue::AsyncQueueable;
 use crate::asynk::async_queue::PeriodicTask;
+use bb8_postgres::tokio_postgres::tls::{MakeTlsConnect, TlsConnect};
+use bb8_postgres::tokio_postgres::Socket;
 use futures::executor;
 use std::time::Duration;
 use tokio::time::sleep;
 
-pub struct Scheduler {
+pub struct Scheduler<Tls>
+where
+    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
+    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
+    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
+    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
+{
     pub check_period: u64,
     pub error_margin_seconds: u64,
-    pub queue: &'static mut dyn AsyncQueueable,
+    pub queue: AsyncQueue<Tls>,
 }
 
-impl Drop for Scheduler {
-    fn drop(&'static mut self) {
+impl<Tls> Drop for Scheduler<Tls>
+where
+    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
+    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
+    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
+    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
+{
+    fn drop(&mut self) {
         executor::block_on(Scheduler::start(
             self.check_period,
             self.error_margin_seconds,
-            self.queue,
+            self.queue.clone(),
         ))
+        .unwrap();
     }
 }
 
-impl Scheduler {
+impl<Tls> Scheduler<Tls>
+where
+    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
+    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
+    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
+    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
+{
     pub async fn start(
         check_period: u64,
         error_margin_seconds: u64,
-        queue: &'static mut dyn AsyncQueueable,
-    ) {
+        queue: AsyncQueue<Tls>,
+    ) -> Result<(), AsyncQueueError> {
         tokio::spawn(async move {
             let mut scheduler = Self::new(check_period, error_margin_seconds, queue);
             scheduler.schedule_loop().await.unwrap();
         })
-        .await;
+        .await
+        .unwrap();
+        Ok(())
     }
-    pub fn new(
-        check_period: u64,
-        error_margin_seconds: u64,
-        queue: &'static mut dyn AsyncQueueable,
-    ) -> Self {
+    pub fn new(check_period: u64, error_margin_seconds: u64, queue: AsyncQueue<Tls>) -> Self {
         Self {
             check_period,
             queue,
@@ -51,7 +71,7 @@ impl Scheduler {
         loop {
             self.schedule().await?;
 
-            sleep(sleep_duration);
+            sleep(sleep_duration).await;
         }
     }
 
@@ -62,7 +82,7 @@ impl Scheduler {
             .await?
         {
             for task in tasks {
-                self.process_task(task).await;
+                self.process_task(task).await?;
             }
         };
         Ok(())

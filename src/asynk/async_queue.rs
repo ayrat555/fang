@@ -150,7 +150,7 @@ pub trait AsyncQueueable: Send + Sync {
     ) -> Result<PeriodicTask, AsyncQueueError>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(TypedBuilder, Debug, Clone)]
 pub struct AsyncQueue<Tls>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
@@ -158,6 +158,7 @@ where
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
+    #[builder(setter(into))]
     pool: Pool<PostgresConnectionManager<Tls>>,
 }
 
