@@ -27,7 +27,7 @@ impl<'a> Scheduler<'a> {
                     "Scheduler failed, restarting {:?}. Number of restarts {}",
                     err, self.number_of_restarts
                 );
-                self.number_of_restarts = self.number_of_restarts + 1;
+                self.number_of_restarts += 1;
                 self.start().await
             }
             Ok(_) => {
@@ -35,7 +35,7 @@ impl<'a> Scheduler<'a> {
                     "Scheduler stopped. restarting. Number of restarts {}",
                     self.number_of_restarts
                 );
-                self.number_of_restarts = self.number_of_restarts + 1;
+                self.number_of_restarts += 1;
                 self.start().await
             }
         }
