@@ -16,6 +16,7 @@ pub struct Executor {
     pub retention_mode: RetentionMode,
     shared_state: Option<SharedState>,
 }
+
 #[derive(Debug)]
 pub struct Error {
     pub description: String,

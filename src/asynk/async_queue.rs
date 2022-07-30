@@ -29,6 +29,7 @@ const FETCH_TASK_TYPE_QUERY: &str = include_str!("queries/fetch_task_type.sql");
 const FETCH_PERIODIC_TASKS_QUERY: &str = include_str!("queries/fetch_periodic_tasks.sql");
 const FIND_PERIODIC_TASK_BY_METADATA_QUERY: &str =
     include_str!("queries/find_periodic_task_by_metadata.sql");
+
 #[cfg(test)]
 const FIND_TASK_BY_ID_QUERY: &str = include_str!("queries/find_task_by_id.sql");
 #[cfg(test)]
@@ -48,11 +49,13 @@ pub enum FangTaskState {
     #[postgres(name = "finished")]
     Finished,
 }
+
 impl Default for FangTaskState {
     fn default() -> Self {
         FangTaskState::New
     }
 }
+
 #[derive(TypedBuilder, Debug, Eq, PartialEq, Clone)]
 pub struct Task {
     #[builder(setter(into))]
@@ -96,6 +99,7 @@ pub enum AsyncQueueError {
     #[error("returned invalid result (expected {expected:?}, found {found:?})")]
     ResultError { expected: u64, found: u64 },
 }
+
 impl From<AsyncQueueError> for FangError {
     fn from(error: AsyncQueueError) -> Self {
         let message = format!("{:?}", error);
@@ -106,10 +110,10 @@ impl From<AsyncQueueError> for FangError {
 }
 
 #[async_trait]
-pub trait AsyncQueueable: Send + Sync {
+pub trait AsyncQueueable {
     async fn fetch_and_touch_task(
         &mut self,
-        task_type: &Option<String>,
+        task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError>;
 
     async fn insert_task(
@@ -197,7 +201,7 @@ impl<'a> AsyncQueueTest<'a> {
 impl AsyncQueueable for AsyncQueueTest<'_> {
     async fn fetch_and_touch_task(
         &mut self,
-        task_type: &Option<String>,
+        task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
@@ -360,14 +364,14 @@ where
 
     pub async fn fetch_and_touch_task_query(
         transaction: &mut Transaction<'_>,
-        task_type: &Option<String>,
+        task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError> {
         let task_type = match task_type {
             Some(passed_task_type) => passed_task_type,
-            None => DEFAULT_TASK_TYPE,
+            None => DEFAULT_TASK_TYPE.to_string(),
         };
 
-        let task = match Self::get_task_type_query(transaction, task_type).await {
+        let task = match Self::get_task_type_query(transaction, &task_type).await {
             Ok(some_task) => Some(some_task),
             Err(_) => None,
         };
@@ -551,7 +555,7 @@ where
 {
     async fn fetch_and_touch_task(
         &mut self,
-        task_type: &Option<String>,
+        task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError> {
         let mut connection = self.pool.get().await?;
         let mut transaction = connection.transaction().await?;
@@ -845,7 +849,7 @@ mod async_queue_tests {
         assert_eq!(Some(2), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        let task = test.fetch_and_touch_task(&None).await.unwrap().unwrap();
+        let task = test.fetch_and_touch_task(None).await.unwrap().unwrap();
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -854,7 +858,7 @@ mod async_queue_tests {
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTask"), type_task);
 
-        let task = test.fetch_and_touch_task(&None).await.unwrap().unwrap();
+        let task = test.fetch_and_touch_task(None).await.unwrap().unwrap();
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();

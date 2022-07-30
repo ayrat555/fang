@@ -1,71 +1,50 @@
-use crate::asynk::async_queue::AsyncQueue;
-use crate::asynk::async_queue::AsyncQueueError;
 use crate::asynk::async_queue::AsyncQueueable;
 use crate::asynk::async_queue::PeriodicTask;
-use bb8_postgres::tokio_postgres::tls::{MakeTlsConnect, TlsConnect};
-use bb8_postgres::tokio_postgres::Socket;
-use futures::executor;
+use crate::asynk::Error;
+use async_recursion::async_recursion;
+use log::error;
 use std::time::Duration;
 use tokio::time::sleep;
+use typed_builder::TypedBuilder;
 
-pub struct Scheduler<Tls>
-where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
-    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
-    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
-    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
-{
+#[derive(TypedBuilder)]
+pub struct Scheduler<'a> {
+    #[builder(setter(into))]
     pub check_period: u64,
+    #[builder(setter(into))]
     pub error_margin_seconds: u64,
-    pub queue: AsyncQueue<Tls>,
+    #[builder(setter(into))]
+    pub queue: &'a mut dyn AsyncQueueable,
+    #[builder(default = 0, setter(into))]
+    pub number_of_restarts: u32,
 }
 
-impl<Tls> Drop for Scheduler<Tls>
-where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
-    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
-    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
-    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
-{
-    fn drop(&mut self) {
-        executor::block_on(Scheduler::start(
-            self.check_period,
-            self.error_margin_seconds,
-            self.queue.clone(),
-        ))
-        .unwrap();
-    }
-}
+impl<'a> Scheduler<'a> {
+    #[async_recursion(?Send)]
+    pub async fn start(&mut self) -> Result<(), Error> {
+        let task_res = self.schedule_loop().await;
 
-impl<Tls> Scheduler<Tls>
-where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
-    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
-    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
-    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
-{
-    pub async fn start(
-        check_period: u64,
-        error_margin_seconds: u64,
-        queue: AsyncQueue<Tls>,
-    ) -> Result<(), AsyncQueueError> {
-        tokio::spawn(async move {
-            let mut scheduler = Self::new(check_period, error_margin_seconds, queue);
-            scheduler.schedule_loop().await.unwrap();
-        })
-        .await
-        .unwrap();
-        Ok(())
-    }
-    pub fn new(check_period: u64, error_margin_seconds: u64, queue: AsyncQueue<Tls>) -> Self {
-        Self {
-            check_period,
-            queue,
-            error_margin_seconds,
+        match task_res {
+            Err(err) => {
+                error!(
+                    "Scheduler failed, restarting {:?}. Number of restarts {}",
+                    err, self.number_of_restarts
+                );
+                self.number_of_restarts += 1;
+                self.start().await
+            }
+            Ok(_) => {
+                error!(
+                    "Scheduler stopped. restarting. Number of restarts {}",
+                    self.number_of_restarts
+                );
+                self.number_of_restarts += 1;
+                self.start().await
+            }
         }
     }
 
-    pub async fn schedule_loop(&mut self) -> Result<(), AsyncQueueError> {
+    pub async fn schedule_loop(&mut self) -> Result<(), Error> {
         let sleep_duration = Duration::from_secs(self.check_period);
 
         loop {
@@ -75,7 +54,7 @@ where
         }
     }
 
-    pub async fn schedule(&mut self) -> Result<(), AsyncQueueError> {
+    pub async fn schedule(&mut self) -> Result<(), Error> {
         if let Some(tasks) = self
             .queue
             .fetch_periodic_tasks(self.error_margin_seconds as i64)
@@ -88,7 +67,7 @@ where
         Ok(())
     }
 
-    async fn process_task(&mut self, task: PeriodicTask) -> Result<(), AsyncQueueError> {
+    async fn process_task(&mut self, task: PeriodicTask) -> Result<(), Error> {
         match task.scheduled_at {
             None => {
                 self.queue.schedule_next_task(task).await?;
