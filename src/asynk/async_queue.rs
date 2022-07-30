@@ -106,7 +106,7 @@ impl From<AsyncQueueError> for FangError {
 }
 
 #[async_trait]
-pub trait AsyncQueueable: Send + Sync {
+pub trait AsyncQueueable {
     async fn fetch_and_touch_task(
         &mut self,
         task_type: &Option<String>,
