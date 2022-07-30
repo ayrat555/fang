@@ -16,7 +16,7 @@ pub struct Scheduler<'a> {
     #[builder(setter(into))]
     pub queue: &'a mut dyn AsyncQueueable,
     #[builder(default = 0, setter(into))]
-    number_of_restarts: u32,
+    pub number_of_restarts: u32,
 }
 
 impl<'a> Scheduler<'a> {
