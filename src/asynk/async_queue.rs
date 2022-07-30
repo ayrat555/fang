@@ -143,6 +143,7 @@ pub trait AsyncQueueable {
     async fn insert_periodic_task(
         &mut self,
         metadata: serde_json::Value,
+        timestamp: DateTime<Utc>,
         period: i32,
     ) -> Result<PeriodicTask, AsyncQueueError>;
     async fn schedule_next_task(
@@ -245,12 +246,18 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
     async fn insert_periodic_task(
         &mut self,
         metadata: serde_json::Value,
+        timestamp: DateTime<Utc>,
         period: i32,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
-        let periodic_task =
-            AsyncQueue::<NoTls>::insert_periodic_task_query(transaction, metadata, period).await?;
+        let periodic_task = AsyncQueue::<NoTls>::insert_periodic_task_query(
+            transaction,
+            metadata,
+            timestamp,
+            period,
+        )
+        .await?;
 
         Ok(periodic_task)
     }
@@ -457,10 +464,14 @@ where
     pub async fn insert_periodic_task_query(
         transaction: &mut Transaction<'_>,
         metadata: serde_json::Value,
+        timestamp: DateTime<Utc>,
         period: i32,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         let row: Row = transaction
-            .query_one(INSERT_PERIODIC_TASK_QUERY, &[&metadata, &period])
+            .query_one(
+                INSERT_PERIODIC_TASK_QUERY,
+                &[&metadata, &timestamp, &period],
+            )
             .await?;
         let periodic_task = Self::row_to_periodic_task(row);
         Ok(periodic_task)
@@ -622,13 +633,14 @@ where
     async fn insert_periodic_task(
         &mut self,
         metadata: serde_json::Value,
+        timestamp: DateTime<Utc>,
         period: i32,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         let mut connection = self.pool.get().await?;
         let mut transaction = connection.transaction().await?;
 
         let periodic_task =
-            Self::insert_periodic_task_query(&mut transaction, metadata, period).await?;
+            Self::insert_periodic_task_query(&mut transaction, metadata, timestamp, period).await?;
 
         transaction.commit().await?;
 

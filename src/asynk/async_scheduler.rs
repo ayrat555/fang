@@ -70,17 +70,12 @@ impl<'a> Scheduler<'a> {
     async fn process_task(&mut self, task: PeriodicTask) -> Result<(), Error> {
         match task.scheduled_at {
             None => {
-                eprintln!("Insert task");
                 self.queue.schedule_next_task(task).await?;
             }
             Some(_) => {
                 let metadata = task.metadata.clone();
-                let type_task = match metadata["type"].as_str() {
-                    Some(task_type) => task_type.clone(),
-                    None => "common",
-                };
-                println!("Insert task");
-                self.queue.insert_task(metadata.clone(), type_task).await?;
+                // known issue,  hardcode common to try if rest of code works
+                self.queue.insert_task(metadata, "common").await?;
 
                 self.queue.schedule_next_task(task).await?;
             }
@@ -100,7 +95,6 @@ impl<'a> Scheduler<'a> {
             {
                 Some(tasks) => {
                     for task in tasks {
-                        eprintln!("Process task");
                         self.process_task(task).await?;
                     }
 
@@ -126,8 +120,10 @@ mod async_scheduler_tests {
     use bb8_postgres::bb8::Pool;
     use bb8_postgres::tokio_postgres::NoTls;
     use bb8_postgres::PostgresConnectionManager;
+    use chrono::DateTime;
+    use chrono::Duration as OtherDuration;
+    use chrono::Utc;
     use serde::{Deserialize, Serialize};
-    use std::time::Duration;
 
     #[derive(Serialize, Deserialize)]
     struct AsyncScheduledTask {
@@ -140,10 +136,9 @@ mod async_scheduler_tests {
         async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
             Ok(())
         }
-        /*        fn task_type(&self) -> String {
-                  "schedule".to_string()
-              }
-        */
+        /*fn task_type(&self) -> String {
+            "schedule".to_string()
+        }*/
     }
 
     #[tokio::test]
@@ -156,9 +151,10 @@ mod async_scheduler_tests {
             transaction,
             duplicated_tasks: true,
         };
-
+        let schedule_in_future = Utc::now() + OtherDuration::seconds(5);
+        let runnable_task = AsyncScheduledTask { number: 1 };
         let _periodic_task =
-            insert_periodic_task(&mut test, &AsyncScheduledTask { number: 1 }, 10).await;
+            insert_periodic_task(&mut test, &runnable_task, schedule_in_future, 10).await;
 
         let mut scheduler = Scheduler::builder()
             .check_period(1 as u64)
@@ -167,9 +163,6 @@ mod async_scheduler_tests {
             .build();
         // Scheduler start tricky not loop :)
         scheduler.schedule_test().await.unwrap();
-
-        let sleep_duration = Duration::from_secs(15);
-        tokio::time::sleep(sleep_duration).await;
 
         let task = scheduler
             .queue
@@ -181,18 +174,20 @@ mod async_scheduler_tests {
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
-        assert_eq!(Some("common"), type_task);
+        assert_eq!("common", runnable_task.task_type());
+        assert_eq!(Some("AsyncScheduledTask"), type_task);
         assert_eq!(Some(1), number);
     }
 
     async fn insert_periodic_task(
         test: &mut AsyncQueueTest<'_>,
         task: &dyn AsyncRunnable,
+        timestamp: DateTime<Utc>,
         period_in_seconds: i32,
     ) -> PeriodicTask {
         let metadata = serde_json::to_value(task).unwrap();
 
-        test.insert_periodic_task(metadata, period_in_seconds)
+        test.insert_periodic_task(metadata, timestamp, period_in_seconds)
             .await
             .unwrap()
     }
