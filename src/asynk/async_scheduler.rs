@@ -12,6 +12,8 @@ pub struct Scheduler<'a> {
     pub check_period: u64,
     pub error_margin_seconds: u64,
     pub queue: &'a mut dyn AsyncQueueable,
+    #[builder(default = 0)]
+    number_of_restarts: u32,
 }
 
 impl<'a> Scheduler<'a> {
@@ -21,11 +23,19 @@ impl<'a> Scheduler<'a> {
 
         match task_res {
             Err(err) => {
-                error!("Scheduler failed, restarting {:?}", err);
+                error!(
+                    "Scheduler failed, restarting {:?}. Number of restarts {}",
+                    err, self.number_of_restarts
+                );
+                self.number_of_restarts = self.number_of_restarts + 1;
                 self.start().await
             }
             Ok(_) => {
-                error!("Scheduler stopped, restarting");
+                error!(
+                    "Scheduler stopped. restarting. Number of restarts {}",
+                    self.number_of_restarts
+                );
+                self.number_of_restarts = self.number_of_restarts + 1;
                 self.start().await
             }
         }

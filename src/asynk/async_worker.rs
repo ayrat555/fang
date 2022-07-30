@@ -13,18 +13,20 @@ use typed_builder::TypedBuilder;
 pub struct AsyncWorker<'a> {
     #[builder(setter(into))]
     pub queue: &'a mut dyn AsyncQueueable,
-    #[builder(default=DEFAULT_TASK_TYPE.to_string() , setter(into))]
+    #[builder(default=DEFAULT_TASK_TYPE.to_string(), setter(into))]
     pub task_type: String,
     #[builder(default, setter(into))]
     pub sleep_params: SleepParams,
     #[builder(default, setter(into))]
     pub retention_mode: RetentionMode,
 }
+
 impl<'a> AsyncWorker<'a> {
     pub async fn run(&mut self, task: Task) -> Result<(), Error> {
         let result = self.execute_task(task).await;
         self.finalize_task(result).await
     }
+
     async fn execute_task(&mut self, task: Task) -> Result<Task, (Task, String)> {
         let actual_task: Box<dyn AsyncRunnable> =
             serde_json::from_value(task.metadata.clone()).unwrap();
@@ -35,6 +37,7 @@ impl<'a> AsyncWorker<'a> {
             Err(error) => Err((task, error.description)),
         }
     }
+
     async fn finalize_task(&mut self, result: Result<Task, (Task, String)>) -> Result<(), Error> {
         match self.retention_mode {
             RetentionMode::KeepAll => match result {
@@ -71,16 +74,18 @@ impl<'a> AsyncWorker<'a> {
             },
         }
     }
+
     pub async fn sleep(&mut self) {
         self.sleep_params.maybe_increase_sleep_period();
 
         tokio::time::sleep(Duration::from_secs(self.sleep_params.sleep_period)).await;
     }
+
     pub async fn run_tasks(&mut self) -> Result<(), Error> {
         loop {
             match self
                 .queue
-                .fetch_and_touch_task(&Some(self.task_type.clone()))
+                .fetch_and_touch_task(Some(self.task_type.clone()))
                 .await
             {
                 Ok(Some(task)) => {
@@ -99,12 +104,13 @@ impl<'a> AsyncWorker<'a> {
             };
         }
     }
+
     #[cfg(test)]
     pub async fn run_tasks_until_none(&mut self) -> Result<(), Error> {
         loop {
             match self
                 .queue
-                .fetch_and_touch_task(&Some(self.task_type.clone()))
+                .fetch_and_touch_task(Some(self.task_type.clone()))
                 .await
             {
                 Ok(Some(task)) => {
@@ -305,13 +311,13 @@ mod async_worker_tests {
 
         worker.run_tasks_until_none().await.unwrap();
         let task = test
-            .fetch_and_touch_task(&Some("type1".to_string()))
+            .fetch_and_touch_task(Some("type1".to_string()))
             .await
             .unwrap();
         assert_eq!(None, task);
 
         let task2 = test
-            .fetch_and_touch_task(&Some("type2".to_string()))
+            .fetch_and_touch_task(Some("type2".to_string()))
             .await
             .unwrap()
             .unwrap();
