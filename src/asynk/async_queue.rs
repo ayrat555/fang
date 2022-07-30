@@ -217,18 +217,13 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         task_type: &str,
     ) -> Result<Task, AsyncQueueError> {
         let transaction = &mut self.transaction;
-        let task: Task;
 
-        if self.duplicated_tasks {
-            task = AsyncQueue::<NoTls>::insert_task_query(transaction, metadata, task_type).await?;
+        let task: Task = if self.duplicated_tasks {
+            AsyncQueue::<NoTls>::insert_task_query(transaction, metadata, task_type).await?
         } else {
-            task = AsyncQueue::<NoTls>::insert_task_if_not_exist_query(
-                transaction,
-                metadata,
-                task_type,
-            )
-            .await?;
-        }
+            AsyncQueue::<NoTls>::insert_task_if_not_exist_query(transaction, metadata, task_type)
+                .await?
+        };
         Ok(task)
     }
 
