@@ -1,1 +1,1 @@
-SELECT * FROM fang_periodic_tasks WHERE schedule_at BETWEEN $1 AND $2 OR schedule_at IS NULL
+SELECT * FROM fang_periodic_tasks WHERE scheduled_at BETWEEN $1 AND $2 OR scheduled_at IS NULL

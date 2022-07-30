@@ -27,8 +27,7 @@ const REMOVE_TASK_QUERY: &str = include_str!("queries/remove_task.sql");
 const REMOVE_TASKS_TYPE_QUERY: &str = include_str!("queries/remove_tasks_type.sql");
 const FETCH_TASK_TYPE_QUERY: &str = include_str!("queries/fetch_task_type.sql");
 const FETCH_PERIODIC_TASKS_QUERY: &str = include_str!("queries/fetch_periodic_tasks.sql");
-const FIND_PERIODIC_TASK_BY_METADATA_QUERY: &str =
-    include_str!("queries/find_periodic_task_by_metadata.sql");
+const FIND_TASK_BY_METADATA_QUERY: &str = include_str!("queries/find_task_by_metadata.sql");
 
 #[cfg(test)]
 const FIND_TASK_BY_ID_QUERY: &str = include_str!("queries/find_task_by_id.sql");
@@ -121,7 +120,6 @@ pub trait AsyncQueueable {
         task: serde_json::Value,
         task_type: &str,
     ) -> Result<Task, AsyncQueueError>;
-
     async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError>;
 
     async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError>;
@@ -147,7 +145,6 @@ pub trait AsyncQueueable {
         metadata: serde_json::Value,
         period: i32,
     ) -> Result<PeriodicTask, AsyncQueueError>;
-
     async fn schedule_next_task(
         &mut self,
         periodic_task: PeriodicTask,
@@ -164,11 +161,14 @@ where
 {
     #[builder(setter(into))]
     pool: Pool<PostgresConnectionManager<Tls>>,
+    #[builder(setter(into))]
+    duplicated_tasks: bool,
 }
 
 #[cfg(test)]
 pub struct AsyncQueueTest<'a> {
     pub transaction: Transaction<'a>,
+    pub duplicated_tasks: bool,
 }
 
 #[cfg(test)]
@@ -216,9 +216,18 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         task_type: &str,
     ) -> Result<Task, AsyncQueueError> {
         let transaction = &mut self.transaction;
+        let task: Task;
 
-        let task = AsyncQueue::<NoTls>::insert_task_query(transaction, metadata, task_type).await?;
-
+        if self.duplicated_tasks {
+            task = AsyncQueue::<NoTls>::insert_task_query(transaction, metadata, task_type).await?;
+        } else {
+            task = AsyncQueue::<NoTls>::insert_task_if_not_exist_query(
+                transaction,
+                metadata,
+                task_type,
+            )
+            .await?;
+        }
         Ok(task)
     }
 
@@ -313,11 +322,18 @@ where
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
-    pub async fn connect(uri: impl ToString, tls: Tls) -> Result<Self, AsyncQueueError> {
+    pub async fn connect(
+        uri: impl ToString,
+        tls: Tls,
+        duplicated_tasks: bool,
+    ) -> Result<Self, AsyncQueueError> {
         let manager = PostgresConnectionManager::new_from_stringlike(uri, tls)?;
         let pool = Pool::builder().build(manager).await?;
 
-        Ok(Self { pool })
+        Ok(Self {
+            pool,
+            duplicated_tasks,
+        })
     }
 
     pub async fn remove_all_tasks_query(
@@ -491,15 +507,29 @@ where
         }
         Ok(result)
     }
-    pub async fn find_periodic_task_by_metadata_query(
+
+    pub async fn insert_task_if_not_exist_query(
+        transaction: &mut Transaction<'_>,
+        metadata: serde_json::Value,
+        task_type: &str,
+    ) -> Result<Task, AsyncQueueError> {
+        match Self::find_task_by_metadata_query(transaction, &metadata).await {
+            Some(task) => Ok(task),
+            None => Self::insert_task_query(transaction, metadata, task_type).await,
+        }
+    }
+    pub async fn find_task_by_metadata_query(
         transaction: &mut Transaction<'_>,
         metadata: &serde_json::Value,
-    ) -> Result<Option<PeriodicTask>, AsyncQueueError> {
-        let row: Row = transaction
-            .query_one(FIND_PERIODIC_TASK_BY_METADATA_QUERY, &[metadata])
-            .await?;
-        let periodic_task = Some(Self::row_to_periodic_task(row));
-        Ok(periodic_task)
+    ) -> Option<Task> {
+        let result = transaction
+            .query_one(FIND_TASK_BY_METADATA_QUERY, &[metadata])
+            .await;
+
+        match result {
+            Ok(row) => Some(Self::row_to_task(row)),
+            Err(_) => None,
+        }
     }
     fn row_to_periodic_task(row: Row) -> PeriodicTask {
         let id: Uuid = row.get("id");
@@ -575,7 +605,14 @@ where
         let mut connection = self.pool.get().await?;
         let mut transaction = connection.transaction().await?;
 
-        let task = Self::insert_task_query(&mut transaction, metadata, task_type).await?;
+        let task: Task;
+
+        if self.duplicated_tasks {
+            task = Self::insert_task_query(&mut transaction, metadata, task_type).await?;
+        } else {
+            task =
+                Self::insert_task_if_not_exist_query(&mut transaction, metadata, task_type).await?;
+        }
 
         transaction.commit().await?;
 
@@ -722,7 +759,10 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest { transaction };
+        let mut test = AsyncQueueTest {
+            transaction,
+            duplicated_tasks: true,
+        };
 
         let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
@@ -741,7 +781,10 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest { transaction };
+        let mut test = AsyncQueueTest {
+            transaction,
+            duplicated_tasks: true,
+        };
 
         let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
@@ -770,7 +813,10 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest { transaction };
+        let mut test = AsyncQueueTest {
+            transaction,
+            duplicated_tasks: true,
+        };
 
         let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
@@ -797,7 +843,10 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest { transaction };
+        let mut test = AsyncQueueTest {
+            transaction,
+            duplicated_tasks: true,
+        };
 
         let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
@@ -829,7 +878,10 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest { transaction };
+        let mut test = AsyncQueueTest {
+            transaction,
+            duplicated_tasks: true,
+        };
 
         let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
@@ -875,7 +927,10 @@ mod async_queue_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest { transaction };
+        let mut test = AsyncQueueTest {
+            transaction,
+            duplicated_tasks: true,
+        };
 
         let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
 
