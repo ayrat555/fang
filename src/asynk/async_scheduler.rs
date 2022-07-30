@@ -156,9 +156,12 @@ mod async_scheduler_tests {
         let _periodic_task =
             insert_periodic_task(&mut test, &runnable_task, schedule_in_future, 10).await;
 
+        let check_period: u64 = 1;
+        let error_margin_seconds: u64 = 2;
+
         let mut scheduler = Scheduler::builder()
-            .check_period(1 as u64)
-            .error_margin_seconds(2 as u64)
+            .check_period(check_period)
+            .error_margin_seconds(error_margin_seconds)
             .queue(&mut test as &mut dyn AsyncQueueable)
             .build();
         // Scheduler start tricky not loop :)
