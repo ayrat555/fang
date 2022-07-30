@@ -616,14 +616,11 @@ where
         let mut connection = self.pool.get().await?;
         let mut transaction = connection.transaction().await?;
 
-        let task: Task;
-
-        if self.duplicated_tasks {
-            task = Self::insert_task_query(&mut transaction, metadata, task_type).await?;
+        let task: Task = if self.duplicated_tasks {
+            Self::insert_task_query(&mut transaction, metadata, task_type).await?
         } else {
-            task =
-                Self::insert_task_if_not_exist_query(&mut transaction, metadata, task_type).await?;
-        }
+            Self::insert_task_if_not_exist_query(&mut transaction, metadata, task_type).await?
+        };
 
         transaction.commit().await?;
 
