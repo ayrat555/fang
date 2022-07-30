@@ -9,10 +9,13 @@ use typed_builder::TypedBuilder;
 
 #[derive(TypedBuilder)]
 pub struct Scheduler<'a> {
+    #[builder(setter(into))]
     pub check_period: u64,
+    #[builder(setter(into))]
     pub error_margin_seconds: u64,
+    #[builder(setter(into))]
     pub queue: &'a mut dyn AsyncQueueable,
-    #[builder(default = 0)]
+    #[builder(default = 0, setter(into))]
     number_of_restarts: u32,
 }
 
