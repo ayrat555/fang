@@ -12,13 +12,9 @@ async fn main() {
 
     log::info!("Starting...");
 
-    let mut queue = AsyncQueue::connect(
-        "postgres://postgres:mypassword1@localhost/fang",
-        NoTls,
-        true,
-    )
-    .await
-    .unwrap();
+    let mut queue = AsyncQueue::connect("postgres://postgres:postgres@localhost/fang", NoTls, true)
+        .await
+        .unwrap();
 
     log::info!("Queue connected...");
 

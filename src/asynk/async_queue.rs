@@ -753,7 +753,7 @@ mod async_queue_tests {
     }
 
     #[typetag::serde]
-    #[async_trait(?Send)]
+    #[async_trait]
     impl AsyncRunnable for AsyncTask {
         async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
             Ok(())

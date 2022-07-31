@@ -157,7 +157,7 @@ mod async_worker_tests {
     }
 
     #[typetag::serde]
-    #[async_trait(?Send)]
+    #[async_trait]
     impl AsyncRunnable for WorkerAsyncTask {
         async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
             Ok(())
@@ -169,7 +169,7 @@ mod async_worker_tests {
     }
 
     #[typetag::serde]
-    #[async_trait(?Send)]
+    #[async_trait]
     impl AsyncRunnable for AsyncFailedTask {
         async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
             let message = format!("number {} is wrong :(", self.number);
@@ -184,7 +184,7 @@ mod async_worker_tests {
     struct AsyncTaskType1 {}
 
     #[typetag::serde]
-    #[async_trait(?Send)]
+    #[async_trait]
     impl AsyncRunnable for AsyncTaskType1 {
         async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
             Ok(())
@@ -199,7 +199,7 @@ mod async_worker_tests {
     struct AsyncTaskType2 {}
 
     #[typetag::serde]
-    #[async_trait(?Send)]
+    #[async_trait]
     impl AsyncRunnable for AsyncTaskType2 {
         async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
             Ok(())
