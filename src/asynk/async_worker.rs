@@ -82,12 +82,17 @@ impl<'a> AsyncWorker<'a> {
     }
 
     pub async fn run_tasks(&mut self) -> Result<(), Error> {
+        log::info!("Loop..");
+        log::info!("kill me...{:?}", self.task_type.clone());
         loop {
-            match self
+            let task_result = self
                 .queue
                 .fetch_and_touch_task(Some(self.task_type.clone()))
-                .await
-            {
+                .await;
+
+            log::info!("result {:?}", task_result);
+
+            match task_result {
                 Ok(Some(task)) => {
                     self.sleep_params.maybe_reset_sleep_period();
                     self.run(task).await?

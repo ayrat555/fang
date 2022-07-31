@@ -37,8 +37,8 @@ async fn main() {
     let metadata1 = serde_json::to_value(task1).unwrap();
     let metadata2 = serde_json::to_value(task2).unwrap();
 
-    queue.insert_task(metadata1, "commmon").await.unwrap();
-    queue.insert_task(metadata2, "commmon").await.unwrap();
+    queue.insert_task(metadata1, "common").await.unwrap();
+    queue.insert_task(metadata2, "common").await.unwrap();
 
     tokio::time::sleep(Duration::from_secs(20)).await;
 }
