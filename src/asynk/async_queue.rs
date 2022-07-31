@@ -1,4 +1,5 @@
 use crate::asynk::async_runnable::Error as FangError;
+use crate::AsyncRunnable;
 use async_trait::async_trait;
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::bb8::RunError;
@@ -95,6 +96,8 @@ pub enum AsyncQueueError {
     PoolError(#[from] RunError<bb8_postgres::tokio_postgres::Error>),
     #[error(transparent)]
     PgError(#[from] bb8_postgres::tokio_postgres::Error),
+    #[error(transparent)]
+    SerdeError(#[from] serde_json::Error),
     #[error("returned invalid result (expected {expected:?}, found {found:?})")]
     ResultError { expected: u64, found: u64 },
 }
@@ -115,11 +118,7 @@ pub trait AsyncQueueable: Send {
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError>;
 
-    async fn insert_task(
-        &mut self,
-        task: serde_json::Value,
-        task_type: &str,
-    ) -> Result<Task, AsyncQueueError>;
+    async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
     async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError>;
 
     async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError>;
@@ -142,7 +141,7 @@ pub trait AsyncQueueable: Send {
 
     async fn insert_periodic_task(
         &mut self,
-        metadata: serde_json::Value,
+        task: &dyn AsyncRunnable,
         timestamp: DateTime<Utc>,
         period: i32,
     ) -> Result<PeriodicTask, AsyncQueueError>;
@@ -214,18 +213,20 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         Ok(task)
     }
 
-    async fn insert_task(
-        &mut self,
-        metadata: serde_json::Value,
-        task_type: &str,
-    ) -> Result<Task, AsyncQueueError> {
+    async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
+        let metadata = serde_json::to_value(task)?;
+
         let task: Task = if self.duplicated_tasks {
-            AsyncQueue::<NoTls>::insert_task_query(transaction, metadata, task_type).await?
+            AsyncQueue::<NoTls>::insert_task_query(transaction, metadata, &task.task_type()).await?
         } else {
-            AsyncQueue::<NoTls>::insert_task_if_not_exist_query(transaction, metadata, task_type)
-                .await?
+            AsyncQueue::<NoTls>::insert_task_if_not_exist_query(
+                transaction,
+                metadata,
+                &task.task_type(),
+            )
+            .await?
         };
         Ok(task)
     }
@@ -243,11 +244,13 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
     }
     async fn insert_periodic_task(
         &mut self,
-        metadata: serde_json::Value,
+        task: &dyn AsyncRunnable,
         timestamp: DateTime<Utc>,
         period: i32,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         let transaction = &mut self.transaction;
+
+        let metadata = serde_json::to_value(task)?;
 
         let periodic_task = AsyncQueue::<NoTls>::insert_periodic_task_query(
             transaction,
@@ -341,27 +344,27 @@ where
         })
     }
 
-    pub async fn remove_all_tasks_query(
+    async fn remove_all_tasks_query(
         transaction: &mut Transaction<'_>,
     ) -> Result<u64, AsyncQueueError> {
         Self::execute_query(transaction, REMOVE_ALL_TASK_QUERY, &[], None).await
     }
 
-    pub async fn remove_task_query(
+    async fn remove_task_query(
         transaction: &mut Transaction<'_>,
         task: Task,
     ) -> Result<u64, AsyncQueueError> {
         Self::execute_query(transaction, REMOVE_TASK_QUERY, &[&task.id], Some(1)).await
     }
 
-    pub async fn remove_tasks_type_query(
+    async fn remove_tasks_type_query(
         transaction: &mut Transaction<'_>,
         task_type: &str,
     ) -> Result<u64, AsyncQueueError> {
         Self::execute_query(transaction, REMOVE_TASKS_TYPE_QUERY, &[&task_type], None).await
     }
 
-    pub async fn fail_task_query(
+    async fn fail_task_query(
         transaction: &mut Transaction<'_>,
         task: Task,
         error_message: &str,
@@ -383,7 +386,7 @@ where
         Ok(failed_task)
     }
 
-    pub async fn fetch_and_touch_task_query(
+    async fn fetch_and_touch_task_query(
         transaction: &mut Transaction<'_>,
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError> {
@@ -407,7 +410,7 @@ where
         Ok(result_task)
     }
 
-    pub async fn get_task_type_query(
+    async fn get_task_type_query(
         transaction: &mut Transaction<'_>,
         task_type: &str,
     ) -> Result<Task, AsyncQueueError> {
@@ -420,7 +423,7 @@ where
         Ok(task)
     }
 
-    pub async fn update_task_state_query(
+    async fn update_task_state_query(
         transaction: &mut Transaction<'_>,
         task: Task,
         state: FangTaskState,
@@ -434,7 +437,7 @@ where
         Ok(task)
     }
 
-    pub async fn insert_task_query(
+    async fn insert_task_query(
         transaction: &mut Transaction<'_>,
         metadata: serde_json::Value,
         task_type: &str,
@@ -445,7 +448,7 @@ where
         let task = Self::row_to_task(row);
         Ok(task)
     }
-    pub async fn schedule_next_task_query(
+    async fn schedule_next_task_query(
         transaction: &mut Transaction<'_>,
         periodic_task: PeriodicTask,
     ) -> Result<PeriodicTask, AsyncQueueError> {
@@ -459,7 +462,7 @@ where
         let periodic_task = Self::row_to_periodic_task(row);
         Ok(periodic_task)
     }
-    pub async fn insert_periodic_task_query(
+    async fn insert_periodic_task_query(
         transaction: &mut Transaction<'_>,
         metadata: serde_json::Value,
         timestamp: DateTime<Utc>,
@@ -475,7 +478,7 @@ where
         Ok(periodic_task)
     }
 
-    pub async fn fetch_periodic_tasks_query(
+    async fn fetch_periodic_tasks_query(
         transaction: &mut Transaction<'_>,
         error_margin_seconds: i64,
     ) -> Result<Option<Vec<PeriodicTask>>, AsyncQueueError> {
@@ -498,7 +501,7 @@ where
             Ok(Some(periodic_tasks))
         }
     }
-    pub async fn execute_query(
+    async fn execute_query(
         transaction: &mut Transaction<'_>,
         query: &str,
         params: &[&(dyn ToSql + Sync)],
@@ -517,7 +520,7 @@ where
         Ok(result)
     }
 
-    pub async fn insert_task_if_not_exist_query(
+    async fn insert_task_if_not_exist_query(
         transaction: &mut Transaction<'_>,
         metadata: serde_json::Value,
         task_type: &str,
@@ -527,7 +530,7 @@ where
             None => Self::insert_task_query(transaction, metadata, task_type).await,
         }
     }
-    pub async fn find_task_by_metadata_query(
+    async fn find_task_by_metadata_query(
         transaction: &mut Transaction<'_>,
         metadata: &serde_json::Value,
     ) -> Option<Task> {
@@ -606,18 +609,17 @@ where
         Ok(task)
     }
 
-    async fn insert_task(
-        &mut self,
-        metadata: serde_json::Value,
-        task_type: &str,
-    ) -> Result<Task, AsyncQueueError> {
+    async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
         let mut connection = self.pool.get().await?;
         let mut transaction = connection.transaction().await?;
 
+        let metadata = serde_json::to_value(task)?;
+
         let task: Task = if self.duplicated_tasks {
-            Self::insert_task_query(&mut transaction, metadata, task_type).await?
+            Self::insert_task_query(&mut transaction, metadata, &task.task_type()).await?
         } else {
-            Self::insert_task_if_not_exist_query(&mut transaction, metadata, task_type).await?
+            Self::insert_task_if_not_exist_query(&mut transaction, metadata, &task.task_type())
+                .await?
         };
 
         transaction.commit().await?;
@@ -627,12 +629,14 @@ where
 
     async fn insert_periodic_task(
         &mut self,
-        metadata: serde_json::Value,
+        task: &dyn AsyncRunnable,
         timestamp: DateTime<Utc>,
         period: i32,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         let mut connection = self.pool.get().await?;
         let mut transaction = connection.transaction().await?;
+
+        let metadata = serde_json::to_value(task)?;
 
         let periodic_task =
             Self::insert_periodic_task_query(&mut transaction, metadata, timestamp, period).await?;
@@ -949,8 +953,7 @@ mod async_queue_tests {
     }
 
     async fn insert_task(test: &mut AsyncQueueTest<'_>, task: &dyn AsyncRunnable) -> Task {
-        let metadata = serde_json::to_value(task).unwrap();
-        test.insert_task(metadata, &task.task_type()).await.unwrap()
+        test.insert_task(task).await.unwrap()
     }
 
     async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {

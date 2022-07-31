@@ -326,8 +326,7 @@ mod async_worker_tests {
         test.transaction.rollback().await.unwrap();
     }
     async fn insert_task(test: &mut AsyncQueueTest<'_>, task: &dyn AsyncRunnable) -> Task {
-        let metadata = serde_json::to_value(task).unwrap();
-        test.insert_task(metadata, &task.task_type()).await.unwrap()
+        test.insert_task(task).await.unwrap()
     }
     async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
         let pg_mgr = PostgresConnectionManager::new_from_stringlike(
