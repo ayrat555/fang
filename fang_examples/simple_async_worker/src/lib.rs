@@ -26,8 +26,10 @@ impl AsyncRunnable for MyTask {
         tokio::time::sleep(Duration::from_secs(3)).await;
 
         let new_task = MyTask::new(self.number + 1);
-        let metadata = serde_json::to_value(&new_task as &dyn AsyncRunnable).unwrap();
-        queue.insert_task(metadata, "common").await.unwrap();
+        queue
+            .insert_task(&new_task as &dyn AsyncRunnable)
+            .await
+            .unwrap();
 
         Ok(())
     }

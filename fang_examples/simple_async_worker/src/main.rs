@@ -31,11 +31,14 @@ async fn main() {
     let task1 = MyTask::new(0);
     let task2 = MyTask::new(20_000);
 
-    let metadata1 = serde_json::to_value(&task1 as &dyn AsyncRunnable).unwrap();
-    let metadata2 = serde_json::to_value(&task2 as &dyn AsyncRunnable).unwrap();
-
-    queue.insert_task(metadata1, "common").await.unwrap();
-    queue.insert_task(metadata2, "common").await.unwrap();
+    queue
+        .insert_task(&task1 as &dyn AsyncRunnable)
+        .await
+        .unwrap();
+    queue
+        .insert_task(&task2 as &dyn AsyncRunnable)
+        .await
+        .unwrap();
 
     tokio::time::sleep(Duration::from_secs(100)).await;
 }
