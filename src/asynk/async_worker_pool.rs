@@ -9,7 +9,6 @@ use bb8_postgres::tokio_postgres::tls::MakeTlsConnect;
 use bb8_postgres::tokio_postgres::tls::TlsConnect;
 use bb8_postgres::tokio_postgres::Socket;
 use log::error;
-use log::info;
 use std::time::Duration;
 use typed_builder::TypedBuilder;
 
