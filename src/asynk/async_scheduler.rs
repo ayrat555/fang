@@ -1,5 +1,6 @@
 use crate::asynk::async_queue::AsyncQueueable;
 use crate::asynk::async_queue::PeriodicTask;
+use crate::asynk::AsyncRunnable;
 use crate::asynk::Error;
 use async_recursion::async_recursion;
 use log::error;
@@ -74,8 +75,13 @@ impl<'a> Scheduler<'a> {
             }
             Some(_) => {
                 let metadata = task.metadata.clone();
-                // known issue,  hardcode common to try if rest of code works
-                self.queue.insert_task(metadata, "common").await?;
+
+                let actual_task: Box<dyn AsyncRunnable> =
+                    serde_json::from_value(task.metadata.clone()).unwrap();
+
+                self.queue
+                    .insert_task(metadata, &(*actual_task).task_type())
+                    .await?;
 
                 self.queue.schedule_next_task(task).await?;
             }
@@ -136,9 +142,9 @@ mod async_scheduler_tests {
         async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
             Ok(())
         }
-        /*fn task_type(&self) -> String {
+        fn task_type(&self) -> String {
             "schedule".to_string()
-        }*/
+        }
     }
 
     #[tokio::test]
@@ -152,9 +158,14 @@ mod async_scheduler_tests {
             duplicated_tasks: true,
         };
         let schedule_in_future = Utc::now() + OtherDuration::seconds(5);
-        let runnable_task = AsyncScheduledTask { number: 1 };
-        let _periodic_task =
-            insert_periodic_task(&mut test, &runnable_task, schedule_in_future, 10).await;
+
+        let _periodic_task = insert_periodic_task(
+            &mut test,
+            &AsyncScheduledTask { number: 1 },
+            schedule_in_future,
+            10,
+        )
+        .await;
 
         let check_period: u64 = 1;
         let error_margin_seconds: u64 = 2;
@@ -169,7 +180,7 @@ mod async_scheduler_tests {
 
         let task = scheduler
             .queue
-            .fetch_and_touch_task(Some("common".to_string()))
+            .fetch_and_touch_task(Some("schedule".to_string()))
             .await
             .unwrap()
             .unwrap();
@@ -177,7 +188,11 @@ mod async_scheduler_tests {
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
         let type_task = metadata["type"].as_str();
-        assert_eq!("common", runnable_task.task_type());
+
+        let runnable_task: Box<dyn AsyncRunnable> =
+            serde_json::from_value(task.metadata.clone()).unwrap();
+
+        assert_eq!("schedule", runnable_task.task_type());
         assert_eq!(Some("AsyncScheduledTask"), type_task);
         assert_eq!(Some(1), number);
     }
