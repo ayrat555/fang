@@ -139,7 +139,7 @@ mod async_scheduler_tests {
     }
 
     #[typetag::serde]
-    #[async_trait(?Send)]
+    #[async_trait]
     impl AsyncRunnable for AsyncScheduledTask {
         async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
             Ok(())

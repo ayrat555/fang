@@ -9,8 +9,8 @@ pub struct Error {
 }
 
 #[typetag::serde(tag = "type")]
-#[async_trait(?Send)]
-pub trait AsyncRunnable {
+#[async_trait]
+pub trait AsyncRunnable: Send + Sync {
     async fn run(&self, client: &mut dyn AsyncQueueable) -> Result<(), Error>;
 
     fn task_type(&self) -> String {

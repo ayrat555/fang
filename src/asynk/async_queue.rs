@@ -109,7 +109,7 @@ impl From<AsyncQueueError> for FangError {
 }
 
 #[async_trait]
-pub trait AsyncQueueable {
+pub trait AsyncQueueable: Send {
     async fn fetch_and_touch_task(
         &mut self,
         task_type: Option<String>,
@@ -753,7 +753,7 @@ mod async_queue_tests {
     }
 
     #[typetag::serde]
-    #[async_trait(?Send)]
+    #[async_trait]
     impl AsyncRunnable for AsyncTask {
         async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
             Ok(())
