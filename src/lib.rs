@@ -59,3 +59,6 @@ pub use blocking::*;
 
 #[cfg(feature = "asynk")]
 pub mod asynk;
+
+#[cfg(feature = "asynk")]
+pub use asynk::*;
