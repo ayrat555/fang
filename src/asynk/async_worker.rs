@@ -210,10 +210,7 @@ mod async_worker_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest {
-            transaction,
-            duplicated_tasks: true,
-        };
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
 
         let task = insert_task(&mut test, &WorkerAsyncTask { number: 1 }).await;
         let id = task.id;
@@ -235,10 +232,7 @@ mod async_worker_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest {
-            transaction,
-            duplicated_tasks: true,
-        };
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
 
         let task = insert_task(&mut test, &AsyncFailedTask { number: 1 }).await;
         let id = task.id;
@@ -265,10 +259,7 @@ mod async_worker_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest {
-            transaction,
-            duplicated_tasks: true,
-        };
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
 
         let task1 = insert_task(&mut test, &AsyncTaskType1 {}).await;
         let task12 = insert_task(&mut test, &AsyncTaskType1 {}).await;
@@ -303,10 +294,7 @@ mod async_worker_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest {
-            transaction,
-            duplicated_tasks: true,
-        };
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
 
         let task1 = insert_task(&mut test, &AsyncTaskType1 {}).await;
         let task12 = insert_task(&mut test, &AsyncTaskType1 {}).await;

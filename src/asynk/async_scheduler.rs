@@ -25,6 +25,8 @@ impl<'a> Scheduler<'a> {
     pub async fn start(&mut self) -> Result<(), Error> {
         let task_res = self.schedule_loop().await;
 
+        sleep(Duration::from_secs(1)).await;
+
         match task_res {
             Err(err) => {
                 error!(
@@ -153,10 +155,8 @@ mod async_scheduler_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest {
-            transaction,
-            duplicated_tasks: true,
-        };
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+
         let schedule_in_future = Utc::now() + OtherDuration::seconds(5);
 
         let _periodic_task = insert_periodic_task(
