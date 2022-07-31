@@ -13,18 +13,20 @@ use typed_builder::TypedBuilder;
 pub struct AsyncWorker<'a> {
     #[builder(setter(into))]
     pub queue: &'a mut dyn AsyncQueueable,
-    #[builder(default=DEFAULT_TASK_TYPE.to_string() , setter(into))]
+    #[builder(default=DEFAULT_TASK_TYPE.to_string(), setter(into))]
     pub task_type: String,
     #[builder(default, setter(into))]
     pub sleep_params: SleepParams,
     #[builder(default, setter(into))]
     pub retention_mode: RetentionMode,
 }
+
 impl<'a> AsyncWorker<'a> {
     pub async fn run(&mut self, task: Task) -> Result<(), Error> {
         let result = self.execute_task(task).await;
         self.finalize_task(result).await
     }
+
     async fn execute_task(&mut self, task: Task) -> Result<Task, (Task, String)> {
         let actual_task: Box<dyn AsyncRunnable> =
             serde_json::from_value(task.metadata.clone()).unwrap();
@@ -35,6 +37,7 @@ impl<'a> AsyncWorker<'a> {
             Err(error) => Err((task, error.description)),
         }
     }
+
     async fn finalize_task(&mut self, result: Result<Task, (Task, String)>) -> Result<(), Error> {
         match self.retention_mode {
             RetentionMode::KeepAll => match result {
@@ -71,16 +74,18 @@ impl<'a> AsyncWorker<'a> {
             },
         }
     }
+
     pub async fn sleep(&mut self) {
         self.sleep_params.maybe_increase_sleep_period();
 
         tokio::time::sleep(Duration::from_secs(self.sleep_params.sleep_period)).await;
     }
+
     pub async fn run_tasks(&mut self) -> Result<(), Error> {
         loop {
             match self
                 .queue
-                .fetch_and_touch_task(&Some(self.task_type.clone()))
+                .fetch_and_touch_task(Some(self.task_type.clone()))
                 .await
             {
                 Ok(Some(task)) => {
@@ -99,12 +104,13 @@ impl<'a> AsyncWorker<'a> {
             };
         }
     }
+
     #[cfg(test)]
     pub async fn run_tasks_until_none(&mut self) -> Result<(), Error> {
         loop {
             match self
                 .queue
-                .fetch_and_touch_task(&Some(self.task_type.clone()))
+                .fetch_and_touch_task(Some(self.task_type.clone()))
                 .await
             {
                 Ok(Some(task)) => {
@@ -204,7 +210,7 @@ mod async_worker_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest { transaction };
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
 
         let task = insert_task(&mut test, &WorkerAsyncTask { number: 1 }).await;
         let id = task.id;
@@ -215,7 +221,7 @@ mod async_worker_tests {
             .build();
 
         worker.run(task).await.unwrap();
-        let task_finished = test.get_task_by_id(id).await.unwrap();
+        let task_finished = test.find_task_by_id(id).await.unwrap();
         assert_eq!(id, task_finished.id);
         assert_eq!(FangTaskState::Finished, task_finished.state);
         test.transaction.rollback().await.unwrap();
@@ -226,7 +232,7 @@ mod async_worker_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest { transaction };
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
 
         let task = insert_task(&mut test, &AsyncFailedTask { number: 1 }).await;
         let id = task.id;
@@ -237,7 +243,7 @@ mod async_worker_tests {
             .build();
 
         worker.run(task).await.unwrap();
-        let task_finished = test.get_task_by_id(id).await.unwrap();
+        let task_finished = test.find_task_by_id(id).await.unwrap();
 
         assert_eq!(id, task_finished.id);
         assert_eq!(FangTaskState::Failed, task_finished.state);
@@ -253,7 +259,7 @@ mod async_worker_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest { transaction };
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
 
         let task1 = insert_task(&mut test, &AsyncTaskType1 {}).await;
         let task12 = insert_task(&mut test, &AsyncTaskType1 {}).await;
@@ -270,9 +276,9 @@ mod async_worker_tests {
             .build();
 
         worker.run_tasks_until_none().await.unwrap();
-        let task1 = test.get_task_by_id(id1).await.unwrap();
-        let task12 = test.get_task_by_id(id12).await.unwrap();
-        let task2 = test.get_task_by_id(id2).await.unwrap();
+        let task1 = test.find_task_by_id(id1).await.unwrap();
+        let task12 = test.find_task_by_id(id12).await.unwrap();
+        let task2 = test.find_task_by_id(id2).await.unwrap();
 
         assert_eq!(id1, task1.id);
         assert_eq!(id12, task12.id);
@@ -288,7 +294,7 @@ mod async_worker_tests {
         let mut connection = pool.get().await.unwrap();
         let transaction = connection.transaction().await.unwrap();
 
-        let mut test = AsyncQueueTest { transaction };
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
 
         let task1 = insert_task(&mut test, &AsyncTaskType1 {}).await;
         let task12 = insert_task(&mut test, &AsyncTaskType1 {}).await;
@@ -305,13 +311,13 @@ mod async_worker_tests {
 
         worker.run_tasks_until_none().await.unwrap();
         let task = test
-            .fetch_and_touch_task(&Some("type1".to_string()))
+            .fetch_and_touch_task(Some("type1".to_string()))
             .await
             .unwrap();
         assert_eq!(None, task);
 
         let task2 = test
-            .fetch_and_touch_task(&Some("type2".to_string()))
+            .fetch_and_touch_task(Some("type2".to_string()))
             .await
             .unwrap()
             .unwrap();
