@@ -74,8 +74,6 @@ where
             .queue(&mut queue as &mut dyn AsyncQueueable)
             .build();
 
-        info!("Running worker..");
-
         worker.run_tasks().await
     }
 }
