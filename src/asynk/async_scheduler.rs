@@ -76,14 +76,10 @@ impl<'a> Scheduler<'a> {
                 self.queue.schedule_next_task(task).await?;
             }
             Some(_) => {
-                let metadata = task.metadata.clone();
-
                 let actual_task: Box<dyn AsyncRunnable> =
                     serde_json::from_value(task.metadata.clone()).unwrap();
 
-                self.queue
-                    .insert_task(metadata, &(*actual_task).task_type())
-                    .await?;
+                self.queue.insert_task(&*actual_task).await?;
 
                 self.queue.schedule_next_task(task).await?;
             }
@@ -203,9 +199,7 @@ mod async_scheduler_tests {
         timestamp: DateTime<Utc>,
         period_in_seconds: i32,
     ) -> PeriodicTask {
-        let metadata = serde_json::to_value(task).unwrap();
-
-        test.insert_periodic_task(metadata, timestamp, period_in_seconds)
+        test.insert_periodic_task(task, timestamp, period_in_seconds)
             .await
             .unwrap()
     }
