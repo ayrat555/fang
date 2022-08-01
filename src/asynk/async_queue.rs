@@ -100,6 +100,10 @@ pub enum AsyncQueueError {
     SerdeError(#[from] serde_json::Error),
     #[error("returned invalid result (expected {expected:?}, found {found:?})")]
     ResultError { expected: u64, found: u64 },
+    #[error(
+        "AsyncQueue is not connected :( , call connect() method first and then perform operations"
+    )]
+    NotConnectedError,
 }
 
 impl From<AsyncQueueError> for FangError {
@@ -159,12 +163,16 @@ where
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
+    #[builder(default=None ,  setter(skip))]
+    pool: Option<Pool<PostgresConnectionManager<Tls>>>,
     #[builder(setter(into))]
-    pool: Pool<PostgresConnectionManager<Tls>>,
+    uri: String,
     #[builder(setter(into))]
     number_conns: u32,
     #[builder(default = false, setter(into))]
     duplicated_tasks: bool,
+    #[builder(default = false, setter(skip))]
+    connected: bool,
 }
 
 #[cfg(test)]
@@ -332,23 +340,17 @@ where
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
-    pub async fn connect(
-        uri: impl ToString,
-        tls: Tls,
-        number_conns: u32,
-        duplicated_tasks: bool,
-    ) -> Result<Self, AsyncQueueError> {
-        let manager = PostgresConnectionManager::new_from_stringlike(uri, tls)?;
+    pub async fn connect(&mut self, tls: Tls) -> Result<(), AsyncQueueError> {
+        let manager = PostgresConnectionManager::new_from_stringlike(self.uri.clone(), tls)?;
+
         let pool = Pool::builder()
-            .max_size(number_conns)
+            .max_size(self.number_conns)
             .build(manager)
             .await?;
 
-        Ok(Self {
-            pool,
-            number_conns,
-            duplicated_tasks,
-        })
+        self.pool = Some(pool);
+        self.connected = true;
+        Ok(())
     }
     pub fn get_number_conns(&self) -> u32 {
         self.number_conns
@@ -608,32 +610,40 @@ where
         &mut self,
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
+        if self.connected {
+            let mut connection = self.pool.as_ref().unwrap().get().await?;
+            let mut transaction = connection.transaction().await?;
 
-        let task = Self::fetch_and_touch_task_query(&mut transaction, task_type).await?;
+            let task = Self::fetch_and_touch_task_query(&mut transaction, task_type).await?;
 
-        transaction.commit().await?;
+            transaction.commit().await?;
 
-        Ok(task)
+            Ok(task)
+        } else {
+            Err(AsyncQueueError::NotConnectedError)
+        }
     }
 
     async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
+        if self.connected {
+            let mut connection = self.pool.as_ref().unwrap().get().await?;
+            let mut transaction = connection.transaction().await?;
 
-        let metadata = serde_json::to_value(task)?;
+            let metadata = serde_json::to_value(task)?;
 
-        let task: Task = if self.duplicated_tasks {
-            Self::insert_task_query(&mut transaction, metadata, &task.task_type()).await?
+            let task: Task = if self.duplicated_tasks {
+                Self::insert_task_query(&mut transaction, metadata, &task.task_type()).await?
+            } else {
+                Self::insert_task_if_not_exist_query(&mut transaction, metadata, &task.task_type())
+                    .await?
+            };
+
+            transaction.commit().await?;
+
+            Ok(task)
         } else {
-            Self::insert_task_if_not_exist_query(&mut transaction, metadata, &task.task_type())
-                .await?
-        };
-
-        transaction.commit().await?;
-
-        Ok(task)
+            Err(AsyncQueueError::NotConnectedError)
+        }
     }
 
     async fn insert_periodic_task(
@@ -642,79 +652,105 @@ where
         timestamp: DateTime<Utc>,
         period: i32,
     ) -> Result<PeriodicTask, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
+        if self.connected {
+            let mut connection = self.pool.as_ref().unwrap().get().await?;
+            let mut transaction = connection.transaction().await?;
 
-        let metadata = serde_json::to_value(task)?;
+            let metadata = serde_json::to_value(task)?;
 
-        let periodic_task =
-            Self::insert_periodic_task_query(&mut transaction, metadata, timestamp, period).await?;
+            let periodic_task =
+                Self::insert_periodic_task_query(&mut transaction, metadata, timestamp, period)
+                    .await?;
 
-        transaction.commit().await?;
+            transaction.commit().await?;
 
-        Ok(periodic_task)
+            Ok(periodic_task)
+        } else {
+            Err(AsyncQueueError::NotConnectedError)
+        }
     }
 
     async fn schedule_next_task(
         &mut self,
         periodic_task: PeriodicTask,
     ) -> Result<PeriodicTask, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
+        if self.connected {
+            let mut connection = self.pool.as_ref().unwrap().get().await?;
+            let mut transaction = connection.transaction().await?;
 
-        let periodic_task = Self::schedule_next_task_query(&mut transaction, periodic_task).await?;
+            let periodic_task =
+                Self::schedule_next_task_query(&mut transaction, periodic_task).await?;
 
-        transaction.commit().await?;
+            transaction.commit().await?;
 
-        Ok(periodic_task)
+            Ok(periodic_task)
+        } else {
+            Err(AsyncQueueError::NotConnectedError)
+        }
     }
 
     async fn fetch_periodic_tasks(
         &mut self,
         error_margin_seconds: i64,
     ) -> Result<Option<Vec<PeriodicTask>>, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
+        if self.connected {
+            let mut connection = self.pool.as_ref().unwrap().get().await?;
+            let mut transaction = connection.transaction().await?;
 
-        let periodic_task =
-            Self::fetch_periodic_tasks_query(&mut transaction, error_margin_seconds).await?;
+            let periodic_task =
+                Self::fetch_periodic_tasks_query(&mut transaction, error_margin_seconds).await?;
 
-        transaction.commit().await?;
+            transaction.commit().await?;
 
-        Ok(periodic_task)
+            Ok(periodic_task)
+        } else {
+            Err(AsyncQueueError::NotConnectedError)
+        }
     }
 
     async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
+        if self.connected {
+            let mut connection = self.pool.as_ref().unwrap().get().await?;
+            let mut transaction = connection.transaction().await?;
 
-        let result = Self::remove_all_tasks_query(&mut transaction).await?;
+            let result = Self::remove_all_tasks_query(&mut transaction).await?;
 
-        transaction.commit().await?;
+            transaction.commit().await?;
 
-        Ok(result)
+            Ok(result)
+        } else {
+            Err(AsyncQueueError::NotConnectedError)
+        }
     }
 
     async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
+        if self.connected {
+            let mut connection = self.pool.as_ref().unwrap().get().await?;
+            let mut transaction = connection.transaction().await?;
 
-        let result = Self::remove_task_query(&mut transaction, task).await?;
+            let result = Self::remove_task_query(&mut transaction, task).await?;
 
-        transaction.commit().await?;
+            transaction.commit().await?;
 
-        Ok(result)
+            Ok(result)
+        } else {
+            Err(AsyncQueueError::NotConnectedError)
+        }
     }
 
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
+        if self.connected {
+            let mut connection = self.pool.as_ref().unwrap().get().await?;
+            let mut transaction = connection.transaction().await?;
 
-        let result = Self::remove_tasks_type_query(&mut transaction, task_type).await?;
+            let result = Self::remove_tasks_type_query(&mut transaction, task_type).await?;
 
-        transaction.commit().await?;
+            transaction.commit().await?;
 
-        Ok(result)
+            Ok(result)
+        } else {
+            Err(AsyncQueueError::NotConnectedError)
+        }
     }
 
     async fn update_task_state(
@@ -722,13 +758,17 @@ where
         task: Task,
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
+        if self.connected {
+            let mut connection = self.pool.as_ref().unwrap().get().await?;
+            let mut transaction = connection.transaction().await?;
 
-        let task = Self::update_task_state_query(&mut transaction, task, state).await?;
-        transaction.commit().await?;
+            let task = Self::update_task_state_query(&mut transaction, task, state).await?;
+            transaction.commit().await?;
 
-        Ok(task)
+            Ok(task)
+        } else {
+            Err(AsyncQueueError::NotConnectedError)
+        }
     }
 
     async fn fail_task(
@@ -736,13 +776,17 @@ where
         task: Task,
         error_message: &str,
     ) -> Result<Task, AsyncQueueError> {
-        let mut connection = self.pool.get().await?;
-        let mut transaction = connection.transaction().await?;
+        if self.connected {
+            let mut connection = self.pool.as_ref().unwrap().get().await?;
+            let mut transaction = connection.transaction().await?;
 
-        let task = Self::fail_task_query(&mut transaction, task, error_message).await?;
-        transaction.commit().await?;
+            let task = Self::fail_task_query(&mut transaction, task, error_message).await?;
+            transaction.commit().await?;
 
-        Ok(task)
+            Ok(task)
+        } else {
+            Err(AsyncQueueError::NotConnectedError)
+        }
     }
 }
 
