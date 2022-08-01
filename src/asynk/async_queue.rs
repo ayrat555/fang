@@ -161,6 +161,8 @@ where
 {
     #[builder(setter(into))]
     pool: Pool<PostgresConnectionManager<Tls>>,
+    #[builder(setter(into))]
+    number_conns: u32,
     #[builder(default = false, setter(into))]
     duplicated_tasks: bool,
 }
@@ -333,17 +335,24 @@ where
     pub async fn connect(
         uri: impl ToString,
         tls: Tls,
+        number_conns: u32,
         duplicated_tasks: bool,
     ) -> Result<Self, AsyncQueueError> {
         let manager = PostgresConnectionManager::new_from_stringlike(uri, tls)?;
-        let pool = Pool::builder().build(manager).await?;
+        let pool = Pool::builder()
+            .max_size(number_conns)
+            .build(manager)
+            .await?;
 
         Ok(Self {
             pool,
+            number_conns,
             duplicated_tasks,
         })
     }
-
+    pub fn get_number_conns(&self) -> u32 {
+        self.number_conns
+    }
     async fn remove_all_tasks_query(
         transaction: &mut Transaction<'_>,
     ) -> Result<u64, AsyncQueueError> {

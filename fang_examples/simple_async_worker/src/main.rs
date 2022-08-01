@@ -12,16 +12,18 @@ async fn main() {
 
     log::info!("Starting...");
 
-    let mut queue = AsyncQueue::connect("postgres://postgres:postgres@localhost/fang", NoTls, true)
-        .await
-        .unwrap();
+    let mut queue = AsyncQueue::connect(
+        "postgres://postgres:postgres@localhost/fang",
+        NoTls,
+        2,
+        true,
+    )
+    .await
+    .unwrap();
 
     log::info!("Queue connected...");
 
-    let mut pool = AsyncWorkerPool::builder()
-        .queue(queue.clone())
-        .number_of_workers(2 as u16)
-        .build();
+    let mut pool = AsyncWorkerPool::builder().queue(queue.clone()).build();
 
     log::info!("Pool created ...");
 
