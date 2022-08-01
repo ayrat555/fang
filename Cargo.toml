@@ -53,7 +53,7 @@ optional = true
 
 [dependencies.tokio]
 version = "1.20"
-features = ["full"]
+features = ["rt", "time"]
 optional = true
 
 [dependencies.async-trait]
@@ -64,7 +64,9 @@ optional = true
 version = "0.10"
 optional = true
 
-
 [dependencies.async-recursion]
 version = "1"
 optional = true
+
+[dev-dependencies]
+tokio = { version = "1.20", features = ["macros"] }
