@@ -26,7 +26,7 @@ where
     #[builder(default, setter(into))]
     pub retention_mode: RetentionMode,
     #[builder(setter(into))]
-    pub number_of_workers: u16,
+    pub number_of_workers: u32,
 }
 
 #[derive(TypedBuilder, Clone)]
@@ -47,7 +47,7 @@ where
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
     pub async fn start(&mut self) {
-        for _idx in 1..self.number_of_workers + 1 {
+        for _idx in 0..self.number_of_workers {
             let queue = self.queue.clone();
             let sleep_params = self.sleep_params.clone();
             let retention_mode = self.retention_mode.clone();

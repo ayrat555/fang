@@ -11,16 +11,19 @@ async fn main() {
     env_logger::init();
 
     log::info!("Starting...");
+    let max_pool_size: u32 = 2;
+    let mut queue = AsyncQueue::builder()
+        .uri("postgres://postgres:postgres@localhost/fang")
+        .max_pool_size(max_pool_size)
+        .duplicated_tasks(true)
+        .build();
 
-    let mut queue = AsyncQueue::connect("postgres://postgres:postgres@localhost/fang", NoTls, true)
-        .await
-        .unwrap();
-
+    queue.connect(NoTls).await.unwrap();
     log::info!("Queue connected...");
 
     let mut pool = AsyncWorkerPool::builder()
+        .number_of_workers(max_pool_size)
         .queue(queue.clone())
-        .number_of_workers(2 as u16)
         .build();
 
     log::info!("Pool created ...");
