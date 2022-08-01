@@ -11,17 +11,20 @@ async fn main() {
     env_logger::init();
 
     log::info!("Starting...");
-    let number_conns: u32 = 2;
+    let max_pool_size: u32 = 2;
     let mut queue = AsyncQueue::builder()
         .uri("postgres://postgres:postgres@localhost/fang")
-        .number_conns(number_conns)
+        .max_pool_size(max_pool_size)
         .duplicated_tasks(true)
         .build();
 
     queue.connect(NoTls).await.unwrap();
     log::info!("Queue connected...");
 
-    let mut pool = AsyncWorkerPool::builder().queue(queue.clone()).build();
+    let mut pool = AsyncWorkerPool::builder()
+        .number_of_workers(max_pool_size)
+        .queue(queue.clone())
+        .build();
 
     log::info!("Pool created ...");
 
