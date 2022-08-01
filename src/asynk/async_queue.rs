@@ -163,7 +163,7 @@ where
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
-    #[builder(default=None ,  setter(skip))]
+    #[builder(default=None, setter(skip))]
     pool: Option<Pool<PostgresConnectionManager<Tls>>>,
     #[builder(setter(into))]
     uri: String,
