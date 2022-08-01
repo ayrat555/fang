@@ -26,6 +26,8 @@ where
     pub sleep_params: SleepParams,
     #[builder(default, setter(into))]
     pub retention_mode: RetentionMode,
+    #[builder(setter(into))]
+    pub number_of_workers: u32,
 }
 
 #[derive(TypedBuilder, Clone)]
@@ -46,7 +48,7 @@ where
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
     pub async fn start(&mut self) {
-        for _idx in 0..self.queue.get_number_conns() {
+        for _idx in 0..self.number_of_workers {
             let queue = self.queue.clone();
             tokio::spawn(async move { Self::supervise_worker(queue).await });
         }
