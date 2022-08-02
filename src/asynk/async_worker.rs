@@ -23,17 +23,7 @@ where
     #[builder(default, setter(into))]
     pub retention_mode: RetentionMode,
 }
-#[derive(TypedBuilder)]
-pub struct AsyncWorkerTest<'a> {
-    #[builder(setter(into))]
-    pub queue: &'a mut dyn AsyncQueueable,
-    #[builder(default=DEFAULT_TASK_TYPE.to_string(), setter(into))]
-    pub task_type: String,
-    #[builder(default, setter(into))]
-    pub sleep_params: SleepParams,
-    #[builder(default, setter(into))]
-    pub retention_mode: RetentionMode,
-}
+
 impl<AQueue> AsyncWorker<AQueue>
 where
     AQueue: AsyncQueueable + Clone + Sync + 'static,
@@ -122,6 +112,20 @@ where
     }
 }
 
+#[cfg(test)]
+#[derive(TypedBuilder)]
+pub struct AsyncWorkerTest<'a> {
+    #[builder(setter(into))]
+    pub queue: &'a mut dyn AsyncQueueable,
+    #[builder(default=DEFAULT_TASK_TYPE.to_string(), setter(into))]
+    pub task_type: String,
+    #[builder(default, setter(into))]
+    pub sleep_params: SleepParams,
+    #[builder(default, setter(into))]
+    pub retention_mode: RetentionMode,
+}
+
+#[cfg(test)]
 impl<'a> AsyncWorkerTest<'a> {
     pub async fn run(&mut self, task: Task) -> Result<(), Error> {
         let result = self.execute_task(task).await;
@@ -181,7 +185,6 @@ impl<'a> AsyncWorkerTest<'a> {
 
         tokio::time::sleep(Duration::from_secs(self.sleep_params.sleep_period)).await;
     }
-    #[cfg(test)]
     pub async fn run_tasks_until_none(&mut self) -> Result<(), Error> {
         loop {
             match self
