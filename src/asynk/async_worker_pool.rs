@@ -1,26 +1,19 @@
-use crate::asynk::async_queue::AsyncQueue;
 use crate::asynk::async_queue::AsyncQueueable;
 use crate::asynk::async_worker::AsyncWorker;
 use crate::asynk::Error;
 use crate::{RetentionMode, SleepParams};
 use async_recursion::async_recursion;
-use bb8_postgres::tokio_postgres::tls::MakeTlsConnect;
-use bb8_postgres::tokio_postgres::tls::TlsConnect;
-use bb8_postgres::tokio_postgres::Socket;
 use log::error;
 use std::time::Duration;
 use typed_builder::TypedBuilder;
 
 #[derive(TypedBuilder, Clone)]
-pub struct AsyncWorkerPool<Tls>
+pub struct AsyncWorkerPool<AQueue>
 where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
-    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
-    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
-    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
+    AQueue: AsyncQueueable + Clone + Sync + 'static,
 {
     #[builder(setter(into))]
-    pub queue: AsyncQueue<Tls>,
+    pub queue: AQueue,
     #[builder(default, setter(into))]
     pub sleep_params: SleepParams,
     #[builder(default, setter(into))]
@@ -39,12 +32,9 @@ pub struct WorkerParams {
     pub task_type: Option<String>,
 }
 
-impl<Tls> AsyncWorkerPool<Tls>
+impl<AQueue> AsyncWorkerPool<AQueue>
 where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
-    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
-    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
-    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
+    AQueue: AsyncQueueable + Clone + Sync + 'static,
 {
     pub async fn start(&mut self) {
         for _idx in 0..self.number_of_workers {
@@ -60,7 +50,7 @@ where
 
     #[async_recursion]
     pub async fn supervise_worker(
-        queue: AsyncQueue<Tls>,
+        queue: AQueue,
         sleep_params: SleepParams,
         retention_mode: RetentionMode,
     ) -> Result<(), Error> {
@@ -82,12 +72,12 @@ where
     }
 
     pub async fn run_worker(
-        mut queue: AsyncQueue<Tls>,
+        queue: AQueue,
         sleep_params: SleepParams,
         retention_mode: RetentionMode,
     ) -> Result<(), Error> {
-        let mut worker = AsyncWorker::builder()
-            .queue(&mut queue as &mut dyn AsyncQueueable)
+        let mut worker: AsyncWorker<AQueue> = AsyncWorker::builder()
+            .queue(queue)
             .sleep_params(sleep_params)
             .retention_mode(retention_mode)
             .build();

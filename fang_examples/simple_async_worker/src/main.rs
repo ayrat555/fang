@@ -21,7 +21,7 @@ async fn main() {
     queue.connect(NoTls).await.unwrap();
     log::info!("Queue connected...");
 
-    let mut pool = AsyncWorkerPool::builder()
+    let mut pool: AsyncWorkerPool<AsyncQueue<NoTls>> = AsyncWorkerPool::builder()
         .number_of_workers(max_pool_size)
         .queue(queue.clone())
         .build();
