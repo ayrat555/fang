@@ -10,7 +10,21 @@ use std::time::Duration;
 use typed_builder::TypedBuilder;
 
 #[derive(TypedBuilder)]
-pub struct AsyncWorker<'a> {
+pub struct AsyncWorker<AQueue>
+where
+    AQueue: AsyncQueueable + Clone + Sync + 'static,
+{
+    #[builder(setter(into))]
+    pub queue: AQueue,
+    #[builder(default=DEFAULT_TASK_TYPE.to_string(), setter(into))]
+    pub task_type: String,
+    #[builder(default, setter(into))]
+    pub sleep_params: SleepParams,
+    #[builder(default, setter(into))]
+    pub retention_mode: RetentionMode,
+}
+#[derive(TypedBuilder)]
+pub struct AsyncWorkerTest<'a> {
     #[builder(setter(into))]
     pub queue: &'a mut dyn AsyncQueueable,
     #[builder(default=DEFAULT_TASK_TYPE.to_string(), setter(into))]
@@ -20,8 +34,10 @@ pub struct AsyncWorker<'a> {
     #[builder(default, setter(into))]
     pub retention_mode: RetentionMode,
 }
-
-impl<'a> AsyncWorker<'a> {
+impl<AQueue> AsyncWorker<AQueue>
+where
+    AQueue: AsyncQueueable + Clone + Sync + 'static,
+{
     pub async fn run(&mut self, task: Task) -> Result<(), Error> {
         let result = self.execute_task(task).await;
         self.finalize_task(result).await
@@ -31,7 +47,7 @@ impl<'a> AsyncWorker<'a> {
         let actual_task: Box<dyn AsyncRunnable> =
             serde_json::from_value(task.metadata.clone()).unwrap();
 
-        let task_result = actual_task.run(self.queue).await;
+        let task_result = actual_task.run(&mut self.queue).await;
         match task_result {
             Ok(()) => Ok(task),
             Err(error) => Err((task, error.description)),
@@ -104,7 +120,67 @@ impl<'a> AsyncWorker<'a> {
             };
         }
     }
+}
 
+impl<'a> AsyncWorkerTest<'a> {
+    pub async fn run(&mut self, task: Task) -> Result<(), Error> {
+        let result = self.execute_task(task).await;
+        self.finalize_task(result).await
+    }
+
+    async fn execute_task(&mut self, task: Task) -> Result<Task, (Task, String)> {
+        let actual_task: Box<dyn AsyncRunnable> =
+            serde_json::from_value(task.metadata.clone()).unwrap();
+
+        let task_result = actual_task.run(self.queue).await;
+        match task_result {
+            Ok(()) => Ok(task),
+            Err(error) => Err((task, error.description)),
+        }
+    }
+
+    async fn finalize_task(&mut self, result: Result<Task, (Task, String)>) -> Result<(), Error> {
+        match self.retention_mode {
+            RetentionMode::KeepAll => match result {
+                Ok(task) => {
+                    self.queue
+                        .update_task_state(task, FangTaskState::Finished)
+                        .await?;
+                    Ok(())
+                }
+                Err((task, error)) => {
+                    self.queue.fail_task(task, &error).await?;
+                    Ok(())
+                }
+            },
+            RetentionMode::RemoveAll => match result {
+                Ok(task) => {
+                    self.queue.remove_task(task).await?;
+                    Ok(())
+                }
+                Err((task, _error)) => {
+                    self.queue.remove_task(task).await?;
+                    Ok(())
+                }
+            },
+            RetentionMode::RemoveFinished => match result {
+                Ok(task) => {
+                    self.queue.remove_task(task).await?;
+                    Ok(())
+                }
+                Err((task, error)) => {
+                    self.queue.fail_task(task, &error).await?;
+                    Ok(())
+                }
+            },
+        }
+    }
+
+    pub async fn sleep(&mut self) {
+        self.sleep_params.maybe_increase_sleep_period();
+
+        tokio::time::sleep(Duration::from_secs(self.sleep_params.sleep_period)).await;
+    }
     #[cfg(test)]
     pub async fn run_tasks_until_none(&mut self) -> Result<(), Error> {
         loop {
@@ -132,7 +208,7 @@ impl<'a> AsyncWorker<'a> {
 
 #[cfg(test)]
 mod async_worker_tests {
-    use super::AsyncWorker;
+    use super::AsyncWorkerTest;
     use crate::asynk::async_queue::AsyncQueueTest;
     use crate::asynk::async_queue::AsyncQueueable;
     use crate::asynk::async_queue::FangTaskState;
@@ -215,7 +291,7 @@ mod async_worker_tests {
         let task = insert_task(&mut test, &WorkerAsyncTask { number: 1 }).await;
         let id = task.id;
 
-        let mut worker = AsyncWorker::builder()
+        let mut worker = AsyncWorkerTest::builder()
             .queue(&mut test as &mut dyn AsyncQueueable)
             .retention_mode(RetentionMode::KeepAll)
             .build();
@@ -237,7 +313,7 @@ mod async_worker_tests {
         let task = insert_task(&mut test, &AsyncFailedTask { number: 1 }).await;
         let id = task.id;
 
-        let mut worker = AsyncWorker::builder()
+        let mut worker = AsyncWorkerTest::builder()
             .queue(&mut test as &mut dyn AsyncQueueable)
             .retention_mode(RetentionMode::KeepAll)
             .build();
@@ -269,7 +345,7 @@ mod async_worker_tests {
         let id12 = task12.id;
         let id2 = task2.id;
 
-        let mut worker = AsyncWorker::builder()
+        let mut worker = AsyncWorkerTest::builder()
             .queue(&mut test as &mut dyn AsyncQueueable)
             .task_type("type1".to_string())
             .retention_mode(RetentionMode::KeepAll)
@@ -304,7 +380,7 @@ mod async_worker_tests {
         let _id12 = task12.id;
         let id2 = task2.id;
 
-        let mut worker = AsyncWorker::builder()
+        let mut worker = AsyncWorkerTest::builder()
             .queue(&mut test as &mut dyn AsyncQueueable)
             .task_type("type1".to_string())
             .build();
