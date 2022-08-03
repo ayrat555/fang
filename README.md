@@ -425,13 +425,12 @@ cargo test --all-features -- --ignored --test-threads=1
 docker kill postgres
 ```
 
-## Author
+## Authors
 
-Ayrat Badykov (@ayrat555)
-
-## Contributors
-
+- Ayrat Badykov (@ayrat555)
+ 
 - Pepe Márquez (@pxp9)
+
 
 [s1]: https://img.shields.io/crates/v/fang.svg
 [docs-badge]: https://img.shields.io/badge/docs-website-blue.svg
