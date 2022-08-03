@@ -52,6 +52,12 @@ pub use diesel::pg::PgConnection;
 #[doc(hidden)]
 pub use typetag;
 
+#[doc(hidden)]
+pub extern crate serde;
+
+#[doc(hidden)]
+pub use serde_derive::{Deserialize, Serialize};
+
 #[cfg(feature = "blocking")]
 pub mod blocking;
 #[cfg(feature = "blocking")]
@@ -62,3 +68,11 @@ pub mod asynk;
 
 #[cfg(feature = "asynk")]
 pub use asynk::*;
+
+#[cfg(feature = "asynk")]
+#[doc(hidden)]
+pub use bb8_postgres::tokio_postgres::tls::NoTls;
+
+#[cfg(feature = "asynk")]
+#[doc(hidden)]
+pub use async_trait::async_trait;

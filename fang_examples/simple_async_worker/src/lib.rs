@@ -1,13 +1,13 @@
-use async_trait::async_trait;
+use fang::async_trait;
 use fang::asynk::async_queue::AsyncQueueable;
 use fang::asynk::async_runnable::Error;
+use fang::serde::{Deserialize, Serialize};
 use fang::typetag;
 use fang::AsyncRunnable;
-use serde::Deserialize;
-use serde::Serialize;
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize)]
+#[serde(crate = "fang::serde")]
 pub struct MyTask {
     pub number: u16,
 }
