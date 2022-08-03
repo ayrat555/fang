@@ -15,7 +15,7 @@ Background task processing library for Rust. It uses Postgres DB as a task queue
 ### Blocking
 ```toml
 [dependencies]
-fang = "0.6"
+fang = { version = "0.6" , features = ["blocking"]}
 ```
 
 ### Async
@@ -39,7 +39,7 @@ use fang::Error;
 use fang::Runnable;
 use fang::typetag;
 use fang::PgConnection;
-use serde::{Deserialize, Serialize};
+use fang::serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "fang::serde")]
