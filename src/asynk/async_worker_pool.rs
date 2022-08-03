@@ -5,6 +5,7 @@ use crate::{RetentionMode, SleepParams};
 use async_recursion::async_recursion;
 use log::error;
 use std::time::Duration;
+use tokio::task::JoinHandle;
 use typed_builder::TypedBuilder;
 
 #[derive(TypedBuilder, Clone)]
@@ -42,34 +43,70 @@ where
             let sleep_params = self.sleep_params.clone();
             let retention_mode = self.retention_mode.clone();
 
-            tokio::spawn(async move {
-                Self::supervise_worker(queue, sleep_params, retention_mode).await
-            });
+            Self::supervise_task(queue, sleep_params, retention_mode, 0).await
         }
     }
 
     #[async_recursion]
-    pub async fn supervise_worker(
+    pub async fn supervise_task(
         queue: AQueue,
         sleep_params: SleepParams,
         retention_mode: RetentionMode,
-    ) -> Result<(), Error> {
-        let result =
-            Self::run_worker(queue.clone(), sleep_params.clone(), retention_mode.clone()).await;
+        restarts: u64,
+    ) {
+        let restarts = restarts + 1;
+        let join_handle =
+            Self::spawn_worker(queue.clone(), sleep_params.clone(), retention_mode.clone()).await;
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        tokio::join!(join_handle);
 
-        match result {
-            Err(err) => {
-                error!("Worker failed. Restarting. {:?}", err);
-                Self::supervise_worker(queue, sleep_params, retention_mode).await
-            }
-            Ok(_) => {
-                error!("Worker stopped. Restarting");
-                Self::supervise_worker(queue, sleep_params, retention_mode).await
-            }
-        }
+        error!(
+            "Worker stopped. Restarting. the number of restarts {}",
+            restarts
+        );
+
+        // println!("Original task is joined.");
+
+        // if join_handle.is_finished() {
+        //     println!("restarting");
+        Self::supervise_task(queue, sleep_params, retention_mode, restarts).await;
+        // }
+
+        // join!(join_handle);
+
+        // Self::supervise_task(queue, sleep_params, retention_mode).await;
     }
+
+    pub async fn spawn_worker(
+        queue: AQueue,
+        sleep_params: SleepParams,
+        retention_mode: RetentionMode,
+    ) -> JoinHandle<Result<(), Error>> {
+        tokio::spawn(async move { Self::run_worker(queue, sleep_params, retention_mode).await })
+    }
+
+    // #[async_recursion]
+    // pub async fn supervise_worker(
+    //     queue: AQueue,
+    //     sleep_params: SleepParams,
+    //     retention_mode: RetentionMode,
+    // ) -> Result<(), Error> {
+    //     let result =
+    //         Self::run_worker(queue.clone(), sleep_params.clone(), retention_mode.clone()).await;
+
+    //     tokio::time::sleep(Duration::from_secs(1)).await;
+
+    //     match result {
+    //         Err(err) => {
+    //             error!("Worker failed. Restarting. {:?}", err);
+    //             Self::supervise_worker(queue, sleep_params, retention_mode).await
+    //         }
+    //         Ok(_) => {
+    //             error!("Worker stopped. Restarting");
+    //             Self::supervise_worker(queue, sleep_params, retention_mode).await
+    //         }
+    //     }
+    // }
 
     pub async fn run_worker(
         queue: AQueue,
