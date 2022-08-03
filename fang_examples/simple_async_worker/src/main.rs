@@ -2,9 +2,9 @@ use fang::asynk::async_queue::AsyncQueue;
 use fang::asynk::async_queue::AsyncQueueable;
 use fang::asynk::async_worker_pool::AsyncWorkerPool;
 use fang::AsyncRunnable;
+use fang::NoTls;
 use simple_async_worker::MyTask;
 use std::time::Duration;
-use tokio_postgres::NoTls;
 
 #[tokio::main]
 async fn main() {

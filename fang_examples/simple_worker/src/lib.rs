@@ -1,14 +1,14 @@
+use fang::serde::{Deserialize, Serialize};
 use fang::typetag;
 use fang::Error;
 use fang::PgConnection;
 use fang::Queue;
 use fang::Runnable;
-use serde::Deserialize;
-use serde::Serialize;
 use std::thread;
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize)]
+#[serde(crate = "fang::serde")]
 pub struct MyJob {
     pub number: u16,
     pub current_thread_name: String,
