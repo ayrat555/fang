@@ -5,7 +5,7 @@
 ### [#21](https://github.com/ayrat555/fang/pull/21)
 
 - Create a full functional async processing module for fang which uses `tokio` to summon processes that are more lighter than threads.
-- Renaming code Job starting names into Task [#29](https://github.com/ayrat555/fang/pull/29).
+- Rename Job starting names into Task [#29](https://github.com/ayrat555/fang/pull/29).
 - Export serde correctly - [commit](https://github.com/ayrat555/fang/pull/21/commits/cf2ce19c970e93d71e387526e882c67db53cea18).
 - Migrate all blocking module code into async 
 - Implement Postgres backend for async.
