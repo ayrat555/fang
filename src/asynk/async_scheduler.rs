@@ -33,10 +33,10 @@ where
         let join_handle: JoinHandle<Result<(), Error>> = self.schedule_loop().await;
 
         match join_handle.await {
-            Err(_) => {
+            Err(err) => {
                 error!(
                     "Scheduler panicked, restarting {:?}. Number of restarts {}",
-                    self.number_of_restarts
+                    err, self.number_of_restarts
                 );
                 self.number_of_restarts += 1;
                 sleep(Duration::from_secs(1)).await;
