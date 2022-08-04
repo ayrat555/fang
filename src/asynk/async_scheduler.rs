@@ -5,56 +5,75 @@ use crate::asynk::Error;
 use async_recursion::async_recursion;
 use log::error;
 use std::time::Duration;
+use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use typed_builder::TypedBuilder;
 
-#[derive(TypedBuilder)]
-pub struct Scheduler<'a> {
+#[derive(TypedBuilder, Clone)]
+pub struct Scheduler<AQueue>
+where
+    AQueue: AsyncQueueable + Clone + Sync + 'static,
+{
     #[builder(setter(into))]
     pub check_period: u64,
     #[builder(setter(into))]
     pub error_margin_seconds: u64,
     #[builder(setter(into))]
-    pub queue: &'a mut dyn AsyncQueueable,
+    pub queue: AQueue,
     #[builder(default = 0, setter(into))]
     pub number_of_restarts: u32,
 }
 
-impl<'a> Scheduler<'a> {
+impl<AQueue> Scheduler<AQueue>
+where
+    AQueue: AsyncQueueable + Clone + Sync + 'static,
+{
     #[async_recursion(?Send)]
     pub async fn start(&mut self) -> Result<(), Error> {
-        let task_res = self.schedule_loop().await;
+        let join_handle: JoinHandle<Result<(), Error>> = self.schedule_loop().await;
 
-        sleep(Duration::from_secs(1)).await;
-
-        match task_res {
-            Err(err) => {
+        match join_handle.await {
+            Err(_) => {
                 error!(
-                    "Scheduler failed, restarting {:?}. Number of restarts {}",
-                    err, self.number_of_restarts
-                );
-                self.number_of_restarts += 1;
-                self.start().await
-            }
-            Ok(_) => {
-                error!(
-                    "Scheduler stopped. restarting. Number of restarts {}",
+                    "Thread panicked , Scheduler stop, Restarting. Number of restarts {}",
                     self.number_of_restarts
                 );
                 self.number_of_restarts += 1;
+                sleep(Duration::from_secs(1)).await;
                 self.start().await
             }
+            Ok(task_res) => match task_res {
+                Err(err) => {
+                    error!(
+                        "Scheduler failed, restarting {:?}. Number of restarts {}",
+                        err, self.number_of_restarts
+                    );
+                    self.number_of_restarts += 1;
+                    self.start().await
+                }
+                Ok(_) => {
+                    error!(
+                        "Scheduler stopped. restarting. Number of restarts {}",
+                        self.number_of_restarts
+                    );
+                    self.number_of_restarts += 1;
+                    self.start().await
+                }
+            },
         }
     }
 
-    pub async fn schedule_loop(&mut self) -> Result<(), Error> {
-        let sleep_duration = Duration::from_secs(self.check_period);
+    pub async fn schedule_loop(&mut self) -> JoinHandle<Result<(), Error>> {
+        let mut scheduler = self.clone();
+        tokio::spawn(async move {
+            let sleep_duration = Duration::from_secs(scheduler.check_period);
 
-        loop {
-            self.schedule().await?;
+            loop {
+                scheduler.schedule().await?;
 
-            sleep(sleep_duration).await;
-        }
+                sleep(sleep_duration).await;
+            }
+        })
     }
 
     pub async fn schedule(&mut self) -> Result<(), Error> {
@@ -86,8 +105,23 @@ impl<'a> Scheduler<'a> {
         }
         Ok(())
     }
+}
 
-    #[cfg(test)]
+#[cfg(test)]
+#[derive(TypedBuilder)]
+pub struct SchedulerTest<'a> {
+    #[builder(setter(into))]
+    pub check_period: u64,
+    #[builder(setter(into))]
+    pub error_margin_seconds: u64,
+    #[builder(setter(into))]
+    pub queue: &'a mut dyn AsyncQueueable,
+    #[builder(default = 0, setter(into))]
+    pub number_of_restarts: u32,
+}
+
+#[cfg(test)]
+impl<'a> SchedulerTest<'a> {
     async fn schedule_test(&mut self) -> Result<(), Error> {
         let sleep_duration = Duration::from_secs(self.check_period);
 
@@ -110,11 +144,28 @@ impl<'a> Scheduler<'a> {
             };
         }
     }
+
+    async fn process_task(&mut self, task: PeriodicTask) -> Result<(), Error> {
+        match task.scheduled_at {
+            None => {
+                self.queue.schedule_next_task(task).await?;
+            }
+            Some(_) => {
+                let actual_task: Box<dyn AsyncRunnable> =
+                    serde_json::from_value(task.metadata.clone()).unwrap();
+
+                self.queue.insert_task(&*actual_task).await?;
+
+                self.queue.schedule_next_task(task).await?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod async_scheduler_tests {
-    use super::Scheduler;
+    use super::SchedulerTest;
     use crate::asynk::async_queue::AsyncQueueTest;
     use crate::asynk::async_queue::AsyncQueueable;
     use crate::asynk::async_queue::PeriodicTask;
@@ -166,7 +217,7 @@ mod async_scheduler_tests {
         let check_period: u64 = 1;
         let error_margin_seconds: u64 = 2;
 
-        let mut scheduler = Scheduler::builder()
+        let mut scheduler = SchedulerTest::builder()
             .check_period(check_period)
             .error_margin_seconds(error_margin_seconds)
             .queue(&mut test as &mut dyn AsyncQueueable)

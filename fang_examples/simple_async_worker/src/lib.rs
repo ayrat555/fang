@@ -30,8 +30,13 @@ impl AsyncRunnable for MyTask {
 
         log::info!("the current number is {}", self.number);
         tokio::time::sleep(Duration::from_secs(3)).await;
-        panic!("Hello!");
 
-        Ok(())
+        let b = true;
+
+        if b {
+            panic!("Hello!");
+        } else {
+            Ok(())
+        }
     }
 }
