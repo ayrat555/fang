@@ -35,7 +35,7 @@ where
         match join_handle.await {
             Err(_) => {
                 error!(
-                    "Thread panicked , Scheduler stop, Restarting. Number of restarts {}",
+                    "Scheduler panicked, restarting {:?}. Number of restarts {}",
                     self.number_of_restarts
                 );
                 self.number_of_restarts += 1;
