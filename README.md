@@ -15,13 +15,13 @@ Background task processing library for Rust. It uses Postgres DB as a task queue
 1. Add this to your Cargo.toml
 
 
-### Blocking
+#### Blocking feature
 ```toml
 [dependencies]
 fang = { version = "0.7" , features = ["blocking"]}
 ```
 
-### Asynk
+#### Asynk feature
 ```toml
 [dependencies]
 fang = { version = "0.7" , features = ["asynk"]}
@@ -34,8 +34,8 @@ fang = { version = "0.7" , features = ["asynk"]}
 
 ### Defining a task
 
-#### Blocking
-Every task in blocking should implement `fang::Runnable` trait which is used by `fang` to execute it.
+#### Blocking feature
+Every task should implement `fang::Runnable` trait which is used by `fang` to execute it.
 
 ```rust
 use fang::Error;
@@ -65,8 +65,8 @@ As you can see from the example above, the trait implementation has `#[typetag::
 The second parameter  of the `run` function is diesel's PgConnection, You can re-use it to manipulate the task queue, for example, to add a new job during the current job's execution. Or you can just re-use it in your own queries if you're using diesel. If you don't need it, just ignore it.
 
 
-#### Asynk
-Every task in async should implement `fang::AsyncRunnable` trait which is used by `fang` to execute it.
+#### Asynk feature
+Every task should implement `fang::AsyncRunnable` trait which is used by `fang` to execute it.
 
 Also be careful to not to call with the same name two impl of AsyncRunnable, because will cause a fail with typetag. 
 ```rust
@@ -96,7 +96,7 @@ impl AsyncRunnable for AsyncTask {
 ```
 ### Enqueuing a task
 
-#### Blocking
+#### Blocking feature
 To enqueue a task use `Queue::enqueue_task`
 
 
@@ -126,8 +126,8 @@ Or you can use `PgConnection` struct:
 Queue::push_task_query(pg_connection, &new_task).unwrap();
 ```
 
-#### Asynk
-To enqueue a task in async use `AsyncQueueable::insert_task`,
+#### Asynk feature
+To enqueue a task use `AsyncQueueable::insert_task`,
 depending of the backend that you prefer you will need to do it with a specific queue.
 
 For Postgres backend.
@@ -169,7 +169,7 @@ let task_returned = queue
 
 ### Starting workers
 
-#### Blocking
+#### Blocking feature
 Every worker runs in a separate thread. In case of panic, they are always restarted.
 
 Use `WorkerPool` to start workers. `WorkerPool::new` accepts one parameter - the number of workers.
@@ -195,7 +195,7 @@ worker_pool.shutdown()
 Using a library like [signal-hook][signal-hook], it's possible to gracefully shutdown a worker. See the
 Simple Worker for an example implementation.
 
-#### Asynk
+#### Asynk feature
 Every worker runs in a separate tokio task. In case of panic, they are always restarted.
 Use `AsyncWorkerPool` to start workers.
 
@@ -222,17 +222,17 @@ Check out:
 
 ### Configuration
 
-#### Blocking
+#### Blocking feature
 
 To configure workers, instead of `WorkerPool::new` which uses default values, use `WorkerPool.new_with_params`. It accepts two parameters - the number of workers and `WorkerParams` struct.
 
-#### Asynk
+#### Asynk feature
 
 Just use `TypeBuilder` done for `AsyncWorkerPool`.
 
 ### Configuring the type of workers
 
-#### Blocking
+#### Blocking feature
 
 You can start workers for a specific types of tasks. These workers will be executing only tasks of the specified type.
 
@@ -267,9 +267,9 @@ WorkerPool::new_with_params(10, worker_params).start();
 Without setting `task_type` workers will be executing any type of task.
 
 
-#### Asynk
+#### Asynk feature
 
-Same as Blocking.
+Same as Blocking feature.
 
 Use `TypeBuilder` for `AsyncWorker`.
 
@@ -289,7 +289,7 @@ pub enum RetentionMode {
 
 Set retention mode with `set_retention_mode`:
 
-#### Blocking
+#### Blocking feature
 
 ```rust
 let mut worker_params = WorkerParams::new();
@@ -297,11 +297,13 @@ worker_params.set_retention_mode(RetentionMode::RemoveAll);
 
 WorkerPool::new_with_params(10, worker_params).start();
 ```
-#### Asynk
+#### Asynk feature
 
 Set it in `AsyncWorker` `TypeBuilder`.
 
 ### Configuring sleep values
+
+#### Blocking feature
 
 You can use use `SleepParams` to confugure sleep values:
 
@@ -330,7 +332,7 @@ worker_params.set_sleep_params(sleep_params);
 
 WorkerPool::new_with_params(10, worker_params).start();
 ```
-#### Asynk
+#### Asynk feature
 
 Set it in `AsyncWorker` `TypeBuilder`.
 
@@ -340,7 +342,7 @@ Fang can add tasks to `fang_tasks` periodically. To use this feature first run [
 
 Usage example:
 
-#### Blocking
+#### Blocking feature
 
 ```rust
 use fang::Scheduler;
@@ -365,7 +367,7 @@ In the example above, `push_periodic_task` is used to save the specified task to
 - Db check period in seconds
 - Acceptable error limit in seconds - |current_time - scheduled_time| < error
 
-#### Asynk
+#### Asynk feature
 ```rust
 use fang::asynk::async_scheduler::Scheduler;
 use fang::asynk::async_queue::AsyncQueueable;
