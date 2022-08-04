@@ -6,6 +6,9 @@
 
 Background task processing library for Rust. It uses Postgres DB as a task queue.
 
+## Features 
+- Asynk feature uses `tokio`. Workers are started in tokio tasks.
+- Blocking feature uses `std::thread`. Workers are started in a separated threads.
 
 ## Installation
 
@@ -15,13 +18,13 @@ Background task processing library for Rust. It uses Postgres DB as a task queue
 ### Blocking
 ```toml
 [dependencies]
-fang = { version = "0.6" , features = ["blocking"]}
+fang = { version = "0.7" , features = ["blocking"]}
 ```
 
-### Async
+### Asynk
 ```toml
 [dependencies]
-fang = { version = "0.6" , features = ["asynk"]}
+fang = { version = "0.7" , features = ["asynk"]}
 ```
 *Supports rustc 1.62+*
 
@@ -62,10 +65,10 @@ As you can see from the example above, the trait implementation has `#[typetag::
 The second parameter  of the `run` function is diesel's PgConnection, You can re-use it to manipulate the task queue, for example, to add a new job during the current job's execution. Or you can just re-use it in your own queries if you're using diesel. If you don't need it, just ignore it.
 
 
-#### Async
+#### Asynk
 Every task in async should implement `fang::AsyncRunnable` trait which is used by `fang` to execute it.
 
-Also be careful to not to call with the same name two impl of AsyncRunnable, because will cause a fail with serde. 
+Also be careful to not to call with the same name two impl of AsyncRunnable, because will cause a fail with typetag. 
 ```rust
 use fang::AsyncRunnable;
 use fang::asynk::async_queue::AsyncQueueable;
@@ -94,7 +97,7 @@ impl AsyncRunnable for AsyncTask {
 ### Enqueuing a task
 
 #### Blocking
-To enqueue a task in blocking use `Queue::enqueue_task`
+To enqueue a task use `Queue::enqueue_task`
 
 
 ```rust
@@ -123,8 +126,8 @@ Or you can use `PgConnection` struct:
 Queue::push_task_query(pg_connection, &new_task).unwrap();
 ```
 
-#### Async
-To enqueue a task in async use `AsyncQueueable::insert_task`
+#### Asynk
+To enqueue a task in async use `AsyncQueueable::insert_task`,
 depending of the backend that you prefer you will need to do it with a specific queue.
 
 For Postgres backend.
@@ -169,7 +172,7 @@ let task_returned = queue
 #### Blocking
 Every worker runs in a separate thread. In case of panic, they are always restarted.
 
-Use `WorkerPool` for blocking to start workers. `WorkerPool::new` accepts one parameter - the number of workers.
+Use `WorkerPool` to start workers. `WorkerPool::new` accepts one parameter - the number of workers.
 
 
 ```rust
@@ -192,14 +195,14 @@ worker_pool.shutdown()
 Using a library like [signal-hook][signal-hook], it's possible to gracefully shutdown a worker. See the
 Simple Worker for an example implementation.
 
-#### Async
-Every worker runs in a separate tokio thread. In case of panic, they are always restarted.
-Use `AsyncWorkerPool` for async to start workers.
+#### Asynk
+Every worker runs in a separate tokio task. In case of panic, they are always restarted.
+Use `AsyncWorkerPool` to start workers.
 
 ```rust
 use fang::asynk::async_worker_pool::AsyncWorkerPool;
 
-// Need to create a queue like before
+// Need to create a queue
 // Also insert some tasks
 
 let mut pool: AsyncWorkerPool<AsyncQueue<NoTls>> = AsyncWorkerPool::builder()
@@ -223,7 +226,7 @@ Check out:
 
 To configure workers, instead of `WorkerPool::new` which uses default values, use `WorkerPool.new_with_params`. It accepts two parameters - the number of workers and `WorkerParams` struct.
 
-#### Async
+#### Asynk
 
 Just use `TypeBuilder` done for `AsyncWorkerPool`.
 
@@ -264,7 +267,7 @@ WorkerPool::new_with_params(10, worker_params).start();
 Without setting `task_type` workers will be executing any type of task.
 
 
-#### Async
+#### Asynk
 
 Same as Blocking.
 
@@ -294,7 +297,7 @@ worker_params.set_retention_mode(RetentionMode::RemoveAll);
 
 WorkerPool::new_with_params(10, worker_params).start();
 ```
-#### Async
+#### Asynk
 
 Set it in `AsyncWorker` `TypeBuilder`.
 
@@ -327,7 +330,7 @@ worker_params.set_sleep_params(sleep_params);
 
 WorkerPool::new_with_params(10, worker_params).start();
 ```
-#### Async
+#### Asynk
 
 Set it in `AsyncWorker` `TypeBuilder`.
 
@@ -362,7 +365,7 @@ In the example above, `push_periodic_task` is used to save the specified task to
 - Db check period in seconds
 - Acceptable error limit in seconds - |current_time - scheduled_time| < error
 
-#### Async
+#### Asynk
 ```rust
 use fang::asynk::async_scheduler::Scheduler;
 use fang::asynk::async_queue::AsyncQueueable;
