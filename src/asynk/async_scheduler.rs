@@ -169,8 +169,8 @@ mod async_scheduler_tests {
     use crate::asynk::async_queue::AsyncQueueTest;
     use crate::asynk::async_queue::AsyncQueueable;
     use crate::asynk::async_queue::PeriodicTask;
+    use crate::asynk::AsyncError as Error;
     use crate::asynk::AsyncRunnable;
-    use crate::asynk::Error;
     use async_trait::async_trait;
     use bb8_postgres::bb8::Pool;
     use bb8_postgres::tokio_postgres::NoTls;

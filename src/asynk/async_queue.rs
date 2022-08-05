@@ -776,8 +776,8 @@ mod async_queue_tests {
     use super::AsyncQueueable;
     use super::FangTaskState;
     use super::Task;
+    use crate::asynk::AsyncError as Error;
     use crate::asynk::AsyncRunnable;
-    use crate::asynk::Error;
     use async_trait::async_trait;
     use bb8_postgres::bb8::Pool;
     use bb8_postgres::tokio_postgres::NoTls;
