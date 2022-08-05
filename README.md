@@ -6,7 +6,7 @@
 
 Background task processing library for Rust. It uses Postgres DB as a task queue.
 
-## Features 
+## Features
 - Asynk feature uses `tokio`. Workers are started in tokio tasks.
 - Blocking feature uses `std::thread`. Workers are started in a separated threads.
 
@@ -18,14 +18,20 @@ Background task processing library for Rust. It uses Postgres DB as a task queue
 #### Blocking feature
 ```toml
 [dependencies]
-fang = { version = "0.7" , features = ["blocking"]}
+fang = { version = "0.7" , features = ["blocking"], default-features = false }
 ```
 
 #### Asynk feature
 ```toml
 [dependencies]
-fang = { version = "0.7" , features = ["asynk"]}
+fang = { version = "0.7" , features = ["asynk"], default-features = false }
 ```
+
+#### Both features
+```toml
+fang = { version = "0.7" }
+```
+
 *Supports rustc 1.62+*
 
 2. Create `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/migrations/2021-06-05-112912_create_fang_tasks/up.sql).
@@ -68,7 +74,7 @@ The second parameter  of the `run` function is diesel's PgConnection, You can re
 #### Asynk feature
 Every task should implement `fang::AsyncRunnable` trait which is used by `fang` to execute it.
 
-Also be careful to not to call with the same name two impl of AsyncRunnable, because will cause a fail with typetag. 
+Also be careful to not to call with the same name two impl of AsyncRunnable, because will cause a fail with typetag.
 ```rust
 use fang::AsyncRunnable;
 use fang::asynk::async_queue::AsyncQueueable;
@@ -87,7 +93,7 @@ impl AsyncRunnable for AsyncTask {
     async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
         Ok(())
     }
-    // this func is optional to impl 
+    // this func is optional to impl
     // Default task-type it is common
     fn task_type(&self) -> String {
         "my-task-type".to_string()
@@ -142,7 +148,7 @@ let max_pool_size: u32 = 2;
 let mut queue = AsyncQueue::builder()
     // Postgres database url
     .uri("postgres://postgres:postgres@localhost/fang")
-    // Max number of connections that are allowed 
+    // Max number of connections that are allowed
     .max_pool_size(max_pool_size)
     // false if would like Uniqueness in tasks
     .duplicated_tasks(true)
@@ -373,7 +379,7 @@ use fang::asynk::async_scheduler::Scheduler;
 use fang::asynk::async_queue::AsyncQueueable;
 use fang::asynk::async_queue::AsyncQueue;
 
-// Build a AsyncQueue as before 
+// Build a AsyncQueue as before
 
 let schedule_in_future = Utc::now() + OtherDuration::seconds(5);
 
@@ -395,7 +401,7 @@ let mut scheduler = Scheduler::builder()
 
 // Add some more task in other thread or before loop
 
-// Scheduler Loop 
+// Scheduler Loop
 scheduler.start().await.unwrap();
 ```
 
@@ -433,7 +439,7 @@ docker kill postgres
 ## Authors
 
 - Ayrat Badykov (@ayrat555)
- 
+
 - Pepe Márquez (@pxp9)
 
 

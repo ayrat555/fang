@@ -1,11 +1,9 @@
+use crate::asynk::async_runnable::AsyncRunnable;
 use crate::asynk::async_runnable::Error as FangError;
-use crate::AsyncRunnable;
 use async_trait::async_trait;
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::bb8::RunError;
 use bb8_postgres::tokio_postgres::row::Row;
-#[cfg(test)]
-use bb8_postgres::tokio_postgres::tls::NoTls;
 use bb8_postgres::tokio_postgres::tls::{MakeTlsConnect, TlsConnect};
 use bb8_postgres::tokio_postgres::Socket;
 use bb8_postgres::tokio_postgres::Transaction;
@@ -17,6 +15,9 @@ use postgres_types::{FromSql, ToSql};
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
+
+#[cfg(test)]
+use bb8_postgres::tokio_postgres::tls::NoTls;
 
 const INSERT_TASK_QUERY: &str = include_str!("queries/insert_task.sql");
 const INSERT_PERIODIC_TASK_QUERY: &str = include_str!("queries/insert_periodic_task.sql");
@@ -333,6 +334,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         Ok(task)
     }
 }
+
 impl<Tls> AsyncQueue<Tls>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
@@ -463,6 +465,7 @@ where
         let task = Self::row_to_task(row);
         Ok(task)
     }
+
     async fn schedule_next_task_query(
         transaction: &mut Transaction<'_>,
         periodic_task: PeriodicTask,
@@ -477,6 +480,7 @@ where
         let periodic_task = Self::row_to_periodic_task(row);
         Ok(periodic_task)
     }
+
     async fn insert_periodic_task_query(
         transaction: &mut Transaction<'_>,
         metadata: serde_json::Value,
@@ -516,6 +520,7 @@ where
             Ok(Some(periodic_tasks))
         }
     }
+
     async fn execute_query(
         transaction: &mut Transaction<'_>,
         query: &str,
@@ -545,6 +550,7 @@ where
             None => Self::insert_task_query(transaction, metadata, task_type).await,
         }
     }
+
     async fn find_task_by_metadata_query(
         transaction: &mut Transaction<'_>,
         metadata: &serde_json::Value,
@@ -558,6 +564,7 @@ where
             Err(_) => None,
         }
     }
+
     fn row_to_periodic_task(row: Row) -> PeriodicTask {
         let id: Uuid = row.get("id");
         let metadata: serde_json::Value = row.get("metadata");
@@ -578,6 +585,7 @@ where
             .updated_at(updated_at)
             .build()
     }
+
     fn row_to_task(row: Row) -> Task {
         let id: Uuid = row.get("id");
         let metadata: serde_json::Value = row.get("metadata");

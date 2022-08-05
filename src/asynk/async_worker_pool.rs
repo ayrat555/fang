@@ -1,6 +1,6 @@
 use crate::asynk::async_queue::AsyncQueueable;
 use crate::asynk::async_worker::AsyncWorker;
-use crate::asynk::Error;
+use crate::asynk::AsyncError as Error;
 use crate::{RetentionMode, SleepParams};
 use async_recursion::async_recursion;
 use log::error;

@@ -5,4 +5,4 @@ pub mod async_worker;
 pub mod async_worker_pool;
 
 pub use async_runnable::AsyncRunnable;
-pub use async_runnable::Error;
+pub use async_runnable::Error as AsyncError;

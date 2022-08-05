@@ -3,7 +3,7 @@ use crate::asynk::async_queue::FangTaskState;
 use crate::asynk::async_queue::Task;
 use crate::asynk::async_queue::DEFAULT_TASK_TYPE;
 use crate::asynk::async_runnable::AsyncRunnable;
-use crate::asynk::Error;
+use crate::asynk::AsyncError as Error;
 use crate::{RetentionMode, SleepParams};
 use log::error;
 use std::time::Duration;

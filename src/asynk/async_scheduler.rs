@@ -1,7 +1,7 @@
 use crate::asynk::async_queue::AsyncQueueable;
 use crate::asynk::async_queue::PeriodicTask;
+use crate::asynk::AsyncError as Error;
 use crate::asynk::AsyncRunnable;
-use crate::asynk::Error;
 use async_recursion::async_recursion;
 use log::error;
 use std::time::Duration;
