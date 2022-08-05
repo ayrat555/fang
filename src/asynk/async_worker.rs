@@ -3,7 +3,7 @@ use crate::asynk::async_queue::FangTaskState;
 use crate::asynk::async_queue::Task;
 use crate::asynk::async_queue::DEFAULT_TASK_TYPE;
 use crate::asynk::async_runnable::AsyncRunnable;
-use crate::asynk::Error;
+use crate::asynk::AsyncError as Error;
 use crate::{RetentionMode, SleepParams};
 use log::error;
 use std::time::Duration;
@@ -216,8 +216,8 @@ mod async_worker_tests {
     use crate::asynk::async_queue::AsyncQueueable;
     use crate::asynk::async_queue::FangTaskState;
     use crate::asynk::async_worker::Task;
+    use crate::asynk::AsyncError as Error;
     use crate::asynk::AsyncRunnable;
-    use crate::asynk::Error;
     use crate::RetentionMode;
     use async_trait::async_trait;
     use bb8_postgres::bb8::Pool;

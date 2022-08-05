@@ -1,6 +1,6 @@
 [package]
 name = "fang"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Ayrat Badykov <ayratin555@gmail.com>" , "Pepe Márquez <pepe.marquezromero@gmail.com>"]
 description = "Background job processing library for Rust"
 repository = "https://github.com/ayrat555/fang"
@@ -45,7 +45,6 @@ optional = true
 version = "0.8"
 features = ["with-serde_json-1" , "with-uuid-0_8" , "with-chrono-0_4"]
 optional = true
-
 
 [dependencies.postgres-types]
 version = "0.X.X"

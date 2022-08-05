@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.1 (2022-08-04)
+
+- Fix a conflict in exports of the `blocking` and the `asynk` features - [#61](https://github.com/ayrat555/fang/pull/61)
+
 ## 0.7.0 (2022-08-03)
 
 ### [#21](https://github.com/ayrat555/fang/pull/21)
