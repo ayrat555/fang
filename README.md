@@ -132,7 +132,7 @@ Or you can use `PgConnection` struct:
 Queue::push_task_query(pg_connection, &new_task).unwrap();
 ```
 
-#### Asynk feature
+#### Async feature
 To enqueue a task use `AsyncQueueable::insert_task`,
 depending of the backend that you prefer you will need to do it with a specific queue.
 
