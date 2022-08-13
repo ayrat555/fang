@@ -4,8 +4,6 @@ use async_trait::async_trait;
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::bb8::RunError;
 use bb8_postgres::tokio_postgres::row::Row;
-#[cfg(test)]
-use bb8_postgres::tokio_postgres::tls::NoTls;
 use bb8_postgres::tokio_postgres::tls::{MakeTlsConnect, TlsConnect};
 use bb8_postgres::tokio_postgres::Socket;
 use bb8_postgres::tokio_postgres::Transaction;
@@ -17,6 +15,9 @@ use postgres_types::{FromSql, ToSql};
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
+
+#[cfg(test)]
+use bb8_postgres::tokio_postgres::tls::NoTls;
 
 const INSERT_TASK_QUERY: &str = include_str!("queries/insert_task.sql");
 const INSERT_PERIODIC_TASK_QUERY: &str = include_str!("queries/insert_periodic_task.sql");
@@ -149,6 +150,7 @@ pub trait AsyncQueueable: Send {
         timestamp: DateTime<Utc>,
         period: i32,
     ) -> Result<PeriodicTask, AsyncQueueError>;
+
     async fn schedule_next_task(
         &mut self,
         periodic_task: PeriodicTask,

@@ -1,4 +1,5 @@
 use crate::asynk::async_queue::AsyncQueueable;
+use crate::asynk::async_queue::DEFAULT_TASK_TYPE;
 use crate::asynk::async_worker::AsyncWorker;
 use crate::asynk::Error;
 use crate::{RetentionMode, SleepParams};
@@ -20,6 +21,8 @@ where
     pub retention_mode: RetentionMode,
     #[builder(setter(into))]
     pub number_of_workers: u32,
+    #[builder(default=DEFAULT_TASK_TYPE.to_string(), setter(into))]
+    pub task_type: String,
 }
 
 impl<AQueue> AsyncWorkerPool<AQueue>
@@ -40,6 +43,7 @@ where
             pool.queue.clone(),
             pool.sleep_params.clone(),
             pool.retention_mode.clone(),
+            pool.task_type.clone(),
         )
         .await;
 
@@ -56,18 +60,23 @@ where
         queue: AQueue,
         sleep_params: SleepParams,
         retention_mode: RetentionMode,
+        task_type: String,
     ) -> JoinHandle<Result<(), Error>> {
-        tokio::spawn(async move { Self::run_worker(queue, sleep_params, retention_mode).await })
+        tokio::spawn(async move {
+            Self::run_worker(queue, sleep_params, retention_mode, task_type).await
+        })
     }
     pub async fn run_worker(
         queue: AQueue,
         sleep_params: SleepParams,
         retention_mode: RetentionMode,
+        task_type: String,
     ) -> Result<(), Error> {
         let mut worker: AsyncWorker<AQueue> = AsyncWorker::builder()
             .queue(queue)
             .sleep_params(sleep_params)
             .retention_mode(retention_mode)
+            .task_type(task_type)
             .build();
 
         worker.run_tasks().await
