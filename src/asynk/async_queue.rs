@@ -166,15 +166,15 @@ where
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
     #[builder(default=None, setter(skip))]
-    pub pool: Option<Pool<PostgresConnectionManager<Tls>>>,
+    pool: Option<Pool<PostgresConnectionManager<Tls>>>,
     #[builder(setter(into))]
-    pub uri: String,
+    uri: String,
     #[builder(setter(into))]
-    pub max_pool_size: u32,
+    max_pool_size: u32,
     #[builder(default = false, setter(into))]
-    pub duplicated_tasks: bool,
+    duplicated_tasks: bool,
     #[builder(default = false, setter(skip))]
-    pub connected: bool,
+    connected: bool,
 }
 
 #[cfg(test)]
