@@ -155,6 +155,7 @@ pub trait AsyncQueueable: Send {
         &mut self,
         periodic_task: PeriodicTask,
     ) -> Result<PeriodicTask, AsyncQueueError>;
+
     fn as_any(&self) -> &dyn Any;
 }
 
@@ -336,7 +337,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         Ok(task)
     }
 
-    fn as_any(&self) -> &dyn Any {
+    fn as_any(&'static self) -> &'static dyn Any {
         self
     }
 }
