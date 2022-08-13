@@ -12,6 +12,7 @@ use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 use postgres_types::{FromSql, ToSql};
+use std::any::Any;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -154,6 +155,7 @@ pub trait AsyncQueueable: Send {
         &mut self,
         periodic_task: PeriodicTask,
     ) -> Result<PeriodicTask, AsyncQueueError>;
+    fn as_any(&self) -> &dyn Any;
 }
 
 #[derive(TypedBuilder, Debug, Clone)]
@@ -332,6 +334,10 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         let task = AsyncQueue::<NoTls>::fail_task_query(transaction, task, error_message).await?;
 
         Ok(task)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -767,6 +773,10 @@ where
         transaction.commit().await?;
 
         Ok(task)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
