@@ -156,7 +156,7 @@ pub trait AsyncQueueable: Send {
         periodic_task: PeriodicTask,
     ) -> Result<PeriodicTask, AsyncQueueError>;
 
-    fn as_any(&self) -> &dyn Any;
+    fn as_any(&'static self) -> &'static dyn Any;
 }
 
 #[derive(TypedBuilder, Debug, Clone)]
@@ -181,15 +181,15 @@ where
 
 #[cfg(test)]
 #[derive(TypedBuilder)]
-pub struct AsyncQueueTest {
+pub struct AsyncQueueTest<'a> {
     #[builder(setter(into))]
-    pub transaction: Transaction<'static>,
+    pub transaction: Transaction<'a>,
     #[builder(default = false, setter(into))]
     pub duplicated_tasks: bool,
 }
 
 #[cfg(test)]
-impl AsyncQueueTest {
+impl<'a> AsyncQueueTest<'a> {
     pub async fn find_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError> {
         let row: Row = self
             .transaction
@@ -215,7 +215,7 @@ impl AsyncQueueTest {
 
 #[cfg(test)]
 #[async_trait]
-impl AsyncQueueable for AsyncQueueTest {
+impl AsyncQueueable for AsyncQueueTest<'_> {
     async fn fetch_and_touch_task(
         &mut self,
         task_type: Option<String>,
@@ -337,7 +337,7 @@ impl AsyncQueueable for AsyncQueueTest {
         Ok(task)
     }
 
-    fn as_any(&self) -> &dyn Any {
+    fn as_any(&'static self) -> &'static dyn Any {
         self
     }
 }
@@ -776,7 +776,7 @@ where
         Ok(task)
     }
 
-    fn as_any(&self) -> &dyn Any {
+    fn as_any(&'static self) -> &'static dyn Any {
         self
     }
 }
