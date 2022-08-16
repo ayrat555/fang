@@ -150,6 +150,7 @@ pub trait AsyncQueueable: Send {
         timestamp: DateTime<Utc>,
         period: i32,
     ) -> Result<PeriodicTask, AsyncQueueError>;
+
     async fn schedule_next_task(
         &mut self,
         periodic_task: PeriodicTask,
