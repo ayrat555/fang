@@ -105,7 +105,7 @@ mod task_scheduler_tests {
     fn schedules_tasks() {
         let queue = Queue::new();
 
-        queue.push_periodic_task(&ScheduledTask {}, 10).unwrap();
+        queue.push_periodic_task(&ScheduledTask {}, 10000).unwrap();
         Scheduler::start(Duration::from_secs(1), Duration::from_secs(2));
 
         let sleep_duration = Duration::from_secs(15);

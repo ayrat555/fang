@@ -83,7 +83,7 @@ pub struct PeriodicTask {
     #[builder(setter(into))]
     pub metadata: serde_json::Value,
     #[builder(setter(into))]
-    pub period_in_seconds: i32,
+    pub period_in_millis: i32,
     #[builder(setter(into))]
     pub scheduled_at: Option<DateTime<Utc>>,
     #[builder(setter(into))]
@@ -474,7 +474,8 @@ where
         periodic_task: PeriodicTask,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         let updated_at = Utc::now();
-        let scheduled_at = updated_at + Duration::seconds(periodic_task.period_in_seconds.into());
+        let scheduled_at =
+            updated_at + Duration::milliseconds(periodic_task.period_in_millis.into());
 
         let row: Row = transaction
             .query_one(SCHEDULE_NEXT_TASK_QUERY, &[&scheduled_at, &updated_at])
@@ -571,7 +572,7 @@ where
     fn row_to_periodic_task(row: Row) -> PeriodicTask {
         let id: Uuid = row.get("id");
         let metadata: serde_json::Value = row.get("metadata");
-        let period_in_seconds: i32 = row.get("period_in_seconds");
+        let period_in_millis: i32 = row.get("period_in_millis");
         let scheduled_at: Option<DateTime<Utc>> = match row.try_get("scheduled_at") {
             Ok(datetime) => Some(datetime),
             Err(_) => None,
@@ -582,7 +583,7 @@ where
         PeriodicTask::builder()
             .id(id)
             .metadata(metadata)
-            .period_in_seconds(period_in_seconds)
+            .period_in_millis(period_in_millis)
             .scheduled_at(scheduled_at)
             .created_at(created_at)
             .updated_at(updated_at)

@@ -33,7 +33,7 @@ table! {
     fang_periodic_tasks (id) {
         id -> Uuid,
         metadata -> Jsonb,
-        period_in_seconds -> Int4,
+        period_in_millis -> Int4,
         scheduled_at -> Nullable<Timestamptz>,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
