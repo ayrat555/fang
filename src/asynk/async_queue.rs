@@ -12,6 +12,7 @@ use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 use postgres_types::{FromSql, ToSql};
+use std::time::Duration as StdDuration;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -99,6 +100,8 @@ pub enum AsyncQueueError {
     PgError(#[from] bb8_postgres::tokio_postgres::Error),
     #[error(transparent)]
     SerdeError(#[from] serde_json::Error),
+    #[error(transparent)]
+    TimeError(#[from] time::OutOfRangeError),
     #[error("returned invalid result (expected {expected:?}, found {found:?})")]
     ResultError { expected: u64, found: u64 },
     #[error(
@@ -141,7 +144,7 @@ pub trait AsyncQueueable: Send {
 
     async fn fetch_periodic_tasks(
         &mut self,
-        error_margin_seconds: i64,
+        error_margin: StdDuration,
     ) -> Result<Option<Vec<PeriodicTask>>, AsyncQueueError>;
 
     async fn insert_periodic_task(
@@ -277,13 +280,12 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
 
     async fn fetch_periodic_tasks(
         &mut self,
-        error_margin_seconds: i64,
+        error_margin: StdDuration,
     ) -> Result<Option<Vec<PeriodicTask>>, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
         let periodic_task =
-            AsyncQueue::<NoTls>::fetch_periodic_tasks_query(transaction, error_margin_seconds)
-                .await?;
+            AsyncQueue::<NoTls>::fetch_periodic_tasks_query(transaction, error_margin).await?;
 
         Ok(periodic_task)
     }
@@ -500,12 +502,12 @@ where
 
     async fn fetch_periodic_tasks_query(
         transaction: &mut Transaction<'_>,
-        error_margin_seconds: i64,
+        error_margin: StdDuration,
     ) -> Result<Option<Vec<PeriodicTask>>, AsyncQueueError> {
         let current_time = Utc::now();
 
-        let low_limit = current_time - Duration::seconds(error_margin_seconds);
-        let high_limit = current_time + Duration::seconds(error_margin_seconds);
+        let low_limit = current_time - Duration::from_std(error_margin)?;
+        let high_limit = current_time + Duration::from_std(error_margin)?;
         let rows: Vec<Row> = transaction
             .query(FETCH_PERIODIC_TASKS_QUERY, &[&low_limit, &high_limit])
             .await?;
@@ -690,14 +692,14 @@ where
 
     async fn fetch_periodic_tasks(
         &mut self,
-        error_margin_seconds: i64,
+        error_margin: StdDuration,
     ) -> Result<Option<Vec<PeriodicTask>>, AsyncQueueError> {
         self.check_if_connection()?;
         let mut connection = self.pool.as_ref().unwrap().get().await?;
         let mut transaction = connection.transaction().await?;
 
         let periodic_task =
-            Self::fetch_periodic_tasks_query(&mut transaction, error_margin_seconds).await?;
+            Self::fetch_periodic_tasks_query(&mut transaction, error_margin).await?;
 
         transaction.commit().await?;
 

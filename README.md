@@ -364,20 +364,22 @@ queue
      .push_periodic_task(&DeliverMyTask::default(), 60)
      .unwrap();
 
-Scheduler::start(10, 5);
+Scheduler::start(Duration::from_secs(10), Duration::from_secs(5));
 ```
 
 In the example above, `push_periodic_task` is used to save the specified task to the `fang_periodic_tasks` table which will be enqueued (saved to `fang_tasks` table) every specied number of seconds.
 
-`Scheduler::start(10, 5)` starts scheduler. It accepts two parameters:
-- Db check period in seconds
-- Acceptable error limit in seconds - |current_time - scheduled_time| < error
+`Scheduler::start(Duration::from_secs(10), Duration::from_secs(5))` starts scheduler. It accepts two parameters:
+- Db check period
+- Acceptable error limit - |current_time - scheduled_time| < error
 
 #### Asynk feature
 ```rust
 use fang::asynk::async_scheduler::Scheduler;
 use fang::asynk::async_queue::AsyncQueueable;
 use fang::asynk::async_queue::AsyncQueue;
+use std::time::Duration; 
+use chrono::Duration as OtherDuration;
 
 // Build a AsyncQueue as before
 
@@ -394,8 +396,8 @@ let check_period: u64 = 1;
 let error_margin_seconds: u64 = 2;
 
 let mut scheduler = Scheduler::builder()
-    .check_period(check_period)
-    .error_margin_seconds(error_margin_seconds)
+    .check_period(Duration::from_secs(check_period))
+    .error_margin_seconds(Duration::from_secs(error_margin_seconds))
     .queue(&mut queue as &mut dyn AsyncQueueable)
     .build();
 

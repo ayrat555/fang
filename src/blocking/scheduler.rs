@@ -5,54 +5,49 @@ use std::thread;
 use std::time::Duration;
 
 pub struct Scheduler {
-    pub check_period: u64,
-    pub error_margin_seconds: u64,
+    pub check_period: Duration,
+    pub error_margin: Duration,
     pub queue: Queue,
 }
 
 impl Drop for Scheduler {
     fn drop(&mut self) {
-        Scheduler::start(self.check_period, self.error_margin_seconds)
+        Scheduler::start(self.check_period, self.error_margin)
     }
 }
 
 impl Scheduler {
-    pub fn start(check_period: u64, error_margin_seconds: u64) {
+    pub fn start(check_period: Duration, error_margin: Duration) {
         let queue = Queue::new();
         let builder = thread::Builder::new().name("scheduler".to_string());
 
         builder
             .spawn(move || {
-                let scheduler = Self::new(check_period, error_margin_seconds, queue);
+                let scheduler = Self::new(check_period, error_margin, queue);
 
                 scheduler.schedule_loop();
             })
             .unwrap();
     }
 
-    pub fn new(check_period: u64, error_margin_seconds: u64, queue: Queue) -> Self {
+    pub fn new(check_period: Duration, error_margin: Duration, queue: Queue) -> Self {
         Self {
             check_period,
             queue,
-            error_margin_seconds,
+            error_margin,
         }
     }
 
     pub fn schedule_loop(&self) {
-        let sleep_duration = Duration::from_secs(self.check_period);
-
         loop {
             self.schedule();
 
-            thread::sleep(sleep_duration);
+            thread::sleep(self.check_period);
         }
     }
 
     pub fn schedule(&self) {
-        if let Some(tasks) = self
-            .queue
-            .fetch_periodic_tasks(self.error_margin_seconds as i64)
-        {
+        if let Some(tasks) = self.queue.fetch_periodic_tasks(self.error_margin) {
             for task in tasks {
                 self.process_task(task);
             }
@@ -111,7 +106,7 @@ mod task_scheduler_tests {
         let queue = Queue::new();
 
         queue.push_periodic_task(&ScheduledTask {}, 10).unwrap();
-        Scheduler::start(1, 2);
+        Scheduler::start(Duration::from_secs(1), Duration::from_secs(2));
 
         let sleep_duration = Duration::from_secs(15);
         thread::sleep(sleep_duration);

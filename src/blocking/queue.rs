@@ -11,6 +11,7 @@ use diesel::r2d2;
 use diesel::result::Error;
 use dotenv::dotenv;
 use std::env;
+use std::time::Duration as StdDuration;
 use uuid::Uuid;
 
 #[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone)]
@@ -198,18 +199,21 @@ impl Queue {
             .ok()
     }
 
-    pub fn fetch_periodic_tasks(&self, error_margin_seconds: i64) -> Option<Vec<PeriodicTask>> {
+    pub fn fetch_periodic_tasks(
+        &self,
+        error_margin_seconds: StdDuration,
+    ) -> Option<Vec<PeriodicTask>> {
         Self::fetch_periodic_tasks_query(&self.connection, error_margin_seconds)
     }
 
     pub fn fetch_periodic_tasks_query(
         connection: &PgConnection,
-        error_margin_seconds: i64,
+        error_margin_seconds: StdDuration,
     ) -> Option<Vec<PeriodicTask>> {
         let current_time = Self::current_time();
 
-        let low_limit = current_time - Duration::seconds(error_margin_seconds);
-        let high_limit = current_time + Duration::seconds(error_margin_seconds);
+        let low_limit = current_time - Duration::from_std(error_margin_seconds).ok()?;
+        let high_limit = current_time + Duration::from_std(error_margin_seconds).ok()?;
 
         fang_periodic_tasks::table
             .filter(
@@ -415,6 +419,7 @@ mod queue_tests {
     use diesel::prelude::*;
     use diesel::result::Error;
     use serde::{Deserialize, Serialize};
+    use std::time::Duration as StdDuration;
 
     #[test]
     fn insert_inserts_task() {
@@ -602,7 +607,9 @@ mod queue_tests {
                 &queue.connection,
             );
 
-            let tasks = queue.fetch_periodic_tasks(100).unwrap();
+            let tasks = queue
+                .fetch_periodic_tasks(StdDuration::from_secs(100))
+                .unwrap();
 
             assert_eq!(tasks.len(), 1);
             assert_eq!(tasks[0].id, task.id);
@@ -685,7 +692,9 @@ mod queue_tests {
             let task =
                 insert_periodic_task(serde_json::json!(true), Utc::now(), 100, &queue.connection);
 
-            let tasks = queue.fetch_periodic_tasks(100).unwrap();
+            let tasks = queue
+                .fetch_periodic_tasks(StdDuration::from_secs(100))
+                .unwrap();
 
             assert_eq!(tasks.len(), 1);
             assert_eq!(tasks[0].id, task.id);
