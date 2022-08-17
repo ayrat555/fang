@@ -315,10 +315,10 @@ You can use use `SleepParams` to confugure sleep values:
 
 ```rust
 pub struct SleepParams {
-    pub sleep_period: u64,     \\ default value is 5
-    pub max_sleep_period: u64, \\ default value is 15
-    pub min_sleep_period: u64, \\ default value is 5
-    pub sleep_step: u64,       \\ default value is 5
+    pub sleep_period: Duration,     \\ default value is 5 seconds
+    pub max_sleep_period: Duration, \\ default value is 15 seconds
+    pub min_sleep_period: Duration, \\ default value is 5 seconds
+    pub sleep_step: Duration,       \\ default value is 5 seconds
 }
 ```
 
@@ -328,10 +328,10 @@ If there are no tasks in the DB, a worker sleeps for `sleep_period` and each tim
 Use `set_sleep_params` to set it:
 ```rust
 let sleep_params = SleepParams {
-    sleep_period: 2,
-    max_sleep_period: 6,
-    min_sleep_period: 2,
-    sleep_step: 1,
+    sleep_period: Duration::from_secs(2),
+    max_sleep_period: Duration::from_secs(6),
+    min_sleep_period: Duration::from_secs(2),
+    sleep_step: Duration::from_secs(1),
 };
 let mut worker_params = WorkerParams::new();
 worker_params.set_sleep_params(sleep_params);
