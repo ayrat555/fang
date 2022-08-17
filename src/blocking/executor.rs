@@ -7,7 +7,6 @@ use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use log::error;
 use std::thread;
-use std::time::Duration;
 
 pub struct Executor {
     pub pooled_connection: PooledConnection<ConnectionManager<PgConnection>>,
@@ -97,7 +96,7 @@ impl Executor {
     pub fn sleep(&mut self) {
         self.sleep_params.maybe_increase_sleep_period();
 
-        thread::sleep(Duration::from_millis(self.sleep_params.sleep_period));
+        thread::sleep(self.sleep_params.sleep_period);
     }
 
     fn execute_task(&self, task: Task) -> Result<Task, (Task, String)> {
