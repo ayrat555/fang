@@ -17,6 +17,7 @@ pub struct SleepParams {
     pub min_sleep_period: u64,
     pub sleep_step: u64,
 }
+
 impl SleepParams {
     pub fn maybe_reset_sleep_period(&mut self) {
         if self.sleep_period != self.min_sleep_period {
@@ -30,13 +31,14 @@ impl SleepParams {
         }
     }
 }
+
 impl Default for SleepParams {
     fn default() -> Self {
         SleepParams {
-            sleep_period: 5,
-            max_sleep_period: 15,
-            min_sleep_period: 5,
-            sleep_step: 5,
+            sleep_period: 5000,
+            max_sleep_period: 15000,
+            min_sleep_period: 5000,
+            sleep_step: 5000,
         }
     }
 }

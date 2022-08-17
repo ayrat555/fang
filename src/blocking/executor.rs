@@ -97,7 +97,7 @@ impl Executor {
     pub fn sleep(&mut self) {
         self.sleep_params.maybe_increase_sleep_period();
 
-        thread::sleep(Duration::from_secs(self.sleep_params.sleep_period));
+        thread::sleep(Duration::from_millis(self.sleep_params.sleep_period));
     }
 
     fn execute_task(&self, task: Task) -> Result<Task, (Task, String)> {

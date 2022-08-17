@@ -84,7 +84,7 @@ where
     pub async fn sleep(&mut self) {
         self.sleep_params.maybe_increase_sleep_period();
 
-        tokio::time::sleep(Duration::from_secs(self.sleep_params.sleep_period)).await;
+        tokio::time::sleep(Duration::from_millis(self.sleep_params.sleep_period)).await;
     }
 
     pub async fn run_tasks(&mut self) -> Result<(), Error> {
@@ -183,8 +183,9 @@ impl<'a> AsyncWorkerTest<'a> {
     pub async fn sleep(&mut self) {
         self.sleep_params.maybe_increase_sleep_period();
 
-        tokio::time::sleep(Duration::from_secs(self.sleep_params.sleep_period)).await;
+        tokio::time::sleep(Duration::from_millis(self.sleep_params.sleep_period)).await;
     }
+
     pub async fn run_tasks_until_none(&mut self) -> Result<(), Error> {
         loop {
             match self
