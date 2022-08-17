@@ -357,17 +357,17 @@ use fang::Queue;
 let queue = Queue::new();
 
 queue
-     .push_periodic_task(&SyncMyTask::default(), 120)
+     .push_periodic_task(&SyncMyTask::default(), 120000)
      .unwrap();
 
 queue
-     .push_periodic_task(&DeliverMyTask::default(), 60)
+     .push_periodic_task(&DeliverMyTask::default(), 60000)
      .unwrap();
 
 Scheduler::start(Duration::from_secs(10), Duration::from_secs(5));
 ```
 
-In the example above, `push_periodic_task` is used to save the specified task to the `fang_periodic_tasks` table which will be enqueued (saved to `fang_tasks` table) every specied number of seconds.
+In the example above, `push_periodic_task` is used to save the specified task to the `fang_periodic_tasks` table which will be enqueued (saved to `fang_tasks` table) every specied number of milliseconds.
 
 `Scheduler::start(Duration::from_secs(10), Duration::from_secs(5))` starts scheduler. It accepts two parameters:
 - Db check period
@@ -388,7 +388,7 @@ let schedule_in_future = Utc::now() + OtherDuration::seconds(5);
 let _periodic_task = queue.insert_periodic_task(
     &AsyncTask { number: 1 },
     schedule_in_future,
-    10,
+    10000,  // period in milliseconds
 )
 .await;
 
