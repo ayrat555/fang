@@ -31,7 +31,7 @@ pub struct Task {
 pub struct PeriodicTask {
     pub id: Uuid,
     pub metadata: serde_json::Value,
-    pub period_in_millis: i32,
+    pub period_in_millis: i64,
     pub scheduled_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -48,7 +48,7 @@ pub struct NewTask {
 #[table_name = "fang_periodic_tasks"]
 pub struct NewPeriodicTask {
     pub metadata: serde_json::Value,
-    pub period_in_millis: i32,
+    pub period_in_millis: i64,
 }
 
 pub struct Queue {
@@ -100,7 +100,7 @@ impl Queue {
     pub fn push_periodic_task(
         &self,
         task: &dyn Runnable,
-        period: i32,
+        period: i64,
     ) -> Result<PeriodicTask, Error> {
         Self::push_periodic_task_query(&self.connection, task, period)
     }
@@ -108,7 +108,7 @@ impl Queue {
     pub fn push_periodic_task_query(
         connection: &PgConnection,
         task: &dyn Runnable,
-        period: i32,
+        period: i64,
     ) -> Result<PeriodicTask, Error> {
         let json_task = serde_json::to_value(task).unwrap();
 
@@ -227,7 +227,7 @@ impl Queue {
 
     pub fn schedule_next_task_execution(&self, task: &PeriodicTask) -> Result<PeriodicTask, Error> {
         let current_time = Self::current_time();
-        let scheduled_at = current_time + Duration::milliseconds(task.period_in_millis.into());
+        let scheduled_at = current_time + Duration::milliseconds(task.period_in_millis);
 
         diesel::update(task)
             .set((
@@ -564,9 +564,9 @@ mod queue_tests {
 
         queue.connection.test_transaction::<(), Error, _>(|| {
             let task = PepeTask { number: 10 };
-            let task = queue.push_periodic_task(&task, 60).unwrap();
+            let task = queue.push_periodic_task(&task, 60_i64).unwrap();
 
-            assert_eq!(task.period_in_millis, 60);
+            assert_eq!(task.period_in_millis, 60_i64);
             assert!(queue.find_periodic_task_by_id(task.id).is_some());
 
             Ok(())
@@ -850,7 +850,7 @@ mod queue_tests {
     fn insert_periodic_task(
         metadata: serde_json::Value,
         timestamp: DateTime<Utc>,
-        period_in_millis: i32,
+        period_in_millis: i64,
         connection: &PgConnection,
     ) -> PeriodicTask {
         diesel::insert_into(fang_periodic_tasks::table)

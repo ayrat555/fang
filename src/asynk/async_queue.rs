@@ -83,7 +83,7 @@ pub struct PeriodicTask {
     #[builder(setter(into))]
     pub metadata: serde_json::Value,
     #[builder(setter(into))]
-    pub period_in_millis: i32,
+    pub period_in_millis: i64,
     #[builder(setter(into))]
     pub scheduled_at: Option<DateTime<Utc>>,
     #[builder(setter(into))]
@@ -151,7 +151,7 @@ pub trait AsyncQueueable: Send {
         &mut self,
         task: &dyn AsyncRunnable,
         timestamp: DateTime<Utc>,
-        period: i32,
+        period: i64,
     ) -> Result<PeriodicTask, AsyncQueueError>;
 
     async fn schedule_next_task(
@@ -261,7 +261,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         &mut self,
         task: &dyn AsyncRunnable,
         timestamp: DateTime<Utc>,
-        period: i32,
+        period: i64,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
@@ -474,8 +474,7 @@ where
         periodic_task: PeriodicTask,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         let updated_at = Utc::now();
-        let scheduled_at =
-            updated_at + Duration::milliseconds(periodic_task.period_in_millis.into());
+        let scheduled_at = updated_at + Duration::milliseconds(periodic_task.period_in_millis);
 
         let row: Row = transaction
             .query_one(SCHEDULE_NEXT_TASK_QUERY, &[&scheduled_at, &updated_at])
@@ -489,7 +488,7 @@ where
         transaction: &mut Transaction<'_>,
         metadata: serde_json::Value,
         timestamp: DateTime<Utc>,
-        period: i32,
+        period: i64,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         let row: Row = transaction
             .query_one(
@@ -577,7 +576,7 @@ where
     fn row_to_periodic_task(row: Row) -> PeriodicTask {
         let id: Uuid = row.get("id");
         let metadata: serde_json::Value = row.get("metadata");
-        let period_in_millis: i32 = row.get("period_in_millis");
+        let period_in_millis: i64 = row.get("period_in_millis");
         let scheduled_at: Option<DateTime<Utc>> = match row.try_get("scheduled_at") {
             Ok(datetime) => Some(datetime),
             Err(_) => None,
@@ -665,7 +664,7 @@ where
         &mut self,
         task: &dyn AsyncRunnable,
         timestamp: DateTime<Utc>,
-        period: i32,
+        period: i64,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         self.check_if_connection()?;
         let mut connection = self.pool.as_ref().unwrap().get().await?;

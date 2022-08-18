@@ -241,7 +241,7 @@ mod async_scheduler_tests {
         test: &mut AsyncQueueTest<'_>,
         task: &dyn AsyncRunnable,
         timestamp: DateTime<Utc>,
-        period_in_millis: i32,
+        period_in_millis: i64,
     ) -> PeriodicTask {
         test.insert_periodic_task(task, timestamp, period_in_millis)
             .await
