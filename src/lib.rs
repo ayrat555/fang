@@ -1,4 +1,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
+
+use std::time::Duration;
+
 #[derive(Clone, Debug)]
 pub enum RetentionMode {
     KeepAll,
@@ -12,11 +15,12 @@ impl Default for RetentionMode {
 }
 #[derive(Clone, Debug)]
 pub struct SleepParams {
-    pub sleep_period: u64,
-    pub max_sleep_period: u64,
-    pub min_sleep_period: u64,
-    pub sleep_step: u64,
+    pub sleep_period: Duration,
+    pub max_sleep_period: Duration,
+    pub min_sleep_period: Duration,
+    pub sleep_step: Duration,
 }
+
 impl SleepParams {
     pub fn maybe_reset_sleep_period(&mut self) {
         if self.sleep_period != self.min_sleep_period {
@@ -30,13 +34,14 @@ impl SleepParams {
         }
     }
 }
+
 impl Default for SleepParams {
     fn default() -> Self {
         SleepParams {
-            sleep_period: 5,
-            max_sleep_period: 15,
-            min_sleep_period: 5,
-            sleep_step: 5,
+            sleep_period: Duration::from_secs(5),
+            max_sleep_period: Duration::from_secs(15),
+            min_sleep_period: Duration::from_secs(5),
+            sleep_step: Duration::from_secs(5),
         }
     }
 }

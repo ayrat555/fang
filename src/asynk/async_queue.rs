@@ -12,6 +12,7 @@ use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 use postgres_types::{FromSql, ToSql};
+use std::time::Duration as StdDuration;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -82,7 +83,7 @@ pub struct PeriodicTask {
     #[builder(setter(into))]
     pub metadata: serde_json::Value,
     #[builder(setter(into))]
-    pub period_in_seconds: i32,
+    pub period_in_millis: i64,
     #[builder(setter(into))]
     pub scheduled_at: Option<DateTime<Utc>>,
     #[builder(setter(into))]
@@ -105,6 +106,8 @@ pub enum AsyncQueueError {
         "AsyncQueue is not connected :( , call connect() method first and then perform operations"
     )]
     NotConnectedError,
+    #[error("Can not convert `std::time::Duration` to `chrono::Duration`")]
+    TimeError,
 }
 
 impl From<AsyncQueueError> for FangError {
@@ -141,14 +144,14 @@ pub trait AsyncQueueable: Send {
 
     async fn fetch_periodic_tasks(
         &mut self,
-        error_margin_seconds: i64,
+        error_margin: StdDuration,
     ) -> Result<Option<Vec<PeriodicTask>>, AsyncQueueError>;
 
     async fn insert_periodic_task(
         &mut self,
         task: &dyn AsyncRunnable,
         timestamp: DateTime<Utc>,
-        period: i32,
+        period: i64,
     ) -> Result<PeriodicTask, AsyncQueueError>;
 
     async fn schedule_next_task(
@@ -258,7 +261,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         &mut self,
         task: &dyn AsyncRunnable,
         timestamp: DateTime<Utc>,
-        period: i32,
+        period: i64,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
@@ -277,13 +280,12 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
 
     async fn fetch_periodic_tasks(
         &mut self,
-        error_margin_seconds: i64,
+        error_margin: StdDuration,
     ) -> Result<Option<Vec<PeriodicTask>>, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
         let periodic_task =
-            AsyncQueue::<NoTls>::fetch_periodic_tasks_query(transaction, error_margin_seconds)
-                .await?;
+            AsyncQueue::<NoTls>::fetch_periodic_tasks_query(transaction, error_margin).await?;
 
         Ok(periodic_task)
     }
@@ -472,7 +474,7 @@ where
         periodic_task: PeriodicTask,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         let updated_at = Utc::now();
-        let scheduled_at = updated_at + Duration::seconds(periodic_task.period_in_seconds.into());
+        let scheduled_at = updated_at + Duration::milliseconds(periodic_task.period_in_millis);
 
         let row: Row = transaction
             .query_one(SCHEDULE_NEXT_TASK_QUERY, &[&scheduled_at, &updated_at])
@@ -486,7 +488,7 @@ where
         transaction: &mut Transaction<'_>,
         metadata: serde_json::Value,
         timestamp: DateTime<Utc>,
-        period: i32,
+        period: i64,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         let row: Row = transaction
             .query_one(
@@ -500,12 +502,17 @@ where
 
     async fn fetch_periodic_tasks_query(
         transaction: &mut Transaction<'_>,
-        error_margin_seconds: i64,
+        error_margin: StdDuration,
     ) -> Result<Option<Vec<PeriodicTask>>, AsyncQueueError> {
         let current_time = Utc::now();
 
-        let low_limit = current_time - Duration::seconds(error_margin_seconds);
-        let high_limit = current_time + Duration::seconds(error_margin_seconds);
+        let margin: Duration = match Duration::from_std(error_margin) {
+            Ok(value) => Ok(value),
+            Err(_) => Err(AsyncQueueError::TimeError),
+        }?;
+
+        let low_limit = current_time - margin;
+        let high_limit = current_time + margin;
         let rows: Vec<Row> = transaction
             .query(FETCH_PERIODIC_TASKS_QUERY, &[&low_limit, &high_limit])
             .await?;
@@ -569,7 +576,7 @@ where
     fn row_to_periodic_task(row: Row) -> PeriodicTask {
         let id: Uuid = row.get("id");
         let metadata: serde_json::Value = row.get("metadata");
-        let period_in_seconds: i32 = row.get("period_in_seconds");
+        let period_in_millis: i64 = row.get("period_in_millis");
         let scheduled_at: Option<DateTime<Utc>> = match row.try_get("scheduled_at") {
             Ok(datetime) => Some(datetime),
             Err(_) => None,
@@ -580,7 +587,7 @@ where
         PeriodicTask::builder()
             .id(id)
             .metadata(metadata)
-            .period_in_seconds(period_in_seconds)
+            .period_in_millis(period_in_millis)
             .scheduled_at(scheduled_at)
             .created_at(created_at)
             .updated_at(updated_at)
@@ -657,7 +664,7 @@ where
         &mut self,
         task: &dyn AsyncRunnable,
         timestamp: DateTime<Utc>,
-        period: i32,
+        period: i64,
     ) -> Result<PeriodicTask, AsyncQueueError> {
         self.check_if_connection()?;
         let mut connection = self.pool.as_ref().unwrap().get().await?;
@@ -690,14 +697,14 @@ where
 
     async fn fetch_periodic_tasks(
         &mut self,
-        error_margin_seconds: i64,
+        error_margin: StdDuration,
     ) -> Result<Option<Vec<PeriodicTask>>, AsyncQueueError> {
         self.check_if_connection()?;
         let mut connection = self.pool.as_ref().unwrap().get().await?;
         let mut transaction = connection.transaction().await?;
 
         let periodic_task =
-            Self::fetch_periodic_tasks_query(&mut transaction, error_margin_seconds).await?;
+            Self::fetch_periodic_tasks_query(&mut transaction, error_margin).await?;
 
         transaction.commit().await?;
 

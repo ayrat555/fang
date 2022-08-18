@@ -11,6 +11,7 @@ use diesel::r2d2;
 use diesel::result::Error;
 use dotenv::dotenv;
 use std::env;
+use std::time::Duration as StdDuration;
 use uuid::Uuid;
 
 #[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone)]
@@ -30,7 +31,7 @@ pub struct Task {
 pub struct PeriodicTask {
     pub id: Uuid,
     pub metadata: serde_json::Value,
-    pub period_in_seconds: i32,
+    pub period_in_millis: i64,
     pub scheduled_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -47,7 +48,7 @@ pub struct NewTask {
 #[table_name = "fang_periodic_tasks"]
 pub struct NewPeriodicTask {
     pub metadata: serde_json::Value,
-    pub period_in_seconds: i32,
+    pub period_in_millis: i64,
 }
 
 pub struct Queue {
@@ -99,7 +100,7 @@ impl Queue {
     pub fn push_periodic_task(
         &self,
         task: &dyn Runnable,
-        period: i32,
+        period: i64,
     ) -> Result<PeriodicTask, Error> {
         Self::push_periodic_task_query(&self.connection, task, period)
     }
@@ -107,7 +108,7 @@ impl Queue {
     pub fn push_periodic_task_query(
         connection: &PgConnection,
         task: &dyn Runnable,
-        period: i32,
+        period: i64,
     ) -> Result<PeriodicTask, Error> {
         let json_task = serde_json::to_value(task).unwrap();
 
@@ -116,7 +117,7 @@ impl Queue {
             None => {
                 let new_task = NewPeriodicTask {
                     metadata: json_task,
-                    period_in_seconds: period,
+                    period_in_millis: period,
                 };
 
                 diesel::insert_into(fang_periodic_tasks::table)
@@ -198,18 +199,20 @@ impl Queue {
             .ok()
     }
 
-    pub fn fetch_periodic_tasks(&self, error_margin_seconds: i64) -> Option<Vec<PeriodicTask>> {
-        Self::fetch_periodic_tasks_query(&self.connection, error_margin_seconds)
+    pub fn fetch_periodic_tasks(&self, error_margin: StdDuration) -> Option<Vec<PeriodicTask>> {
+        Self::fetch_periodic_tasks_query(&self.connection, error_margin)
     }
 
     pub fn fetch_periodic_tasks_query(
         connection: &PgConnection,
-        error_margin_seconds: i64,
+        error_margin: StdDuration,
     ) -> Option<Vec<PeriodicTask>> {
         let current_time = Self::current_time();
 
-        let low_limit = current_time - Duration::seconds(error_margin_seconds);
-        let high_limit = current_time + Duration::seconds(error_margin_seconds);
+        let margin = Duration::from_std(error_margin).unwrap();
+
+        let low_limit = current_time - margin;
+        let high_limit = current_time + margin;
 
         fang_periodic_tasks::table
             .filter(
@@ -224,7 +227,7 @@ impl Queue {
 
     pub fn schedule_next_task_execution(&self, task: &PeriodicTask) -> Result<PeriodicTask, Error> {
         let current_time = Self::current_time();
-        let scheduled_at = current_time + Duration::seconds(task.period_in_seconds.into());
+        let scheduled_at = current_time + Duration::milliseconds(task.period_in_millis);
 
         diesel::update(task)
             .set((
@@ -415,6 +418,7 @@ mod queue_tests {
     use diesel::prelude::*;
     use diesel::result::Error;
     use serde::{Deserialize, Serialize};
+    use std::time::Duration as StdDuration;
 
     #[test]
     fn insert_inserts_task() {
@@ -560,9 +564,9 @@ mod queue_tests {
 
         queue.connection.test_transaction::<(), Error, _>(|| {
             let task = PepeTask { number: 10 };
-            let task = queue.push_periodic_task(&task, 60).unwrap();
+            let task = queue.push_periodic_task(&task, 60_i64).unwrap();
 
-            assert_eq!(task.period_in_seconds, 60);
+            assert_eq!(task.period_in_millis, 60_i64);
             assert!(queue.find_periodic_task_by_id(task.id).is_some());
 
             Ok(())
@@ -602,7 +606,9 @@ mod queue_tests {
                 &queue.connection,
             );
 
-            let tasks = queue.fetch_periodic_tasks(100).unwrap();
+            let tasks = queue
+                .fetch_periodic_tasks(StdDuration::from_secs(100))
+                .unwrap();
 
             assert_eq!(tasks.len(), 1);
             assert_eq!(tasks[0].id, task.id);
@@ -616,13 +622,17 @@ mod queue_tests {
         let queue = Queue::new();
 
         queue.connection.test_transaction::<(), Error, _>(|| {
-            let task =
-                insert_periodic_task(serde_json::json!(true), Utc::now(), 100, &queue.connection);
+            let task = insert_periodic_task(
+                serde_json::json!(true),
+                Utc::now(),
+                100000,
+                &queue.connection,
+            );
 
             let updated_task = queue.schedule_next_task_execution(&task).unwrap();
 
             let next_schedule = (task.scheduled_at.unwrap()
-                + Duration::seconds(task.period_in_seconds.into()))
+                + Duration::milliseconds(task.period_in_millis))
             .round_subsecs(0);
 
             assert_eq!(
@@ -685,7 +695,9 @@ mod queue_tests {
             let task =
                 insert_periodic_task(serde_json::json!(true), Utc::now(), 100, &queue.connection);
 
-            let tasks = queue.fetch_periodic_tasks(100).unwrap();
+            let tasks = queue
+                .fetch_periodic_tasks(StdDuration::from_secs(100))
+                .unwrap();
 
             assert_eq!(tasks.len(), 1);
             assert_eq!(tasks[0].id, task.id);
@@ -838,14 +850,14 @@ mod queue_tests {
     fn insert_periodic_task(
         metadata: serde_json::Value,
         timestamp: DateTime<Utc>,
-        period_in_seconds: i32,
+        period_in_millis: i64,
         connection: &PgConnection,
     ) -> PeriodicTask {
         diesel::insert_into(fang_periodic_tasks::table)
             .values(&vec![(
                 fang_periodic_tasks::metadata.eq(metadata),
                 fang_periodic_tasks::scheduled_at.eq(timestamp),
-                fang_periodic_tasks::period_in_seconds.eq(period_in_seconds),
+                fang_periodic_tasks::period_in_millis.eq(period_in_millis),
             )])
             .get_result::<PeriodicTask>(connection)
             .unwrap()

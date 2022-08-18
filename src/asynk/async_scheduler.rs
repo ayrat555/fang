@@ -15,9 +15,9 @@ where
     AQueue: AsyncQueueable + Clone + Sync + 'static,
 {
     #[builder(setter(into))]
-    pub check_period: u64,
+    pub check_period: Duration,
     #[builder(setter(into))]
-    pub error_margin_seconds: u64,
+    pub error_margin: Duration,
     #[builder(setter(into))]
     pub queue: AQueue,
     #[builder(default = 0, setter(into))]
@@ -66,7 +66,7 @@ where
     pub async fn schedule_loop(&mut self) -> JoinHandle<Result<(), Error>> {
         let mut scheduler = self.clone();
         tokio::spawn(async move {
-            let sleep_duration = Duration::from_secs(scheduler.check_period);
+            let sleep_duration = scheduler.check_period;
 
             loop {
                 scheduler.schedule().await?;
@@ -77,11 +77,7 @@ where
     }
 
     pub async fn schedule(&mut self) -> Result<(), Error> {
-        if let Some(tasks) = self
-            .queue
-            .fetch_periodic_tasks(self.error_margin_seconds as i64)
-            .await?
-        {
+        if let Some(tasks) = self.queue.fetch_periodic_tasks(self.error_margin).await? {
             for task in tasks {
                 self.process_task(task).await?;
             }
@@ -111,9 +107,9 @@ where
 #[derive(TypedBuilder)]
 pub struct SchedulerTest<'a> {
     #[builder(setter(into))]
-    pub check_period: u64,
+    pub check_period: Duration,
     #[builder(setter(into))]
-    pub error_margin_seconds: u64,
+    pub error_margin: Duration,
     #[builder(setter(into))]
     pub queue: &'a mut dyn AsyncQueueable,
     #[builder(default = 0, setter(into))]
@@ -123,14 +119,10 @@ pub struct SchedulerTest<'a> {
 #[cfg(test)]
 impl<'a> SchedulerTest<'a> {
     async fn schedule_test(&mut self) -> Result<(), Error> {
-        let sleep_duration = Duration::from_secs(self.check_period);
+        let sleep_duration = self.check_period;
 
         loop {
-            match self
-                .queue
-                .fetch_periodic_tasks(self.error_margin_seconds as i64)
-                .await?
-            {
+            match self.queue.fetch_periodic_tasks(self.error_margin).await? {
                 Some(tasks) => {
                     for task in tasks {
                         self.process_task(task).await?;
@@ -179,6 +171,7 @@ mod async_scheduler_tests {
     use chrono::Duration as OtherDuration;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
+    use std::time::Duration;
 
     #[derive(Serialize, Deserialize)]
     struct AsyncScheduledTask {
@@ -210,7 +203,7 @@ mod async_scheduler_tests {
             &mut test,
             &AsyncScheduledTask { number: 1 },
             schedule_in_future,
-            10,
+            10000,
         )
         .await;
 
@@ -218,8 +211,8 @@ mod async_scheduler_tests {
         let error_margin_seconds: u64 = 2;
 
         let mut scheduler = SchedulerTest::builder()
-            .check_period(check_period)
-            .error_margin_seconds(error_margin_seconds)
+            .check_period(Duration::from_secs(check_period))
+            .error_margin(Duration::from_secs(error_margin_seconds))
             .queue(&mut test as &mut dyn AsyncQueueable)
             .build();
         // Scheduler start tricky not loop :)
@@ -248,9 +241,9 @@ mod async_scheduler_tests {
         test: &mut AsyncQueueTest<'_>,
         task: &dyn AsyncRunnable,
         timestamp: DateTime<Utc>,
-        period_in_seconds: i32,
+        period_in_millis: i64,
     ) -> PeriodicTask {
-        test.insert_periodic_task(task, timestamp, period_in_seconds)
+        test.insert_periodic_task(task, timestamp, period_in_millis)
             .await
             .unwrap()
     }

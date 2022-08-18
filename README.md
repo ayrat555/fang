@@ -315,10 +315,10 @@ You can use use `SleepParams` to confugure sleep values:
 
 ```rust
 pub struct SleepParams {
-    pub sleep_period: u64,     \\ default value is 5
-    pub max_sleep_period: u64, \\ default value is 15
-    pub min_sleep_period: u64, \\ default value is 5
-    pub sleep_step: u64,       \\ default value is 5
+    pub sleep_period: Duration,     \\ default value is 5 seconds
+    pub max_sleep_period: Duration, \\ default value is 15 seconds
+    pub min_sleep_period: Duration, \\ default value is 5 seconds
+    pub sleep_step: Duration,       \\ default value is 5 seconds
 }
 ```
 
@@ -328,10 +328,10 @@ If there are no tasks in the DB, a worker sleeps for `sleep_period` and each tim
 Use `set_sleep_params` to set it:
 ```rust
 let sleep_params = SleepParams {
-    sleep_period: 2,
-    max_sleep_period: 6,
-    min_sleep_period: 2,
-    sleep_step: 1,
+    sleep_period: Duration::from_secs(2),
+    max_sleep_period: Duration::from_secs(6),
+    min_sleep_period: Duration::from_secs(2),
+    sleep_step: Duration::from_secs(1),
 };
 let mut worker_params = WorkerParams::new();
 worker_params.set_sleep_params(sleep_params);
@@ -357,27 +357,29 @@ use fang::Queue;
 let queue = Queue::new();
 
 queue
-     .push_periodic_task(&SyncMyTask::default(), 120)
+     .push_periodic_task(&SyncMyTask::default(), 120000)
      .unwrap();
 
 queue
-     .push_periodic_task(&DeliverMyTask::default(), 60)
+     .push_periodic_task(&DeliverMyTask::default(), 60000)
      .unwrap();
 
-Scheduler::start(10, 5);
+Scheduler::start(Duration::from_secs(10), Duration::from_secs(5));
 ```
 
-In the example above, `push_periodic_task` is used to save the specified task to the `fang_periodic_tasks` table which will be enqueued (saved to `fang_tasks` table) every specied number of seconds.
+In the example above, `push_periodic_task` is used to save the specified task to the `fang_periodic_tasks` table which will be enqueued (saved to `fang_tasks` table) every specied number of milliseconds.
 
-`Scheduler::start(10, 5)` starts scheduler. It accepts two parameters:
-- Db check period in seconds
-- Acceptable error limit in seconds - |current_time - scheduled_time| < error
+`Scheduler::start(Duration::from_secs(10), Duration::from_secs(5))` starts scheduler. It accepts two parameters:
+- Db check period
+- Acceptable error limit - |current_time - scheduled_time| < error
 
 #### Asynk feature
 ```rust
 use fang::asynk::async_scheduler::Scheduler;
 use fang::asynk::async_queue::AsyncQueueable;
 use fang::asynk::async_queue::AsyncQueue;
+use std::time::Duration; 
+use chrono::Duration as OtherDuration;
 
 // Build a AsyncQueue as before
 
@@ -386,7 +388,7 @@ let schedule_in_future = Utc::now() + OtherDuration::seconds(5);
 let _periodic_task = queue.insert_periodic_task(
     &AsyncTask { number: 1 },
     schedule_in_future,
-    10,
+    10000,  // period in milliseconds
 )
 .await;
 
@@ -394,8 +396,8 @@ let check_period: u64 = 1;
 let error_margin_seconds: u64 = 2;
 
 let mut scheduler = Scheduler::builder()
-    .check_period(check_period)
-    .error_margin_seconds(error_margin_seconds)
+    .check_period(Duration::from_secs(check_period))
+    .error_margin_seconds(Duration::from_secs(error_margin_seconds))
     .queue(&mut queue as &mut dyn AsyncQueueable)
     .build();
 
