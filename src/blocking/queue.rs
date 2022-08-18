@@ -632,7 +632,7 @@ mod queue_tests {
             let updated_task = queue.schedule_next_task_execution(&task).unwrap();
 
             let next_schedule = (task.scheduled_at.unwrap()
-                + Duration::milliseconds(task.period_in_millis.into()))
+                + Duration::milliseconds(task.period_in_millis))
             .round_subsecs(0);
 
             assert_eq!(
