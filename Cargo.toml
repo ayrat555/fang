@@ -1,6 +1,6 @@
 [package]
 name = "fang"
-version = "0.7.2"
+version = "0.8.0"
 authors = ["Ayrat Badykov <ayratin555@gmail.com>" , "Pepe Márquez <pepe.marquezromero@gmail.com>"]
 description = "Background job processing library for Rust"
 repository = "https://github.com/ayrat555/fang"

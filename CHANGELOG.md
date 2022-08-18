@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0 (2022-08-18)
+
+- Use Duration in SleepParams and schedulers - [#67](https://github.com/ayrat555/fang/pull/67)
+
 ## 0.7.2 (2022-08-16)
 
 - Set task_type when starting a worker pool - [#66](https://github.com/ayrat555/fang/pull/66)

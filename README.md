@@ -18,18 +18,18 @@ Background task processing library for Rust. It uses Postgres DB as a task queue
 #### Blocking feature
 ```toml
 [dependencies]
-fang = { version = "0.7" , features = ["blocking"], default-features = false }
+fang = { version = "0.8" , features = ["blocking"], default-features = false }
 ```
 
 #### Asynk feature
 ```toml
 [dependencies]
-fang = { version = "0.7" , features = ["asynk"], default-features = false }
+fang = { version = "0.8" , features = ["asynk"], default-features = false }
 ```
 
 #### Both features
 ```toml
-fang = { version = "0.7" }
+fang = { version = "0.8" }
 ```
 
 *Supports rustc 1.62+*
@@ -378,7 +378,7 @@ In the example above, `push_periodic_task` is used to save the specified task to
 use fang::asynk::async_scheduler::Scheduler;
 use fang::asynk::async_queue::AsyncQueueable;
 use fang::asynk::async_queue::AsyncQueue;
-use std::time::Duration; 
+use std::time::Duration;
 use chrono::Duration as OtherDuration;
 
 // Build a AsyncQueue as before
