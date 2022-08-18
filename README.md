@@ -18,18 +18,18 @@ Background task processing library for Rust. It uses Postgres DB as a task queue
 #### Blocking feature
 ```toml
 [dependencies]
-fang = { version = "0.8" , features = ["blocking"], default-features = false }
+fang = { version = "0.7" , features = ["blocking"], default-features = false }
 ```
 
 #### Asynk feature
 ```toml
 [dependencies]
-fang = { version = "0.8" , features = ["asynk"], default-features = false }
+fang = { version = "0.7" , features = ["asynk"], default-features = false }
 ```
 
 #### Both features
 ```toml
-fang = { version = "0.8" }
+fang = { version = "0.7" }
 ```
 
 *Supports rustc 1.62+*
@@ -224,7 +224,8 @@ Check out:
 
 - [Simple Worker Example](https://github.com/ayrat555/fang/tree/master/fang_examples/simple_worker) - simple worker example
 - [Simple Async Worker Example](https://github.com/ayrat555/fang/tree/master/fang_examples/simple_async_worker) - simple async worker example
-- [El Monitorro](https://github.com/ayrat555/el_monitorro) - telegram feed reader. It uses Fang to synchronize feeds and deliver updates to users.
+- [El Monitorro](https://github.com/ayrat555/el_monitorro) - telegram feed reader. It uses Fang blocking module to synchronize feeds and deliver updates to users.
+- [weather_bot_rust](https://github.com/pxp9/weather_bot_rust) - A bot that provides weather info. It uses Fang asynk module to process updates from Telegram users.
 
 ### Configuration
 
@@ -378,7 +379,7 @@ In the example above, `push_periodic_task` is used to save the specified task to
 use fang::asynk::async_scheduler::Scheduler;
 use fang::asynk::async_queue::AsyncQueueable;
 use fang::asynk::async_queue::AsyncQueue;
-use std::time::Duration;
+use std::time::Duration; 
 use chrono::Duration as OtherDuration;
 
 // Build a AsyncQueue as before
