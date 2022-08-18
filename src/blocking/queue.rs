@@ -199,21 +199,20 @@ impl Queue {
             .ok()
     }
 
-    pub fn fetch_periodic_tasks(
-        &self,
-        error_margin_seconds: StdDuration,
-    ) -> Option<Vec<PeriodicTask>> {
-        Self::fetch_periodic_tasks_query(&self.connection, error_margin_seconds)
+    pub fn fetch_periodic_tasks(&self, error_margin: StdDuration) -> Option<Vec<PeriodicTask>> {
+        Self::fetch_periodic_tasks_query(&self.connection, error_margin)
     }
 
     pub fn fetch_periodic_tasks_query(
         connection: &PgConnection,
-        error_margin_seconds: StdDuration,
+        error_margin: StdDuration,
     ) -> Option<Vec<PeriodicTask>> {
         let current_time = Self::current_time();
 
-        let low_limit = current_time - Duration::from_std(error_margin_seconds).ok()?;
-        let high_limit = current_time + Duration::from_std(error_margin_seconds).ok()?;
+        let margin = Duration::from_std(error_margin).unwrap();
+
+        let low_limit = current_time - margin;
+        let high_limit = current_time + margin;
 
         fang_periodic_tasks::table
             .filter(

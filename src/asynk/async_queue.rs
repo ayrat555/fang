@@ -100,14 +100,14 @@ pub enum AsyncQueueError {
     PgError(#[from] bb8_postgres::tokio_postgres::Error),
     #[error(transparent)]
     SerdeError(#[from] serde_json::Error),
-    #[error(transparent)]
-    TimeError(#[from] time::OutOfRangeError),
     #[error("returned invalid result (expected {expected:?}, found {found:?})")]
     ResultError { expected: u64, found: u64 },
     #[error(
         "AsyncQueue is not connected :( , call connect() method first and then perform operations"
     )]
     NotConnectedError,
+    #[error("Can not convert `std::time::Duration` to `chrono::Duration`")]
+    TimeError,
 }
 
 impl From<AsyncQueueError> for FangError {
@@ -507,8 +507,13 @@ where
     ) -> Result<Option<Vec<PeriodicTask>>, AsyncQueueError> {
         let current_time = Utc::now();
 
-        let low_limit = current_time - Duration::from_std(error_margin)?;
-        let high_limit = current_time + Duration::from_std(error_margin)?;
+        let margin: Duration = match Duration::from_std(error_margin) {
+            Ok(value) => Ok(value),
+            Err(_) => Err(AsyncQueueError::TimeError),
+        }?;
+
+        let low_limit = current_time - margin;
+        let high_limit = current_time + margin;
         let rows: Vec<Row> = transaction
             .query(FETCH_PERIODIC_TASKS_QUERY, &[&low_limit, &high_limit])
             .await?;
