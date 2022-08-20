@@ -71,21 +71,11 @@ pub struct Task {
     #[builder(setter(into))]
     pub task_type: String,
     #[builder(setter(into))]
-    pub created_at: DateTime<Utc>,
+    pub periodic: bool,
     #[builder(setter(into))]
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(TypedBuilder, Debug, Eq, PartialEq, Clone)]
-pub struct PeriodicTask {
+    pub uniq_hash: String,
     #[builder(setter(into))]
-    pub id: Uuid,
-    #[builder(setter(into))]
-    pub metadata: serde_json::Value,
-    #[builder(setter(into))]
-    pub period_in_millis: i64,
-    #[builder(setter(into))]
-    pub scheduled_at: Option<DateTime<Utc>>,
+    pub scheduled_at: DateTime<Utc>,
     #[builder(setter(into))]
     pub created_at: DateTime<Utc>,
     #[builder(setter(into))]
