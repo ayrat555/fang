@@ -10,7 +10,6 @@ pub struct Error {
 
 pub enum Uniq {
     Metadata,
-    String(String),
     Hash(String),
 }
 
