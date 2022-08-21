@@ -8,11 +8,6 @@ pub struct Error {
     pub description: String,
 }
 
-pub enum Uniq {
-    Metadata,
-    Hash(String),
-}
-
 #[typetag::serde(tag = "type")]
 #[async_trait]
 pub trait AsyncRunnable: Send + Sync {
@@ -22,7 +17,7 @@ pub trait AsyncRunnable: Send + Sync {
         COMMON_TYPE.to_string()
     }
 
-    fn uniq(&self) -> Option<Uniq> {
-        None
+    fn uniq(&self) -> bool {
+        false
     }
 }
