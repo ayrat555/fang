@@ -16,4 +16,8 @@ pub trait AsyncRunnable: Send + Sync {
     fn task_type(&self) -> String {
         COMMON_TYPE.to_string()
     }
+
+    fn uniq(&self) -> bool {
+        false
+    }
 }
