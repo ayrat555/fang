@@ -16,4 +16,12 @@ pub trait AsyncRunnable: Send + Sync {
     fn task_type(&self) -> String {
         COMMON_TYPE.to_string()
     }
+
+    fn uniq(&self) -> bool {
+        false
+    }
+
+    fn period_in_millis(&self) -> i64 {
+        1000_i64
+    }
 }
