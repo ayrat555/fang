@@ -188,19 +188,12 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         let metadata = serde_json::to_value(task)?;
 
         let task: Task = if !task.uniq() {
-            AsyncQueue::<NoTls>::insert_task_query(
-                transaction,
-                metadata,
-                &task.task_type(),
-                task.period_in_millis(),
-            )
-            .await?
+            AsyncQueue::<NoTls>::insert_task_query(transaction, metadata, &task.task_type()).await?
         } else {
             AsyncQueue::<NoTls>::insert_task_if_not_exist_query(
                 transaction,
                 metadata,
                 &task.task_type(),
-                task.period_in_millis(),
             )
             .await?
         };
@@ -379,13 +372,9 @@ where
         transaction: &mut Transaction<'_>,
         metadata: serde_json::Value,
         task_type: &str,
-        period_in_millis: i64,
     ) -> Result<Task, AsyncQueueError> {
         let row: Row = transaction
-            .query_one(
-                INSERT_TASK_QUERY,
-                &[&metadata, &task_type, &period_in_millis],
-            )
+            .query_one(INSERT_TASK_QUERY, &[&metadata, &task_type])
             .await?;
         let task = Self::row_to_task(row);
         Ok(task)
@@ -395,7 +384,6 @@ where
         transaction: &mut Transaction<'_>,
         metadata: serde_json::Value,
         task_type: &str,
-        period_in_millis: i64,
     ) -> Result<Task, AsyncQueueError> {
         let mut hasher = Sha256::new();
 
@@ -406,10 +394,7 @@ where
         let uniq_hash = hex::encode(result);
 
         let row: Row = transaction
-            .query_one(
-                INSERT_TASK_UNIQ_QUERY,
-                &[&metadata, &task_type, &uniq_hash, &period_in_millis],
-            )
+            .query_one(INSERT_TASK_UNIQ_QUERY, &[&metadata, &task_type, &uniq_hash])
             .await?;
 
         let task = Self::row_to_task(row);
@@ -439,14 +424,10 @@ where
         transaction: &mut Transaction<'_>,
         metadata: serde_json::Value,
         task_type: &str,
-        period_in_millis: i64,
     ) -> Result<Task, AsyncQueueError> {
         match Self::find_task_by_uniq_hash_query(transaction, &metadata).await {
             Some(task) => Ok(task),
-            None => {
-                Self::insert_task_uniq_query(transaction, metadata, task_type, period_in_millis)
-                    .await
-            }
+            None => Self::insert_task_uniq_query(transaction, metadata, task_type).await,
         }
     }
 
@@ -489,7 +470,6 @@ where
         let updated_at: DateTime<Utc> = row.get("updated_at");
         let scheduled_at: DateTime<Utc> = row.get("scheduled_at");
         let periodic: bool = row.get("periodic");
-        let period_in_millis: i64 = row.get("period_in_millis");
 
         Task::builder()
             .id(id)
@@ -498,7 +478,6 @@ where
             .state(state)
             .uniq_hash(uniq_hash)
             .periodic(periodic)
-            .period_in_millis(period_in_millis)
             .task_type(task_type)
             .created_at(created_at)
             .updated_at(updated_at)
@@ -538,21 +517,10 @@ where
         let metadata = serde_json::to_value(task)?;
 
         let task: Task = if !task.uniq() {
-            Self::insert_task_query(
-                &mut transaction,
-                metadata,
-                &task.task_type(),
-                task.period_in_millis(),
-            )
-            .await?
+            Self::insert_task_query(&mut transaction, metadata, &task.task_type()).await?
         } else {
-            Self::insert_task_if_not_exist_query(
-                &mut transaction,
-                metadata,
-                &task.task_type(),
-                task.period_in_millis(),
-            )
-            .await?
+            Self::insert_task_if_not_exist_query(&mut transaction, metadata, &task.task_type())
+                .await?
         };
 
         transaction.commit().await?;

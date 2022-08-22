@@ -5,7 +5,6 @@ use crate::asynk::async_queue::DEFAULT_TASK_TYPE;
 use crate::asynk::async_runnable::AsyncRunnable;
 use crate::asynk::AsyncError as Error;
 use crate::{RetentionMode, SleepParams};
-use chrono::Duration;
 use chrono::Utc;
 use core::cmp::Ordering;
 use log::error;
@@ -108,9 +107,8 @@ where
                             self.run(task).await?
                         }
                         Ordering::Greater => {
-                                    // not sure what should i do here, this case is Scheduled task
-                                    // should wait and we need to execute other tasks that are not that
-                            }
+                            // not sure what should i do here, this case is Scheduled task
+                            // should wait and we need to execute other tasks that are not that
                         }
                     }
                 }
@@ -210,8 +208,21 @@ impl<'a> AsyncWorkerTest<'a> {
                 .await
             {
                 Ok(Some(task)) => {
-                    self.sleep_params.maybe_reset_sleep_period();
-                    self.run(task).await?
+                    let result = task.scheduled_at.cmp(&Utc::now());
+                    match result {
+                        Ordering::Less => {
+                            self.sleep_params.maybe_reset_sleep_period();
+                            self.run(task).await?
+                        }
+                        Ordering::Equal => {
+                            self.sleep_params.maybe_reset_sleep_period();
+                            self.run(task).await?
+                        }
+                        Ordering::Greater => {
+                            // not sure what should i do here, this case is Scheduled task
+                            // should wait and we need to execute other tasks that are not that
+                        }
+                    }
                 }
                 Ok(None) => {
                     return Ok(());
