@@ -10,7 +10,6 @@ CREATE TABLE fang_tasks (
      task_type VARCHAR DEFAULT 'common' NOT NULL,
      periodic BOOLEAN DEFAULT FALSE,
      uniq_hash CHAR(64),
-     period_in_millis BIGINT,
      scheduled_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()

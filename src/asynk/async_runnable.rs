@@ -20,8 +20,4 @@ pub trait AsyncRunnable: Send + Sync {
     fn uniq(&self) -> bool {
         false
     }
-
-    fn period_in_millis(&self) -> i64 {
-        1000_i64
-    }
 }

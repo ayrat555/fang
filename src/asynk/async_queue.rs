@@ -71,8 +71,6 @@ pub struct Task {
     #[builder(setter(into))]
     pub uniq_hash: Option<String>,
     #[builder(setter(into))]
-    pub period_in_millis: i64,
-    #[builder(setter(into))]
     pub scheduled_at: DateTime<Utc>,
     #[builder(setter(into))]
     pub created_at: DateTime<Utc>,
