@@ -270,6 +270,7 @@ impl<'a> AsyncWorkerTest<'a> {
 #[cfg(test)]
 mod async_worker_tests {
     use super::AsyncWorkerTest;
+    use crate::async_runnable::Scheduled;
     use crate::asynk::async_queue::AsyncQueueTest;
     use crate::asynk::async_queue::AsyncQueueable;
     use crate::asynk::async_queue::FangTaskState;
@@ -281,6 +282,8 @@ mod async_worker_tests {
     use bb8_postgres::bb8::Pool;
     use bb8_postgres::tokio_postgres::NoTls;
     use bb8_postgres::PostgresConnectionManager;
+    use chrono::Duration;
+    use chrono::Utc;
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]
@@ -295,6 +298,23 @@ mod async_worker_tests {
             Ok(())
         }
     }
+
+    #[derive(Serialize, Deserialize)]
+    struct WorkerAsyncTaskSchedule {
+        pub number: u16,
+    }
+
+    #[typetag::serde]
+    #[async_trait]
+    impl AsyncRunnable for WorkerAsyncTaskSchedule {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+            Ok(())
+        }
+        fn cron(&self) -> Option<Scheduled> {
+            Some(Scheduled::ScheduleOnce(Utc::now() + Duration::seconds(7)))
+        }
+    }
+
     #[derive(Serialize, Deserialize)]
     struct AsyncFailedTask {
         pub number: u16,
@@ -364,6 +384,42 @@ mod async_worker_tests {
         assert_eq!(FangTaskState::Finished, task_finished.state);
         test.transaction.rollback().await.unwrap();
     }
+
+    #[tokio::test]
+    async fn schedule_task_test() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
+
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+
+        let actual_task = WorkerAsyncTaskSchedule { number: 1 };
+
+        let task = test.schedule_task(&actual_task).await.unwrap();
+
+        let id = task.id;
+
+        let mut worker = AsyncWorkerTest::builder()
+            .queue(&mut test as &mut dyn AsyncQueueable)
+            .retention_mode(RetentionMode::KeepAll)
+            .build();
+
+        worker.run_tasks_until_none().await.unwrap();
+
+        let task = worker.queue.find_task_by_id(id).await.unwrap();
+
+        assert_eq!(id, task.id);
+        assert_eq!(FangTaskState::New, task.state);
+
+        tokio::time::sleep(core::time::Duration::from_secs(10)).await;
+
+        worker.run_tasks_until_none().await.unwrap();
+
+        let task = test.find_task_by_id(id).await.unwrap();
+        assert_eq!(id, task.id);
+        assert_eq!(FangTaskState::Finished, task.state);
+    }
+
     #[tokio::test]
     async fn saves_error_for_failed_task() {
         let pool = pool().await;
@@ -427,6 +483,7 @@ mod async_worker_tests {
         assert_eq!(FangTaskState::New, task2.state);
         test.transaction.rollback().await.unwrap();
     }
+
     #[tokio::test]
     async fn remove_when_finished() {
         let pool = pool().await;

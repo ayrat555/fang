@@ -31,8 +31,6 @@ const REMOVE_TASK_QUERY: &str = include_str!("queries/remove_task.sql");
 const REMOVE_TASKS_TYPE_QUERY: &str = include_str!("queries/remove_tasks_type.sql");
 const FETCH_TASK_TYPE_QUERY: &str = include_str!("queries/fetch_task_type.sql");
 const FIND_TASK_BY_UNIQ_HASH_QUERY: &str = include_str!("queries/find_task_by_uniq_hash.sql");
-
-#[cfg(test)]
 const FIND_TASK_BY_ID_QUERY: &str = include_str!("queries/find_task_by_id.sql");
 
 pub const DEFAULT_TASK_TYPE: &str = "common";
@@ -122,6 +120,8 @@ pub trait AsyncQueueable: Send {
 
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError>;
 
+    async fn find_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError>;
+
     async fn update_task_state(
         &mut self,
         task: Task,
@@ -160,21 +160,15 @@ pub struct AsyncQueueTest<'a> {
 }
 
 #[cfg(test)]
-impl<'a> AsyncQueueTest<'a> {
-    pub async fn find_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError> {
-        let row: Row = self
-            .transaction
-            .query_one(FIND_TASK_BY_ID_QUERY, &[&id])
-            .await?;
-
-        let task = AsyncQueue::<NoTls>::row_to_task(row);
-        Ok(task)
-    }
-}
-
-#[cfg(test)]
 #[async_trait]
 impl AsyncQueueable for AsyncQueueTest<'_> {
+    async fn find_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError> {
+        let transaction = &mut self.transaction;
+
+        let task = AsyncQueue::<NoTls>::find_task_by_id_query(transaction, id).await?;
+        Ok(task)
+    }
+
     async fn fetch_and_touch_task(
         &mut self,
         task_type: Option<String>,
@@ -345,6 +339,16 @@ where
         Self::execute_query(transaction, REMOVE_TASKS_TYPE_QUERY, &[&task_type], None).await
     }
 
+    async fn find_task_by_id_query(
+        transaction: &mut Transaction<'_>,
+        id: Uuid,
+    ) -> Result<Task, AsyncQueueError> {
+        let row: Row = transaction.query_one(FIND_TASK_BY_ID_QUERY, &[&id]).await?;
+
+        let task = AsyncQueue::<NoTls>::row_to_task(row);
+        Ok(task)
+    }
+
     async fn fail_task_query(
         transaction: &mut Transaction<'_>,
         task: Task,
@@ -396,7 +400,7 @@ where
         task_type: &str,
     ) -> Result<Task, AsyncQueueError> {
         let row: Row = transaction
-            .query_one(FETCH_TASK_TYPE_QUERY, &[&task_type])
+            .query_one(FETCH_TASK_TYPE_QUERY, &[&task_type, &Utc::now()])
             .await?;
 
         let task = Self::row_to_task(row);
@@ -550,6 +554,17 @@ where
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
+    async fn find_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError> {
+        let mut connection = self.pool.as_ref().unwrap().get().await?;
+        let mut transaction = connection.transaction().await?;
+
+        let task = Self::find_task_by_id_query(&mut transaction, id).await?;
+
+        transaction.commit().await?;
+
+        Ok(task)
+    }
+
     async fn fetch_and_touch_task(
         &mut self,
         task_type: Option<String>,
@@ -699,12 +714,15 @@ mod async_queue_tests {
     use super::AsyncQueueable;
     use super::FangTaskState;
     use super::Task;
+    use crate::async_runnable::Scheduled;
     use crate::asynk::AsyncError as Error;
     use crate::asynk::AsyncRunnable;
     use async_trait::async_trait;
     use bb8_postgres::bb8::Pool;
     use bb8_postgres::tokio_postgres::NoTls;
     use bb8_postgres::PostgresConnectionManager;
+    use chrono::Duration;
+    use chrono::Utc;
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]
@@ -717,6 +735,23 @@ mod async_queue_tests {
     impl AsyncRunnable for AsyncTask {
         async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
             Ok(())
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct AsyncTaskSchedule {
+        pub number: u16,
+    }
+
+    #[typetag::serde]
+    #[async_trait]
+    impl AsyncRunnable for AsyncTaskSchedule {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+            Ok(())
+        }
+
+        fn cron(&self) -> Option<Scheduled> {
+            Some(Scheduled::ScheduleOnce(Utc::now() + Duration::seconds(7)))
         }
     }
 
@@ -825,6 +860,27 @@ mod async_queue_tests {
         assert_eq!(2, result);
 
         test.transaction.rollback().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn schedule_task_test() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
+
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+
+        let task = test
+            .schedule_task(&AsyncTaskSchedule { number: 1 })
+            .await
+            .unwrap();
+
+        let metadata = task.metadata.as_object().unwrap();
+        let number = metadata["number"].as_u64();
+        let type_task = metadata["type"].as_str();
+
+        assert_eq!(Some(1), number);
+        assert_eq!(Some("AsyncTaskSchedule"), type_task);
     }
 
     #[tokio::test]
