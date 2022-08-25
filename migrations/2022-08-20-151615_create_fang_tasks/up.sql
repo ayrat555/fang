@@ -8,12 +8,13 @@ CREATE TABLE fang_tasks (
      error_message TEXT,
      state fang_task_state DEFAULT 'new' NOT NULL,
      task_type VARCHAR DEFAULT 'common' NOT NULL,
-     periodic BOOLEAN DEFAULT FALSE,
      uniq_hash CHAR(64),
+     scheduled_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX fang_tasks_state_index ON fang_tasks(state);
 CREATE INDEX fang_tasks_type_index ON fang_tasks(task_type);
+CREATE INDEX fang_tasks_scheduled_at_index ON fang_tasks(scheduled_at);
 CREATE INDEX fang_tasks_uniq_hash ON fang_tasks(uniq_hash);

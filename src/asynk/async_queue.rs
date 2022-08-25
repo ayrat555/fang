@@ -1,3 +1,4 @@
+use crate::async_runnable::Scheduled::*;
 use crate::asynk::async_runnable::AsyncRunnable;
 use crate::asynk::async_runnable::Error as FangError;
 use async_trait::async_trait;
@@ -10,8 +11,10 @@ use bb8_postgres::tokio_postgres::Transaction;
 use bb8_postgres::PostgresConnectionManager;
 use chrono::DateTime;
 use chrono::Utc;
+use cron::Schedule;
 use postgres_types::{FromSql, ToSql};
 use sha2::{Digest, Sha256};
+use std::str::FromStr;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -66,10 +69,9 @@ pub struct Task {
     #[builder(setter(into))]
     pub task_type: String,
     #[builder(setter(into))]
-    // maybe this attribute can be a cron pattern
-    pub periodic: bool,
-    #[builder(setter(into))]
     pub uniq_hash: Option<String>,
+    #[builder(setter(into))]
+    pub scheduled_at: DateTime<Utc>,
     #[builder(setter(into))]
     pub created_at: DateTime<Utc>,
     #[builder(setter(into))]
@@ -92,6 +94,8 @@ pub enum AsyncQueueError {
     NotConnectedError,
     #[error("Can not convert `std::time::Duration` to `chrono::Duration`")]
     TimeError,
+    #[error("You have to implement method `cron()` in your AsyncRunnable")]
+    TaskNotSchedulableError,
 }
 
 impl From<AsyncQueueError> for FangError {
@@ -126,6 +130,8 @@ pub trait AsyncQueueable: Send {
 
     async fn fail_task(&mut self, task: Task, error_message: &str)
         -> Result<Task, AsyncQueueError>;
+
+    async fn schedule_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
 }
 
 #[derive(TypedBuilder, Debug, Clone)]
@@ -186,18 +192,64 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         let metadata = serde_json::to_value(task)?;
 
         let task: Task = if !task.uniq() {
-            AsyncQueue::<NoTls>::insert_task_query(transaction, metadata, &task.task_type()).await?
+            AsyncQueue::<NoTls>::insert_task_query(
+                transaction,
+                metadata,
+                &task.task_type(),
+                Utc::now(),
+            )
+            .await?
         } else {
             AsyncQueue::<NoTls>::insert_task_if_not_exist_query(
                 transaction,
                 metadata,
                 &task.task_type(),
+                Utc::now(),
             )
             .await?
         };
         Ok(task)
     }
 
+    async fn schedule_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
+        let transaction = &mut self.transaction;
+
+        let metadata = serde_json::to_value(task)?;
+
+        let scheduled_at = match task.cron() {
+            Some(scheduled) => match scheduled {
+                CronPattern(cron_pattern) => {
+                    let schedule = Schedule::from_str(&cron_pattern).unwrap();
+                    let mut iterator = schedule.upcoming(Utc);
+                    iterator.next().unwrap()
+                }
+                ScheduleOnce(datetime) => datetime,
+            },
+            None => {
+                return Err(AsyncQueueError::TaskNotSchedulableError);
+            }
+        };
+
+        let task: Task = if !task.uniq() {
+            AsyncQueue::<NoTls>::insert_task_query(
+                transaction,
+                metadata,
+                &task.task_type(),
+                scheduled_at,
+            )
+            .await?
+        } else {
+            AsyncQueue::<NoTls>::insert_task_if_not_exist_query(
+                transaction,
+                metadata,
+                &task.task_type(),
+                scheduled_at,
+            )
+            .await?
+        };
+
+        Ok(task)
+    }
     async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
@@ -370,9 +422,10 @@ where
         transaction: &mut Transaction<'_>,
         metadata: serde_json::Value,
         task_type: &str,
+        scheduled_at: DateTime<Utc>,
     ) -> Result<Task, AsyncQueueError> {
         let row: Row = transaction
-            .query_one(INSERT_TASK_QUERY, &[&metadata, &task_type])
+            .query_one(INSERT_TASK_QUERY, &[&metadata, &task_type, &scheduled_at])
             .await?;
         let task = Self::row_to_task(row);
         Ok(task)
@@ -382,6 +435,7 @@ where
         transaction: &mut Transaction<'_>,
         metadata: serde_json::Value,
         task_type: &str,
+        scheduled_at: DateTime<Utc>,
     ) -> Result<Task, AsyncQueueError> {
         let mut hasher = Sha256::new();
 
@@ -392,7 +446,10 @@ where
         let uniq_hash = hex::encode(result);
 
         let row: Row = transaction
-            .query_one(INSERT_TASK_UNIQ_QUERY, &[&metadata, &task_type, &uniq_hash])
+            .query_one(
+                INSERT_TASK_UNIQ_QUERY,
+                &[&metadata, &task_type, &uniq_hash, &scheduled_at],
+            )
             .await?;
 
         let task = Self::row_to_task(row);
@@ -422,10 +479,13 @@ where
         transaction: &mut Transaction<'_>,
         metadata: serde_json::Value,
         task_type: &str,
+        scheduled_at: DateTime<Utc>,
     ) -> Result<Task, AsyncQueueError> {
         match Self::find_task_by_uniq_hash_query(transaction, &metadata).await {
             Some(task) => Ok(task),
-            None => Self::insert_task_uniq_query(transaction, metadata, task_type).await,
+            None => {
+                Self::insert_task_uniq_query(transaction, metadata, task_type, scheduled_at).await
+            }
         }
     }
 
@@ -466,7 +526,7 @@ where
         let task_type: String = row.get("task_type");
         let created_at: DateTime<Utc> = row.get("created_at");
         let updated_at: DateTime<Utc> = row.get("updated_at");
-        let periodic: bool = row.get("periodic");
+        let scheduled_at: DateTime<Utc> = row.get("scheduled_at");
 
         Task::builder()
             .id(id)
@@ -474,10 +534,10 @@ where
             .error_message(error_message)
             .state(state)
             .uniq_hash(uniq_hash)
-            .periodic(periodic)
             .task_type(task_type)
             .created_at(created_at)
             .updated_at(updated_at)
+            .scheduled_at(scheduled_at)
             .build()
     }
 }
@@ -513,14 +573,56 @@ where
         let metadata = serde_json::to_value(task)?;
 
         let task: Task = if !task.uniq() {
-            Self::insert_task_query(&mut transaction, metadata, &task.task_type()).await?
-        } else {
-            Self::insert_task_if_not_exist_query(&mut transaction, metadata, &task.task_type())
+            Self::insert_task_query(&mut transaction, metadata, &task.task_type(), Utc::now())
                 .await?
+        } else {
+            Self::insert_task_if_not_exist_query(
+                &mut transaction,
+                metadata,
+                &task.task_type(),
+                Utc::now(),
+            )
+            .await?
         };
 
         transaction.commit().await?;
 
+        Ok(task)
+    }
+
+    async fn schedule_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
+        self.check_if_connection()?;
+        let mut connection = self.pool.as_ref().unwrap().get().await?;
+        let mut transaction = connection.transaction().await?;
+        let metadata = serde_json::to_value(task)?;
+
+        let scheduled_at = match task.cron() {
+            Some(scheduled) => match scheduled {
+                CronPattern(cron_pattern) => {
+                    let schedule = Schedule::from_str(&cron_pattern).unwrap();
+                    let mut iterator = schedule.upcoming(Utc);
+                    iterator.next().unwrap()
+                }
+                ScheduleOnce(datetime) => datetime,
+            },
+            None => {
+                return Err(AsyncQueueError::TaskNotSchedulableError);
+            }
+        };
+
+        let task: Task = if !task.uniq() {
+            Self::insert_task_query(&mut transaction, metadata, &task.task_type(), scheduled_at)
+                .await?
+        } else {
+            Self::insert_task_if_not_exist_query(
+                &mut transaction,
+                metadata,
+                &task.task_type(),
+                scheduled_at,
+            )
+            .await?
+        };
+        transaction.commit().await?;
         Ok(task)
     }
 

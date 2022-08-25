@@ -1,3 +1,4 @@
+use crate::async_runnable::Scheduled::*;
 use crate::asynk::async_queue::AsyncQueueable;
 use crate::asynk::async_queue::FangTaskState;
 use crate::asynk::async_queue::Task;
@@ -5,11 +6,7 @@ use crate::asynk::async_queue::DEFAULT_TASK_TYPE;
 use crate::asynk::async_runnable::AsyncRunnable;
 use crate::asynk::AsyncError as Error;
 use crate::{RetentionMode, SleepParams};
-use chrono::Utc;
-use core::cmp::Ordering;
-use cron::Schedule;
 use log::error;
-use std::str::FromStr;
 use typed_builder::TypedBuilder;
 
 #[derive(TypedBuilder)]
@@ -97,6 +94,7 @@ where
 
     pub async fn run_tasks(&mut self) -> Result<(), Error> {
         loop {
+            //fetch task
             match self
                 .queue
                 .fetch_and_touch_task(Some(self.task_type.clone()))
@@ -106,28 +104,24 @@ where
                     let actual_task: Box<dyn AsyncRunnable> =
                         serde_json::from_value(task.metadata.clone()).unwrap();
 
+                    // check if task is scheduled or not
                     match actual_task.cron() {
                         None => {
                             self.sleep_params.maybe_reset_sleep_period();
                             self.run(task, actual_task).await?
                         }
-                        Some(cron_pattern) => {
-                            let schedule = Schedule::from_str(&cron_pattern).unwrap();
-                            let mut iterator = schedule.upcoming(Utc);
-                            let first = iterator.next().unwrap();
-
-                            match first.cmp(&Utc::now()) {
-                                Ordering::Less => {
+                        Some(scheduled) => {
+                            match scheduled {
+                                CronPattern(_) => {
+                                    // program task
+                                    self.queue.schedule_task(&*actual_task).await.unwrap();
+                                    // run scheduled task
+                                    self.sleep_params.maybe_reset_sleep_period();
+                                    self.run(task, actual_task).await?;
+                                }
+                                ScheduleOnce(_) => {
                                     self.sleep_params.maybe_reset_sleep_period();
                                     self.run(task, actual_task).await?
-                                }
-                                Ordering::Equal => {
-                                    self.sleep_params.maybe_reset_sleep_period();
-                                    self.run(task, actual_task).await?
-                                }
-
-                                Ordering::Greater => {
-                                    self.sleep().await;
                                 }
                             }
                         }
@@ -237,28 +231,24 @@ impl<'a> AsyncWorkerTest<'a> {
                     let actual_task: Box<dyn AsyncRunnable> =
                         serde_json::from_value(task.metadata.clone()).unwrap();
 
+                    // check if task is scheduled or not
                     match actual_task.cron() {
                         None => {
                             self.sleep_params.maybe_reset_sleep_period();
                             self.run(task, actual_task).await?
                         }
-                        Some(cron_pattern) => {
-                            let schedule = Schedule::from_str(&cron_pattern).unwrap();
-                            let mut iterator = schedule.upcoming(Utc);
-                            let first = iterator.next().unwrap();
-
-                            match first.cmp(&Utc::now()) {
-                                Ordering::Less => {
+                        Some(scheduled) => {
+                            match scheduled {
+                                CronPattern(_) => {
+                                    // program task
+                                    self.queue.schedule_task(&*actual_task).await.unwrap();
+                                    // run scheduled task
+                                    self.sleep_params.maybe_reset_sleep_period();
+                                    self.run(task, actual_task).await?;
+                                }
+                                ScheduleOnce(_) => {
                                     self.sleep_params.maybe_reset_sleep_period();
                                     self.run(task, actual_task).await?
-                                }
-                                Ordering::Equal => {
-                                    self.sleep_params.maybe_reset_sleep_period();
-                                    self.run(task, actual_task).await?
-                                }
-
-                                Ordering::Greater => {
-                                    self.sleep().await;
                                 }
                             }
                         }
