@@ -71,8 +71,6 @@ pub struct Task {
     #[builder(setter(into))]
     pub uniq_hash: Option<String>,
     #[builder(setter(into))]
-    pub scheduled_at: DateTime<Utc>,
-    #[builder(setter(into))]
     pub created_at: DateTime<Utc>,
     #[builder(setter(into))]
     pub updated_at: DateTime<Utc>,
@@ -468,7 +466,6 @@ where
         let task_type: String = row.get("task_type");
         let created_at: DateTime<Utc> = row.get("created_at");
         let updated_at: DateTime<Utc> = row.get("updated_at");
-        let scheduled_at: DateTime<Utc> = row.get("scheduled_at");
         let periodic: bool = row.get("periodic");
 
         Task::builder()
@@ -481,7 +478,6 @@ where
             .task_type(task_type)
             .created_at(created_at)
             .updated_at(updated_at)
-            .scheduled_at(scheduled_at)
             .build()
     }
 }

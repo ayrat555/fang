@@ -20,4 +20,8 @@ pub trait AsyncRunnable: Send + Sync {
     fn uniq(&self) -> bool {
         false
     }
+
+    fn cron(&self) -> Option<String> {
+        None
+    }
 }

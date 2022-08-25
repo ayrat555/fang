@@ -7,7 +7,9 @@ use crate::asynk::AsyncError as Error;
 use crate::{RetentionMode, SleepParams};
 use chrono::Utc;
 use core::cmp::Ordering;
+use cron::Schedule;
 use log::error;
+use std::str::FromStr;
 use typed_builder::TypedBuilder;
 
 #[derive(TypedBuilder)]
@@ -29,15 +31,20 @@ impl<AQueue> AsyncWorker<AQueue>
 where
     AQueue: AsyncQueueable + Clone + Sync + 'static,
 {
-    pub async fn run(&mut self, task: Task) -> Result<(), Error> {
-        let result = self.execute_task(task).await;
+    pub async fn run(
+        &mut self,
+        task: Task,
+        actual_task: Box<dyn AsyncRunnable>,
+    ) -> Result<(), Error> {
+        let result = self.execute_task(task, actual_task).await;
         self.finalize_task(result).await
     }
 
-    async fn execute_task(&mut self, task: Task) -> Result<Task, (Task, String)> {
-        let actual_task: Box<dyn AsyncRunnable> =
-            serde_json::from_value(task.metadata.clone()).unwrap();
-
+    async fn execute_task(
+        &mut self,
+        task: Task,
+        actual_task: Box<dyn AsyncRunnable>,
+    ) -> Result<Task, (Task, String)> {
         let task_result = actual_task.run(&mut self.queue).await;
         match task_result {
             Ok(()) => Ok(task),
@@ -96,19 +103,33 @@ where
                 .await
             {
                 Ok(Some(task)) => {
-                    let result = task.scheduled_at.cmp(&Utc::now());
-                    match result {
-                        Ordering::Less => {
+                    let actual_task: Box<dyn AsyncRunnable> =
+                        serde_json::from_value(task.metadata.clone()).unwrap();
+
+                    match actual_task.cron() {
+                        None => {
                             self.sleep_params.maybe_reset_sleep_period();
-                            self.run(task).await?
+                            self.run(task, actual_task).await?
                         }
-                        Ordering::Equal => {
-                            self.sleep_params.maybe_reset_sleep_period();
-                            self.run(task).await?
-                        }
-                        Ordering::Greater => {
-                            // not sure what should i do here, this case is Scheduled task
-                            // should wait and we need to execute other tasks that are not that
+                        Some(cron_pattern) => {
+                            let schedule = Schedule::from_str(&cron_pattern).unwrap();
+                            let mut iterator = schedule.upcoming(Utc);
+                            let first = iterator.next().unwrap();
+
+                            match first.cmp(&Utc::now()) {
+                                Ordering::Less => {
+                                    self.sleep_params.maybe_reset_sleep_period();
+                                    self.run(task, actual_task).await?
+                                }
+                                Ordering::Equal => {
+                                    self.sleep_params.maybe_reset_sleep_period();
+                                    self.run(task, actual_task).await?
+                                }
+
+                                Ordering::Greater => {
+                                    self.sleep().await;
+                                }
+                            }
                         }
                     }
                 }
@@ -141,15 +162,20 @@ pub struct AsyncWorkerTest<'a> {
 
 #[cfg(test)]
 impl<'a> AsyncWorkerTest<'a> {
-    pub async fn run(&mut self, task: Task) -> Result<(), Error> {
-        let result = self.execute_task(task).await;
+    pub async fn run(
+        &mut self,
+        task: Task,
+        actual_task: Box<dyn AsyncRunnable>,
+    ) -> Result<(), Error> {
+        let result = self.execute_task(task, actual_task).await;
         self.finalize_task(result).await
     }
 
-    async fn execute_task(&mut self, task: Task) -> Result<Task, (Task, String)> {
-        let actual_task: Box<dyn AsyncRunnable> =
-            serde_json::from_value(task.metadata.clone()).unwrap();
-
+    async fn execute_task(
+        &mut self,
+        task: Task,
+        actual_task: Box<dyn AsyncRunnable>,
+    ) -> Result<Task, (Task, String)> {
         let task_result = actual_task.run(self.queue).await;
         match task_result {
             Ok(()) => Ok(task),
@@ -208,19 +234,33 @@ impl<'a> AsyncWorkerTest<'a> {
                 .await
             {
                 Ok(Some(task)) => {
-                    let result = task.scheduled_at.cmp(&Utc::now());
-                    match result {
-                        Ordering::Less => {
+                    let actual_task: Box<dyn AsyncRunnable> =
+                        serde_json::from_value(task.metadata.clone()).unwrap();
+
+                    match actual_task.cron() {
+                        None => {
                             self.sleep_params.maybe_reset_sleep_period();
-                            self.run(task).await?
+                            self.run(task, actual_task).await?
                         }
-                        Ordering::Equal => {
-                            self.sleep_params.maybe_reset_sleep_period();
-                            self.run(task).await?
-                        }
-                        Ordering::Greater => {
-                            // not sure what should i do here, this case is Scheduled task
-                            // should wait and we need to execute other tasks that are not that
+                        Some(cron_pattern) => {
+                            let schedule = Schedule::from_str(&cron_pattern).unwrap();
+                            let mut iterator = schedule.upcoming(Utc);
+                            let first = iterator.next().unwrap();
+
+                            match first.cmp(&Utc::now()) {
+                                Ordering::Less => {
+                                    self.sleep_params.maybe_reset_sleep_period();
+                                    self.run(task, actual_task).await?
+                                }
+                                Ordering::Equal => {
+                                    self.sleep_params.maybe_reset_sleep_period();
+                                    self.run(task, actual_task).await?
+                                }
+
+                                Ordering::Greater => {
+                                    self.sleep().await;
+                                }
+                            }
                         }
                     }
                 }
@@ -318,8 +358,9 @@ mod async_worker_tests {
         let transaction = connection.transaction().await.unwrap();
 
         let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+        let actual_task = WorkerAsyncTask { number: 1 };
 
-        let task = insert_task(&mut test, &WorkerAsyncTask { number: 1 }).await;
+        let task = insert_task(&mut test, &actual_task).await;
         let id = task.id;
 
         let mut worker = AsyncWorkerTest::builder()
@@ -327,7 +368,7 @@ mod async_worker_tests {
             .retention_mode(RetentionMode::KeepAll)
             .build();
 
-        worker.run(task).await.unwrap();
+        worker.run(task, Box::new(actual_task)).await.unwrap();
         let task_finished = test.find_task_by_id(id).await.unwrap();
         assert_eq!(id, task_finished.id);
         assert_eq!(FangTaskState::Finished, task_finished.state);
@@ -340,8 +381,9 @@ mod async_worker_tests {
         let transaction = connection.transaction().await.unwrap();
 
         let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+        let failed_task = AsyncFailedTask { number: 1 };
 
-        let task = insert_task(&mut test, &AsyncFailedTask { number: 1 }).await;
+        let task = insert_task(&mut test, &failed_task).await;
         let id = task.id;
 
         let mut worker = AsyncWorkerTest::builder()
@@ -349,7 +391,7 @@ mod async_worker_tests {
             .retention_mode(RetentionMode::KeepAll)
             .build();
 
-        worker.run(task).await.unwrap();
+        worker.run(task, Box::new(failed_task)).await.unwrap();
         let task_finished = test.find_task_by_id(id).await.unwrap();
 
         assert_eq!(id, task_finished.id);
