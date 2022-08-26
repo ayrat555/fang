@@ -11,8 +11,10 @@ use bb8_postgres::tokio_postgres::Transaction;
 use bb8_postgres::PostgresConnectionManager;
 use chrono::DateTime;
 use chrono::Utc;
+use cron::Schedule;
 use postgres_types::{FromSql, ToSql};
 use sha2::{Digest, Sha256};
+use std::str::FromStr;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -92,6 +94,8 @@ pub enum AsyncQueueError {
     TimeError,
     #[error("You have to implement method `cron()` in your AsyncRunnable")]
     TaskNotSchedulableError,
+    #[error("Cron pattern not valid")]
+    CronNotValidError,
 }
 
 impl From<AsyncQueueError> for FangError {
@@ -210,7 +214,11 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
 
         let scheduled_at = match task.cron() {
             Some(scheduled) => match scheduled {
-                CronPattern(schedule) => {
+                CronPattern(cron_pattern) => {
+                    let schedule = match Schedule::from_str(&cron_pattern) {
+                        Ok(schedule) => Ok(schedule),
+                        Err(_) => Err(AsyncQueueError::CronNotValidError),
+                    }?;
                     let mut iterator = schedule.upcoming(Utc);
                     iterator.next().unwrap()
                 }
@@ -601,7 +609,11 @@ where
 
         let scheduled_at = match task.cron() {
             Some(scheduled) => match scheduled {
-                CronPattern(schedule) => {
+                CronPattern(cron_pattern) => {
+                    let schedule = match Schedule::from_str(&cron_pattern) {
+                        Ok(schedule) => Ok(schedule),
+                        Err(_) => Err(AsyncQueueError::CronNotValidError),
+                    }?;
                     let mut iterator = schedule.upcoming(Utc);
                     iterator.next().unwrap()
                 }
