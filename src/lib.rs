@@ -61,7 +61,14 @@ pub use typetag;
 pub extern crate serde;
 
 #[doc(hidden)]
+pub extern crate chrono;
+
+#[doc(hidden)]
 pub use serde_derive::{Deserialize, Serialize};
+
+pub use chrono::DateTime;
+pub use chrono::Utc;
+pub use cron::Schedule;
 
 #[cfg(feature = "blocking")]
 pub mod blocking;

@@ -105,24 +105,19 @@ where
                         serde_json::from_value(task.metadata.clone()).unwrap();
 
                     // check if task is scheduled or not
+                    self.sleep_params.maybe_reset_sleep_period();
+
                     match actual_task.cron() {
-                        None => {
-                            self.sleep_params.maybe_reset_sleep_period();
-                            self.run(task, actual_task).await?
-                        }
+                        None => self.run(task, actual_task).await?,
                         Some(scheduled) => {
                             match scheduled {
                                 CronPattern(_) => {
                                     // program task
-                                    self.queue.schedule_task(&*actual_task).await.unwrap();
+                                    self.queue.schedule_task(&*actual_task).await?;
                                     // run scheduled task
-                                    self.sleep_params.maybe_reset_sleep_period();
                                     self.run(task, actual_task).await?;
                                 }
-                                ScheduleOnce(_) => {
-                                    self.sleep_params.maybe_reset_sleep_period();
-                                    self.run(task, actual_task).await?
-                                }
+                                ScheduleOnce(_) => self.run(task, actual_task).await?,
                             }
                         }
                     }
@@ -232,24 +227,18 @@ impl<'a> AsyncWorkerTest<'a> {
                         serde_json::from_value(task.metadata.clone()).unwrap();
 
                     // check if task is scheduled or not
+                    self.sleep_params.maybe_reset_sleep_period();
                     match actual_task.cron() {
-                        None => {
-                            self.sleep_params.maybe_reset_sleep_period();
-                            self.run(task, actual_task).await?
-                        }
+                        None => self.run(task, actual_task).await?,
                         Some(scheduled) => {
                             match scheduled {
                                 CronPattern(_) => {
                                     // program task
                                     self.queue.schedule_task(&*actual_task).await.unwrap();
                                     // run scheduled task
-                                    self.sleep_params.maybe_reset_sleep_period();
                                     self.run(task, actual_task).await?;
                                 }
-                                ScheduleOnce(_) => {
-                                    self.sleep_params.maybe_reset_sleep_period();
-                                    self.run(task, actual_task).await?
-                                }
+                                ScheduleOnce(_) => self.run(task, actual_task).await?,
                             }
                         }
                     }

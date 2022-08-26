@@ -11,10 +11,8 @@ use bb8_postgres::tokio_postgres::Transaction;
 use bb8_postgres::PostgresConnectionManager;
 use chrono::DateTime;
 use chrono::Utc;
-use cron::Schedule;
 use postgres_types::{FromSql, ToSql};
 use sha2::{Digest, Sha256};
-use std::str::FromStr;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -441,13 +439,7 @@ where
         task_type: &str,
         scheduled_at: DateTime<Utc>,
     ) -> Result<Task, AsyncQueueError> {
-        let mut hasher = Sha256::new();
-
-        hasher.update(metadata.to_string().as_bytes());
-
-        let result = hasher.finalize();
-
-        let uniq_hash = hex::encode(result);
+        let uniq_hash = Self::calculate_hash(metadata.to_string());
 
         let row: Row = transaction
             .query_one(
@@ -493,17 +485,18 @@ where
         }
     }
 
+    fn calculate_hash(json: String) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(json.as_bytes());
+        let result = hasher.finalize();
+        hex::encode(result)
+    }
+
     async fn find_task_by_uniq_hash_query(
         transaction: &mut Transaction<'_>,
         metadata: &serde_json::Value,
     ) -> Option<Task> {
-        let mut hasher = Sha256::new();
-
-        hasher.update(metadata.to_string().as_bytes());
-
-        let result = hasher.finalize();
-
-        let uniq_hash = hex::encode(result);
+        let uniq_hash = Self::calculate_hash(metadata.to_string());
 
         let result = transaction
             .query_one(FIND_TASK_BY_UNIQ_HASH_QUERY, &[&uniq_hash])
@@ -518,14 +511,10 @@ where
     fn row_to_task(row: Row) -> Task {
         let id: Uuid = row.get("id");
         let metadata: serde_json::Value = row.get("metadata");
-        let error_message: Option<String> = match row.try_get("error_message") {
-            Ok(error_message) => Some(error_message),
-            Err(_) => None,
-        };
-        let uniq_hash: Option<String> = match row.try_get("uniq_hash") {
-            Ok(uniq_hash) => Some(uniq_hash),
-            Err(_) => None,
-        };
+
+        let error_message: Option<String> = row.try_get("error_message").ok();
+
+        let uniq_hash: Option<String> = row.try_get("uniq_hash").ok();
         let state: FangTaskState = row.get("state");
         let task_type: String = row.get("task_type");
         let created_at: DateTime<Utc> = row.get("created_at");
@@ -613,8 +602,7 @@ where
 
         let scheduled_at = match task.cron() {
             Some(scheduled) => match scheduled {
-                CronPattern(cron_pattern) => {
-                    let schedule = Schedule::from_str(&cron_pattern).unwrap();
+                CronPattern(schedule) => {
                     let mut iterator = schedule.upcoming(Utc);
                     iterator.next().unwrap()
                 }

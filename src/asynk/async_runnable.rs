@@ -2,6 +2,7 @@ use crate::asynk::async_queue::AsyncQueueable;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
+use cron::Schedule;
 
 const COMMON_TYPE: &str = "common";
 
@@ -11,7 +12,7 @@ pub struct Error {
 }
 
 pub enum Scheduled {
-    CronPattern(String),
+    CronPattern(Schedule),
     ScheduleOnce(DateTime<Utc>),
 }
 
