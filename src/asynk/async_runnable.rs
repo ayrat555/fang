@@ -12,7 +12,7 @@ pub struct Error {
 }
 
 pub enum Scheduled {
-    CronPattern(Schedule),
+    CronPattern(Box<Schedule>),
     ScheduleOnce(DateTime<Utc>),
 }
 

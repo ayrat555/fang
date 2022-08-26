@@ -210,8 +210,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
 
         let scheduled_at = match task.cron() {
             Some(scheduled) => match scheduled {
-                CronPattern(cron_pattern) => {
-                    let schedule = Schedule::from_str(&cron_pattern).unwrap();
+                CronPattern(schedule) => {
                     let mut iterator = schedule.upcoming(Utc);
                     iterator.next().unwrap()
                 }
