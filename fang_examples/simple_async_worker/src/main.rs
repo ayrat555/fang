@@ -3,6 +3,7 @@ use fang::asynk::async_queue::AsyncQueueable;
 use fang::asynk::async_worker_pool::AsyncWorkerPool;
 use fang::AsyncRunnable;
 use fang::NoTls;
+use simple_async_worker::MyCronTask;
 use simple_async_worker::MyFailingTask;
 use simple_async_worker::MyTask;
 use std::time::Duration;
@@ -12,11 +13,10 @@ async fn main() {
     env_logger::init();
 
     log::info!("Starting...");
-    let max_pool_size: u32 = 2;
+    let max_pool_size: u32 = 3;
     let mut queue = AsyncQueue::builder()
         .uri("postgres://postgres:postgres@localhost/fang")
         .max_pool_size(max_pool_size)
-        .duplicated_tasks(true)
         .build();
 
     queue.connect(NoTls).await.unwrap();
@@ -32,21 +32,28 @@ async fn main() {
     pool.start().await;
     log::info!("Workers started ...");
 
-    let task1 = MyTask::new(0);
-    let task2 = MyTask::new(20_000);
-    let task3 = MyFailingTask::new(50_000);
+    //let task1 = MyTask::new(0);
+    //let task2 = MyTask::new(20_000);
+    //let task3 = MyFailingTask::new(50_000);
+    let task4 = MyCronTask::new(5_000);
 
-    queue
+    /*queue
         .insert_task(&task1 as &dyn AsyncRunnable)
         .await
         .unwrap();
-    queue
+    */
+    /*queue
         .insert_task(&task2 as &dyn AsyncRunnable)
         .await
         .unwrap();
-
-    queue
+    */
+    /*queue
         .insert_task(&task3 as &dyn AsyncRunnable)
+        .await
+        .unwrap();
+    */
+    queue
+        .schedule_task(&task4 as &dyn AsyncRunnable)
         .await
         .unwrap();
 
