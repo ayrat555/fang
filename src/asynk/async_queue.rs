@@ -345,7 +345,7 @@ where
     ) -> Result<Task, AsyncQueueError> {
         let row: Row = transaction.query_one(FIND_TASK_BY_ID_QUERY, &[&id]).await?;
 
-        let task = AsyncQueue::<NoTls>::row_to_task(row);
+        let task = Self::row_to_task(row);
         Ok(task)
     }
 
