@@ -1,63 +1,117 @@
-use crate::executor::Runnable;
-use crate::schema::fang_periodic_tasks;
+use crate::runnable::Runnable;
+use crate::runnable::Scheduled::*;
 use crate::schema::fang_tasks;
 use crate::schema::FangTaskState;
 use chrono::DateTime;
-use chrono::Duration;
 use chrono::Utc;
+use cron::Schedule;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2;
 use diesel::result::Error;
 use dotenv::dotenv;
+use sha2::Digest;
+use sha2::Sha256;
 use std::env;
-use std::time::Duration as StdDuration;
+use std::str::FromStr;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-#[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone)]
+#[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone, TypedBuilder)]
 #[table_name = "fang_tasks"]
 pub struct Task {
+    #[builder(setter(into))]
     pub id: Uuid,
+    #[builder(setter(into))]
     pub metadata: serde_json::Value,
+    #[builder(setter(into))]
     pub error_message: Option<String>,
+    #[builder(setter(into))]
     pub state: FangTaskState,
+    #[builder(setter(into))]
     pub task_type: String,
+    #[builder(setter(into))]
+    pub uniq_hash: Option<String>,
+    #[builder(setter(into))]
+    pub scheduled_at: DateTime<Utc>,
+    #[builder(setter(into))]
     pub created_at: DateTime<Utc>,
+    #[builder(setter(into))]
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone)]
-#[table_name = "fang_periodic_tasks"]
-pub struct PeriodicTask {
-    pub id: Uuid,
-    pub metadata: serde_json::Value,
-    pub period_in_millis: i64,
-    pub scheduled_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Insertable)]
+#[derive(Insertable, Debug, Eq, PartialEq, Clone, TypedBuilder)]
 #[table_name = "fang_tasks"]
 pub struct NewTask {
-    pub metadata: serde_json::Value,
-    pub task_type: String,
+    #[builder(setter(into))]
+    metadata: serde_json::Value,
+    #[builder(setter(into))]
+    task_type: String,
+    #[builder(setter(into))]
+    uniq_hash: Option<String>,
+    #[builder(setter(into))]
+    scheduled_at: DateTime<Utc>,
 }
 
-#[derive(Insertable)]
-#[table_name = "fang_periodic_tasks"]
-pub struct NewPeriodicTask {
-    pub metadata: serde_json::Value,
-    pub period_in_millis: i64,
+pub trait Queueable {
+    fn fetch_and_touch_task(&self, task_type: String) -> Result<Option<Task>, Error>;
+
+    fn insert_task(&self, params: &dyn Runnable) -> Result<Task, Error>;
+
+    fn remove_all_tasks(&self) -> Result<usize, Error>;
+
+    fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, Error>;
+
+    fn remove_task(&self, id: Uuid) -> Result<usize, Error>;
+
+    fn find_task_by_id(&self, id: Uuid) -> Option<Task>;
+
+    fn update_task_state(&self, task: &Task, state: FangTaskState) -> Result<Task, Error>;
+
+    fn fail_task(&self, task: &Task, error: String) -> Result<Task, Error>;
+
+    fn schedule_task(&self, task: &dyn Runnable) -> Result<Task, Error>;
 }
 
+#[derive(TypedBuilder)]
 pub struct Queue {
+    #[builder(setter(into))]
     pub connection: PgConnection,
 }
 
-impl Default for Queue {
-    fn default() -> Self {
-        Self::new()
+impl Queueable for Queue {
+    fn fetch_and_touch_task(&self, task_type: String) -> Result<Option<Task>, Error> {
+        Self::fetch_and_touch_query(&self.connection, task_type)
+    }
+
+    fn insert_task(&self, params: &dyn Runnable) -> Result<Task, Error> {
+        Self::insert_query(&self.connection, params, Utc::now())
+    }
+    fn schedule_task(&self, params: &dyn Runnable) -> Result<Task, Error> {
+        Self::schedule_task_query(&self.connection, params)
+    }
+    fn remove_all_tasks(&self) -> Result<usize, Error> {
+        Self::remove_all_tasks_query(&self.connection)
+    }
+
+    fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, Error> {
+        Self::remove_tasks_of_type_query(&self.connection, task_type)
+    }
+
+    fn remove_task(&self, id: Uuid) -> Result<usize, Error> {
+        Self::remove_task_query(&self.connection, id)
+    }
+
+    fn update_task_state(&self, task: &Task, state: FangTaskState) -> Result<Task, Error> {
+        Self::update_task_state_query(&self.connection, task, state)
+    }
+
+    fn fail_task(&self, task: &Task, error: String) -> Result<Task, Error> {
+        Self::fail_task_query(&self.connection, task, error)
+    }
+
+    fn find_task_by_id(&self, id: Uuid) -> Option<Task> {
+        Self::find_task_by_id_query(&self.connection, id)
     }
 }
 
@@ -78,87 +132,76 @@ impl Queue {
         Self { connection }
     }
 
-    pub fn push_task(&self, task: &dyn Runnable) -> Result<Task, Error> {
-        Self::push_task_query(&self.connection, task)
-    }
-
-    pub fn push_task_query(connection: &PgConnection, task: &dyn Runnable) -> Result<Task, Error> {
-        let json_task = serde_json::to_value(task).unwrap();
-
-        match Self::find_task_by_metadata_query(connection, &json_task) {
-            Some(task) => Ok(task),
-            None => {
-                let new_task = NewTask {
-                    metadata: json_task.clone(),
-                    task_type: task.task_type(),
-                };
-                Self::insert_query(connection, &new_task)
-            }
-        }
-    }
-
-    pub fn push_periodic_task(
-        &self,
-        task: &dyn Runnable,
-        period: i64,
-    ) -> Result<PeriodicTask, Error> {
-        Self::push_periodic_task_query(&self.connection, task, period)
-    }
-
-    pub fn push_periodic_task_query(
+    pub fn schedule_task_query(
         connection: &PgConnection,
-        task: &dyn Runnable,
-        period: i64,
-    ) -> Result<PeriodicTask, Error> {
-        let json_task = serde_json::to_value(task).unwrap();
-
-        match Self::find_periodic_task_by_metadata_query(connection, &json_task) {
-            Some(task) => Ok(task),
+        params: &dyn Runnable,
+    ) -> Result<Task, Error> {
+        let scheduled_at = match params.cron() {
+            Some(scheduled) => match scheduled {
+                CronPattern(cron_pattern) => {
+                    let schedule = Schedule::from_str(&cron_pattern).unwrap();
+                    let mut iterator = schedule.upcoming(Utc);
+                    iterator.next().unwrap()
+                }
+                ScheduleOnce(datetime) => datetime,
+            },
             None => {
-                let new_task = NewPeriodicTask {
-                    metadata: json_task,
-                    period_in_millis: period,
-                };
+                panic!("Task not Schedulable because it is not implemented `cron()` method from `Runnable`");
+            }
+        };
 
-                diesel::insert_into(fang_periodic_tasks::table)
-                    .values(new_task)
-                    .get_result::<PeriodicTask>(connection)
+        Self::insert_query(connection, params, scheduled_at)
+    }
+
+    pub fn insert_query(
+        connection: &PgConnection,
+        params: &dyn Runnable,
+        scheduled_at: DateTime<Utc>,
+    ) -> Result<Task, Error> {
+        if !params.uniq() {
+            let new_task = NewTask::builder()
+                .scheduled_at(scheduled_at)
+                .uniq_hash(None)
+                .task_type(params.task_type())
+                .metadata(serde_json::to_value(params).unwrap())
+                .build();
+
+            diesel::insert_into(fang_tasks::table)
+                .values(new_task)
+                .get_result::<Task>(connection)
+        } else {
+            let metadata = serde_json::to_value(params).unwrap();
+
+            let mut hasher = Sha256::new();
+            hasher.update(metadata.to_string().as_bytes());
+            let result = hasher.finalize();
+            let uniq_hash = hex::encode(result);
+
+            match Self::find_task_by_uniq_hash_query(connection, &uniq_hash) {
+                Some(task) => Ok(task),
+                None => {
+                    let new_task = NewTask::builder()
+                        .scheduled_at(scheduled_at)
+                        .uniq_hash(Some(uniq_hash))
+                        .task_type(params.task_type())
+                        .metadata(serde_json::to_value(params).unwrap())
+                        .build();
+
+                    diesel::insert_into(fang_tasks::table)
+                        .values(new_task)
+                        .get_result::<Task>(connection)
+                }
             }
         }
     }
 
-    pub fn enqueue_task(task: &dyn Runnable) -> Result<Task, Error> {
-        Self::new().push_task(task)
-    }
-
-    pub fn insert(&self, params: &NewTask) -> Result<Task, Error> {
-        Self::insert_query(&self.connection, params)
-    }
-
-    pub fn insert_query(connection: &PgConnection, params: &NewTask) -> Result<Task, Error> {
-        diesel::insert_into(fang_tasks::table)
-            .values(params)
-            .get_result::<Task>(connection)
-    }
-
-    pub fn fetch_task(&self, task_type: &Option<String>) -> Option<Task> {
-        Self::fetch_task_query(&self.connection, task_type)
-    }
-
-    pub fn fetch_task_query(connection: &PgConnection, task_type: &Option<String>) -> Option<Task> {
-        match task_type {
-            None => Self::fetch_any_task_query(connection),
-            Some(task_type_str) => Self::fetch_task_of_type_query(connection, task_type_str),
-        }
-    }
-
-    pub fn fetch_and_touch(&self, task_type: &Option<String>) -> Result<Option<Task>, Error> {
-        Self::fetch_and_touch_query(&self.connection, task_type)
+    pub fn fetch_task_query(connection: &PgConnection, task_type: String) -> Option<Task> {
+        Self::fetch_task_of_type_query(connection, &task_type)
     }
 
     pub fn fetch_and_touch_query(
         connection: &PgConnection,
-        task_type: &Option<String>,
+        task_type: String,
     ) -> Result<Option<Task>, Error> {
         connection.transaction::<Option<Task>, Error, _>(|| {
             let found_task = Self::fetch_task_query(connection, task_type);
@@ -167,15 +210,15 @@ impl Queue {
                 return Ok(None);
             }
 
-            match Self::start_processing_task_query(connection, &found_task.unwrap()) {
+            match Self::update_task_state_query(
+                connection,
+                &found_task.unwrap(),
+                FangTaskState::InProgress,
+            ) {
                 Ok(updated_task) => Ok(Some(updated_task)),
                 Err(err) => Err(err),
             }
         })
-    }
-
-    pub fn find_task_by_id(&self, id: Uuid) -> Option<Task> {
-        Self::find_task_by_id_query(&self.connection, id)
     }
 
     pub fn find_task_by_id_query(connection: &PgConnection, id: Uuid) -> Option<Task> {
@@ -185,68 +228,8 @@ impl Queue {
             .ok()
     }
 
-    pub fn find_periodic_task_by_id(&self, id: Uuid) -> Option<PeriodicTask> {
-        Self::find_periodic_task_by_id_query(&self.connection, id)
-    }
-
-    pub fn find_periodic_task_by_id_query(
-        connection: &PgConnection,
-        id: Uuid,
-    ) -> Option<PeriodicTask> {
-        fang_periodic_tasks::table
-            .filter(fang_periodic_tasks::id.eq(id))
-            .first::<PeriodicTask>(connection)
-            .ok()
-    }
-
-    pub fn fetch_periodic_tasks(&self, error_margin: StdDuration) -> Option<Vec<PeriodicTask>> {
-        Self::fetch_periodic_tasks_query(&self.connection, error_margin)
-    }
-
-    pub fn fetch_periodic_tasks_query(
-        connection: &PgConnection,
-        error_margin: StdDuration,
-    ) -> Option<Vec<PeriodicTask>> {
-        let current_time = Self::current_time();
-
-        let margin = Duration::from_std(error_margin).unwrap();
-
-        let low_limit = current_time - margin;
-        let high_limit = current_time + margin;
-
-        fang_periodic_tasks::table
-            .filter(
-                fang_periodic_tasks::scheduled_at
-                    .gt(low_limit)
-                    .and(fang_periodic_tasks::scheduled_at.lt(high_limit)),
-            )
-            .or_filter(fang_periodic_tasks::scheduled_at.is_null())
-            .load::<PeriodicTask>(connection)
-            .ok()
-    }
-
-    pub fn schedule_next_task_execution(&self, task: &PeriodicTask) -> Result<PeriodicTask, Error> {
-        let current_time = Self::current_time();
-        let scheduled_at = current_time + Duration::milliseconds(task.period_in_millis);
-
-        diesel::update(task)
-            .set((
-                fang_periodic_tasks::scheduled_at.eq(scheduled_at),
-                fang_periodic_tasks::updated_at.eq(current_time),
-            ))
-            .get_result::<PeriodicTask>(&self.connection)
-    }
-
-    pub fn remove_all_tasks(&self) -> Result<usize, Error> {
-        Self::remove_all_tasks_query(&self.connection)
-    }
-
     pub fn remove_all_tasks_query(connection: &PgConnection) -> Result<usize, Error> {
         diesel::delete(fang_tasks::table).execute(connection)
-    }
-
-    pub fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, Error> {
-        Self::remove_tasks_of_type_query(&self.connection, task_type)
     }
 
     pub fn remove_tasks_of_type_query(
@@ -258,55 +241,23 @@ impl Queue {
         diesel::delete(query).execute(connection)
     }
 
-    pub fn remove_all_periodic_tasks(&self) -> Result<usize, Error> {
-        Self::remove_all_periodic_tasks_query(&self.connection)
-    }
-
-    pub fn remove_all_periodic_tasks_query(connection: &PgConnection) -> Result<usize, Error> {
-        diesel::delete(fang_periodic_tasks::table).execute(connection)
-    }
-
-    pub fn remove_task(&self, id: Uuid) -> Result<usize, Error> {
-        Self::remove_task_query(&self.connection, id)
-    }
-
     pub fn remove_task_query(connection: &PgConnection, id: Uuid) -> Result<usize, Error> {
         let query = fang_tasks::table.filter(fang_tasks::id.eq(id));
 
         diesel::delete(query).execute(connection)
     }
 
-    pub fn finish_task(&self, task: &Task) -> Result<Task, Error> {
-        Self::finish_task_query(&self.connection, task)
-    }
-
-    pub fn finish_task_query(connection: &PgConnection, task: &Task) -> Result<Task, Error> {
-        diesel::update(task)
-            .set((
-                fang_tasks::state.eq(FangTaskState::Finished),
-                fang_tasks::updated_at.eq(Self::current_time()),
-            ))
-            .get_result::<Task>(connection)
-    }
-
-    pub fn start_processing_task(&self, task: &Task) -> Result<Task, Error> {
-        Self::start_processing_task_query(&self.connection, task)
-    }
-
-    pub fn start_processing_task_query(
+    pub fn update_task_state_query(
         connection: &PgConnection,
         task: &Task,
+        state: FangTaskState,
     ) -> Result<Task, Error> {
         diesel::update(task)
             .set((
-                fang_tasks::state.eq(FangTaskState::InProgress),
+                fang_tasks::state.eq(state),
                 fang_tasks::updated_at.eq(Self::current_time()),
             ))
             .get_result::<Task>(connection)
-    }
-
-    pub fn fail_task(&self, task: &Task, error: String) -> Result<Task, Error> {
-        Self::fail_task_query(&self.connection, task, error)
     }
 
     pub fn fail_task_query(
@@ -366,6 +317,7 @@ impl Queue {
         fang_tasks::table
             .order(fang_tasks::created_at.asc())
             .limit(1)
+            .filter(fang_tasks::scheduled_at.le(Utc::now()))
             .filter(fang_tasks::state.eq(FangTaskState::New))
             .filter(fang_tasks::task_type.eq(task_type))
             .for_update()
@@ -373,23 +325,9 @@ impl Queue {
             .get_result::<Task>(connection)
             .ok()
     }
-
-    fn find_periodic_task_by_metadata_query(
-        connection: &PgConnection,
-        metadata: &serde_json::Value,
-    ) -> Option<PeriodicTask> {
-        fang_periodic_tasks::table
-            .filter(fang_periodic_tasks::metadata.eq(metadata))
-            .first::<PeriodicTask>(connection)
-            .ok()
-    }
-
-    fn find_task_by_metadata_query(
-        connection: &PgConnection,
-        metadata: &serde_json::Value,
-    ) -> Option<Task> {
+    fn find_task_by_uniq_hash_query(connection: &PgConnection, uniq_hash: &str) -> Option<Task> {
         fang_tasks::table
-            .filter(fang_tasks::metadata.eq(metadata))
+            .filter(fang_tasks::uniq_hash.eq(uniq_hash))
             .filter(
                 fang_tasks::state
                     .eq(FangTaskState::New)
@@ -402,13 +340,10 @@ impl Queue {
 
 #[cfg(test)]
 mod queue_tests {
-    use super::NewTask;
-    use super::PeriodicTask;
     use super::Queue;
     use super::Task;
     use crate::executor::Error as ExecutorError;
     use crate::executor::Runnable;
-    use crate::schema::fang_periodic_tasks;
     use crate::schema::fang_tasks;
     use crate::schema::FangTaskState;
     use crate::typetag;
@@ -420,6 +355,7 @@ mod queue_tests {
     use serde::{Deserialize, Serialize};
     use std::time::Duration as StdDuration;
 
+    // TODO MODIFY TESTS
     #[test]
     fn insert_inserts_task() {
         let queue = Queue::new();
@@ -559,110 +495,6 @@ mod queue_tests {
     }
 
     #[test]
-    fn push_periodic_task() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = PepeTask { number: 10 };
-            let task = queue.push_periodic_task(&task, 60_i64).unwrap();
-
-            assert_eq!(task.period_in_millis, 60_i64);
-            assert!(queue.find_periodic_task_by_id(task.id).is_some());
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn push_periodic_task_returns_existing_task() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = PepeTask { number: 10 };
-            let task1 = queue.push_periodic_task(&task, 60).unwrap();
-
-            let task2 = queue.push_periodic_task(&task, 60).unwrap();
-
-            assert_eq!(task1.id, task2.id);
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn fetch_periodic_tasks_fetches_periodic_task_without_scheduled_at() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = PepeTask { number: 10 };
-            let task = queue.push_periodic_task(&task, 60).unwrap();
-
-            let schedule_in_future = Utc::now() + Duration::hours(100);
-
-            insert_periodic_task(
-                serde_json::json!(true),
-                schedule_in_future,
-                100,
-                &queue.connection,
-            );
-
-            let tasks = queue
-                .fetch_periodic_tasks(StdDuration::from_secs(100))
-                .unwrap();
-
-            assert_eq!(tasks.len(), 1);
-            assert_eq!(tasks[0].id, task.id);
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn schedule_next_task_execution() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = insert_periodic_task(
-                serde_json::json!(true),
-                Utc::now(),
-                100000,
-                &queue.connection,
-            );
-
-            let updated_task = queue.schedule_next_task_execution(&task).unwrap();
-
-            let next_schedule = (task.scheduled_at.unwrap()
-                + Duration::milliseconds(task.period_in_millis))
-            .round_subsecs(0);
-
-            assert_eq!(
-                next_schedule,
-                updated_task.scheduled_at.unwrap().round_subsecs(0)
-            );
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn remove_all_periodic_tasks() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task =
-                insert_periodic_task(serde_json::json!(true), Utc::now(), 100, &queue.connection);
-
-            let result = queue.remove_all_periodic_tasks().unwrap();
-
-            assert_eq!(1, result);
-
-            assert_eq!(None, queue.find_periodic_task_by_id(task.id));
-
-            Ok(())
-        });
-    }
-
-    #[test]
     fn remove_all_tasks() {
         let queue = Queue::new();
 
@@ -673,34 +505,6 @@ mod queue_tests {
             assert_eq!(1, result);
 
             assert_eq!(None, queue.find_task_by_id(task.id));
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn fetch_periodic_tasks() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let schedule_in_future = Utc::now() + Duration::hours(100);
-
-            insert_periodic_task(
-                serde_json::json!(true),
-                schedule_in_future,
-                100,
-                &queue.connection,
-            );
-
-            let task =
-                insert_periodic_task(serde_json::json!(true), Utc::now(), 100, &queue.connection);
-
-            let tasks = queue
-                .fetch_periodic_tasks(StdDuration::from_secs(100))
-                .unwrap();
-
-            assert_eq!(tasks.len(), 1);
-            assert_eq!(tasks[0].id, task.id);
 
             Ok(())
         });
@@ -844,22 +648,6 @@ mod queue_tests {
                 fang_tasks::created_at.eq(timestamp),
             )])
             .get_result::<Task>(connection)
-            .unwrap()
-    }
-
-    fn insert_periodic_task(
-        metadata: serde_json::Value,
-        timestamp: DateTime<Utc>,
-        period_in_millis: i64,
-        connection: &PgConnection,
-    ) -> PeriodicTask {
-        diesel::insert_into(fang_periodic_tasks::table)
-            .values(&vec![(
-                fang_periodic_tasks::metadata.eq(metadata),
-                fang_periodic_tasks::scheduled_at.eq(timestamp),
-                fang_periodic_tasks::period_in_millis.eq(period_in_millis),
-            )])
-            .get_result::<PeriodicTask>(connection)
             .unwrap()
     }
 

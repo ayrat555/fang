@@ -1,19 +1,28 @@
 use crate::error::FangError;
-use crate::queue::Queue;
+use crate::queue::Queueable;
 use crate::queue::Task;
-use crate::worker_pool::{SharedState, WorkerState};
+use crate::runnable::Runnable;
+use crate::runnable::COMMON_TYPE;
+use crate::schema::FangTaskState;
 use crate::{RetentionMode, SleepParams};
-use diesel::pg::PgConnection;
-use diesel::r2d2::{ConnectionManager, PooledConnection};
 use log::error;
 use std::thread;
+use typed_builder::TypedBuilder;
 
-pub struct Executor {
-    pub pooled_connection: PooledConnection<ConnectionManager<PgConnection>>,
-    pub task_type: Option<String>,
+// TODO Check if this executes well
+#[derive(TypedBuilder)]
+pub struct Executor<BQueue>
+where
+    BQueue: Queueable,
+{
+    #[builder(setter(into))]
+    pub queue: BQueue,
+    #[builder(default=COMMON_TYPE.to_string(), setter(into))]
+    pub task_type: String,
+    #[builder(default, setter(into))]
     pub sleep_params: SleepParams,
+    #[builder(default, setter(into))]
     pub retention_mode: RetentionMode,
-    shared_state: Option<SharedState>,
 }
 
 #[derive(Debug)]
@@ -21,42 +30,10 @@ pub struct Error {
     pub description: String,
 }
 
-#[typetag::serde(tag = "type")]
-pub trait Runnable {
-    fn run(&self, connection: &PgConnection) -> Result<(), Error>;
-
-    fn task_type(&self) -> String {
-        "common".to_string()
-    }
-}
-
-impl Executor {
-    pub fn new(pooled_connection: PooledConnection<ConnectionManager<PgConnection>>) -> Self {
-        Self {
-            pooled_connection,
-            sleep_params: SleepParams::default(),
-            retention_mode: RetentionMode::RemoveFinished,
-            task_type: None,
-            shared_state: None,
-        }
-    }
-
-    pub fn set_shared_state(&mut self, shared_state: SharedState) {
-        self.shared_state = Some(shared_state);
-    }
-
-    pub fn set_task_type(&mut self, task_type: String) {
-        self.task_type = Some(task_type);
-    }
-
-    pub fn set_sleep_params(&mut self, sleep_params: SleepParams) {
-        self.sleep_params = sleep_params;
-    }
-
-    pub fn set_retention_mode(&mut self, retention_mode: RetentionMode) {
-        self.retention_mode = retention_mode;
-    }
-
+impl<BQueue> Executor<BQueue>
+where
+    BQueue: Queueable,
+{
     pub fn run(&self, task: Task) {
         let result = self.execute_task(task);
         self.finalize_task(result)
@@ -64,14 +41,7 @@ impl Executor {
 
     pub fn run_tasks(&mut self) -> Result<(), FangError> {
         loop {
-            if let Some(ref shared_state) = self.shared_state {
-                let shared_state = shared_state.read()?;
-                if let WorkerState::Shutdown = *shared_state {
-                    return Ok(());
-                }
-            }
-
-            match Queue::fetch_and_touch_query(&self.pooled_connection, &self.task_type.clone()) {
+            match self.queue.fetch_and_touch_task(self.task_type.clone()) {
                 Ok(Some(task)) => {
                     self.maybe_reset_sleep_period();
                     self.run(task);
@@ -101,7 +71,7 @@ impl Executor {
 
     fn execute_task(&self, task: Task) -> Result<Task, (Task, String)> {
         let actual_task: Box<dyn Runnable> = serde_json::from_value(task.metadata.clone()).unwrap();
-        let task_result = actual_task.run(&self.pooled_connection);
+        let task_result = actual_task.run(&self.queue);
 
         match task_result {
             Ok(()) => Ok(task),
@@ -113,32 +83,32 @@ impl Executor {
         match self.retention_mode {
             RetentionMode::KeepAll => {
                 match result {
-                    Ok(task) => Queue::finish_task_query(&self.pooled_connection, &task).unwrap(),
-                    Err((task, error)) => {
-                        Queue::fail_task_query(&self.pooled_connection, &task, error).unwrap()
-                    }
+                    Ok(task) => self
+                        .queue
+                        .update_task_state(&task, FangTaskState::Finished)
+                        .unwrap(),
+                    Err((task, error)) => self.queue.fail_task(&task, error).unwrap(),
                 };
             }
             RetentionMode::RemoveAll => {
                 match result {
-                    Ok(task) => Queue::remove_task_query(&self.pooled_connection, task.id).unwrap(),
-                    Err((task, _error)) => {
-                        Queue::remove_task_query(&self.pooled_connection, task.id).unwrap()
-                    }
+                    Ok(task) => self.queue.remove_task(task.id).unwrap(),
+                    Err((task, _error)) => self.queue.remove_task(task.id).unwrap(),
                 };
             }
             RetentionMode::RemoveFinished => match result {
                 Ok(task) => {
-                    Queue::remove_task_query(&self.pooled_connection, task.id).unwrap();
+                    self.queue.remove_task(task.id).unwrap();
                 }
                 Err((task, error)) => {
-                    Queue::fail_task_query(&self.pooled_connection, &task, error).unwrap();
+                    self.queue.fail_task(&task, error).unwrap();
                 }
             },
         }
     }
 }
 
+//TODO fix tests
 #[cfg(test)]
 mod executor_tests {
     use super::Error;

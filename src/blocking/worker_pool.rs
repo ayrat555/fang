@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::thread;
 
+// TODO Re-implement worker pool with new Worker and Queue
 #[derive(Clone)]
 pub struct WorkerPool {
     pub number_of_workers: u32,

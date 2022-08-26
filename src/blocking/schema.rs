@@ -24,17 +24,8 @@ table! {
         error_message -> Nullable<Text>,
         state -> FangTaskStateMapping,
         task_type -> Varchar,
-        created_at -> Timestamptz,
-        updated_at -> Timestamptz,
-    }
-}
-
-table! {
-    fang_periodic_tasks (id) {
-        id -> Uuid,
-        metadata -> Jsonb,
-        period_in_millis -> Int8,
-        scheduled_at -> Nullable<Timestamptz>,
+        uniq_hash -> Nullable<Text>,
+        scheduled_at -> Timestamptz,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
     }
