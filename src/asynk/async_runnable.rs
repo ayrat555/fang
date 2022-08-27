@@ -1,11 +1,18 @@
 use crate::asynk::async_queue::AsyncQueueable;
 use async_trait::async_trait;
+use chrono::DateTime;
+use chrono::Utc;
 
 const COMMON_TYPE: &str = "common";
 
 #[derive(Debug)]
 pub struct Error {
     pub description: String,
+}
+
+pub enum Scheduled {
+    CronPattern(String),
+    ScheduleOnce(DateTime<Utc>),
 }
 
 #[typetag::serde(tag = "type")]
@@ -19,5 +26,9 @@ pub trait AsyncRunnable: Send + Sync {
 
     fn uniq(&self) -> bool {
         false
+    }
+
+    fn cron(&self) -> Option<Scheduled> {
+        None
     }
 }
