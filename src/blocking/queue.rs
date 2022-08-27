@@ -8,14 +8,20 @@ use cron::Schedule;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2;
-use diesel::result::Error;
+use diesel::r2d2::ConnectionManager;
+use diesel::r2d2::Error as PoolError;
+use diesel::r2d2::PooledConnection;
+use diesel::result::Error as DieselError;
 use dotenv::dotenv;
 use sha2::Digest;
 use sha2::Sha256;
 use std::env;
 use std::str::FromStr;
+use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
+
+type PoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
 
 #[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone, TypedBuilder)]
 #[table_name = "fang_tasks"]
@@ -53,65 +59,91 @@ pub struct NewTask {
     scheduled_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Error)]
+pub enum QueueError {
+    #[error(transparent)]
+    DieselError(#[from] DieselError),
+    #[error(transparent)]
+    PoolError(#[from] PoolError),
+}
+
 pub trait Queueable {
-    fn fetch_and_touch_task(&self, task_type: String) -> Result<Option<Task>, Error>;
+    fn fetch_and_touch_task(&self, task_type: String) -> Result<Option<Task>, QueueError>;
 
-    fn insert_task(&self, params: &dyn Runnable) -> Result<Task, Error>;
+    fn insert_task(&self, params: &dyn Runnable) -> Result<Task, QueueError>;
 
-    fn remove_all_tasks(&self) -> Result<usize, Error>;
+    fn remove_all_tasks(&self) -> Result<usize, QueueError>;
 
-    fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, Error>;
+    fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, QueueError>;
 
-    fn remove_task(&self, id: Uuid) -> Result<usize, Error>;
+    fn remove_task(&self, id: Uuid) -> Result<usize, QueueError>;
 
     fn find_task_by_id(&self, id: Uuid) -> Option<Task>;
 
-    fn update_task_state(&self, task: &Task, state: FangTaskState) -> Result<Task, Error>;
+    fn update_task_state(&self, task: &Task, state: FangTaskState) -> Result<Task, QueueError>;
 
-    fn fail_task(&self, task: &Task, error: String) -> Result<Task, Error>;
+    fn fail_task(&self, task: &Task, error: String) -> Result<Task, QueueError>;
 
-    fn schedule_task(&self, task: &dyn Runnable) -> Result<Task, Error>;
+    fn schedule_task(&self, task: &dyn Runnable) -> Result<Task, QueueError>;
 }
 
-#[derive(TypedBuilder)]
+#[derive(Clone, TypedBuilder)]
 pub struct Queue {
     #[builder(setter(into))]
-    pub connection: PgConnection,
+    pub connection_pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
 }
 
 impl Queueable for Queue {
-    fn fetch_and_touch_task(&self, task_type: String) -> Result<Option<Task>, Error> {
-        Self::fetch_and_touch_query(&self.connection, task_type)
+    fn fetch_and_touch_task(&self, task_type: String) -> Result<Option<Task>, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::fetch_and_touch_query(connection, task_type)
     }
 
-    fn insert_task(&self, params: &dyn Runnable) -> Result<Task, Error> {
-        Self::insert_query(&self.connection, params, Utc::now())
+    fn insert_task(&self, params: &dyn Runnable) -> Result<Task, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::insert_query(connection, params, Utc::now())
     }
-    fn schedule_task(&self, params: &dyn Runnable) -> Result<Task, Error> {
-        Self::schedule_task_query(&self.connection, params)
+    fn schedule_task(&self, params: &dyn Runnable) -> Result<Task, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::schedule_task_query(connection, params)
     }
-    fn remove_all_tasks(&self) -> Result<usize, Error> {
-        Self::remove_all_tasks_query(&self.connection)
+    fn remove_all_tasks(&self) -> Result<usize, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::remove_all_tasks_query(connection)
     }
 
-    fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, Error> {
-        Self::remove_tasks_of_type_query(&self.connection, task_type)
+    fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::remove_tasks_of_type_query(connection, task_type)
     }
 
-    fn remove_task(&self, id: Uuid) -> Result<usize, Error> {
-        Self::remove_task_query(&self.connection, id)
+    fn remove_task(&self, id: Uuid) -> Result<usize, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::remove_task_query(connection, id)
     }
 
-    fn update_task_state(&self, task: &Task, state: FangTaskState) -> Result<Task, Error> {
-        Self::update_task_state_query(&self.connection, task, state)
+    fn update_task_state(&self, task: &Task, state: FangTaskState) -> Result<Task, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::update_task_state_query(connection, task, state)
     }
 
-    fn fail_task(&self, task: &Task, error: String) -> Result<Task, Error> {
-        Self::fail_task_query(&self.connection, task, error)
+    fn fail_task(&self, task: &Task, error: String) -> Result<Task, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::fail_task_query(connection, task, error)
     }
 
     fn find_task_by_id(&self, id: Uuid) -> Option<Task> {
-        Self::find_task_by_id_query(&self.connection, id)
+        let connection = self.get_connection()?;
+
+        Self::find_task_by_id_query(connection, id)
     }
 }
 
@@ -132,10 +164,17 @@ impl Queue {
         Self { connection }
     }
 
+    pub fn get_connection(&self) -> Result<PoolConnection, QueueError> {
+        self.connection_pool.get().ok_or(|err| {
+            log::error!("Failed to get a db connection {:?}", err);
+            Err(QueueError::PoolError);
+        })
+    }
+
     pub fn schedule_task_query(
         connection: &PgConnection,
         params: &dyn Runnable,
-    ) -> Result<Task, Error> {
+    ) -> Result<Task, DieselError> {
         let scheduled_at = match params.cron() {
             Some(scheduled) => match scheduled {
                 CronPattern(cron_pattern) => {
@@ -157,7 +196,7 @@ impl Queue {
         connection: &PgConnection,
         params: &dyn Runnable,
         scheduled_at: DateTime<Utc>,
-    ) -> Result<Task, Error> {
+    ) -> Result<Task, DieselError> {
         if !params.uniq() {
             let new_task = NewTask::builder()
                 .scheduled_at(scheduled_at)
@@ -202,8 +241,8 @@ impl Queue {
     pub fn fetch_and_touch_query(
         connection: &PgConnection,
         task_type: String,
-    ) -> Result<Option<Task>, Error> {
-        connection.transaction::<Option<Task>, Error, _>(|| {
+    ) -> Result<Option<Task>, DieselError> {
+        connection.transaction::<Option<Task>, DieselError, _>(|| {
             let found_task = Self::fetch_task_query(connection, task_type);
 
             if found_task.is_none() {
@@ -228,20 +267,20 @@ impl Queue {
             .ok()
     }
 
-    pub fn remove_all_tasks_query(connection: &PgConnection) -> Result<usize, Error> {
+    pub fn remove_all_tasks_query(connection: &PgConnection) -> Result<usize, DieselError> {
         diesel::delete(fang_tasks::table).execute(connection)
     }
 
     pub fn remove_tasks_of_type_query(
         connection: &PgConnection,
         task_type: &str,
-    ) -> Result<usize, Error> {
+    ) -> Result<usize, DieselError> {
         let query = fang_tasks::table.filter(fang_tasks::task_type.eq(task_type));
 
         diesel::delete(query).execute(connection)
     }
 
-    pub fn remove_task_query(connection: &PgConnection, id: Uuid) -> Result<usize, Error> {
+    pub fn remove_task_query(connection: &PgConnection, id: Uuid) -> Result<usize, DieselError> {
         let query = fang_tasks::table.filter(fang_tasks::id.eq(id));
 
         diesel::delete(query).execute(connection)
@@ -251,7 +290,7 @@ impl Queue {
         connection: &PgConnection,
         task: &Task,
         state: FangTaskState,
-    ) -> Result<Task, Error> {
+    ) -> Result<Task, DieselError> {
         diesel::update(task)
             .set((
                 fang_tasks::state.eq(state),
@@ -264,7 +303,7 @@ impl Queue {
         connection: &PgConnection,
         task: &Task,
         error: String,
-    ) -> Result<Task, Error> {
+    ) -> Result<Task, DieselError> {
         diesel::update(task)
             .set((
                 fang_tasks::state.eq(FangTaskState::Failed),

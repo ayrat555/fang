@@ -11,7 +11,7 @@ use typed_builder::TypedBuilder;
 
 // TODO Check if this executes well
 #[derive(TypedBuilder)]
-pub struct Executor<BQueue>
+pub struct Worker<BQueue>
 where
     BQueue: Queueable,
 {
@@ -30,7 +30,7 @@ pub struct Error {
     pub description: String,
 }
 
-impl<BQueue> Executor<BQueue>
+impl<BQueue> Worker<BQueue>
 where
     BQueue: Queueable,
 {
