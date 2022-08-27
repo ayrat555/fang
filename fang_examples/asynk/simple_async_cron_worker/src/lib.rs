@@ -8,24 +8,13 @@ use fang::AsyncRunnable;
 
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "fang::serde")]
-pub struct MyCronTask {
-    pub number: u16,
-}
-
-impl MyCronTask {
-    pub fn new(number: u16) -> Self {
-        Self { number }
-    }
-}
+pub struct MyCronTask {}
 
 #[async_trait]
 #[typetag::serde]
 impl AsyncRunnable for MyCronTask {
     async fn run(&self, _queue: &mut dyn AsyncQueueable) -> Result<(), Error> {
-        log::info!(
-            "CRON!!!!!!!!!!!!!!!!!!!! the current number is {}",
-            self.number
-        );
+        log::info!("CRON!!!!!!!!!!!!!!!",);
 
         Ok(())
     }

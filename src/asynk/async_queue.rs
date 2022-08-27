@@ -181,8 +181,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
     async fn find_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
-        let task = AsyncQueue::<NoTls>::find_task_by_id_query(transaction, id).await?;
-        Ok(task)
+        AsyncQueue::<NoTls>::find_task_by_id_query(transaction, id).await
     }
 
     async fn fetch_and_touch_task(
@@ -191,9 +190,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
     ) -> Result<Option<Task>, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
-        let task = AsyncQueue::<NoTls>::fetch_and_touch_task_query(transaction, task_type).await?;
-
-        Ok(task)
+        AsyncQueue::<NoTls>::fetch_and_touch_task_query(transaction, task_type).await
     }
 
     async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
@@ -268,25 +265,19 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
     async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
-        let result = AsyncQueue::<NoTls>::remove_all_tasks_query(transaction).await?;
-
-        Ok(result)
+        AsyncQueue::<NoTls>::remove_all_tasks_query(transaction).await
     }
 
     async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
-        let result = AsyncQueue::<NoTls>::remove_task_query(transaction, task).await?;
-
-        Ok(result)
+        AsyncQueue::<NoTls>::remove_task_query(transaction, task).await
     }
 
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
-        let result = AsyncQueue::<NoTls>::remove_tasks_type_query(transaction, task_type).await?;
-
-        Ok(result)
+        AsyncQueue::<NoTls>::remove_tasks_type_query(transaction, task_type).await
     }
 
     async fn update_task_state(
@@ -296,9 +287,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
     ) -> Result<Task, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
-        let task = AsyncQueue::<NoTls>::update_task_state_query(transaction, task, state).await?;
-
-        Ok(task)
+        AsyncQueue::<NoTls>::update_task_state_query(transaction, task, state).await
     }
 
     async fn fail_task(
@@ -308,9 +297,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
     ) -> Result<Task, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
-        let task = AsyncQueue::<NoTls>::fail_task_query(transaction, task, error_message).await?;
-
-        Ok(task)
+        AsyncQueue::<NoTls>::fail_task_query(transaction, task, error_message).await
     }
 }
 
@@ -737,7 +724,9 @@ mod async_queue_tests {
     use bb8_postgres::bb8::Pool;
     use bb8_postgres::tokio_postgres::NoTls;
     use bb8_postgres::PostgresConnectionManager;
+    use chrono::DateTime;
     use chrono::Duration;
+    use chrono::SubsecRound;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
 
@@ -757,6 +746,7 @@ mod async_queue_tests {
     #[derive(Serialize, Deserialize)]
     struct AsyncTaskSchedule {
         pub number: u16,
+        pub datetime: String,
     }
 
     #[typetag::serde]
@@ -767,7 +757,8 @@ mod async_queue_tests {
         }
 
         fn cron(&self) -> Option<Scheduled> {
-            Some(Scheduled::ScheduleOnce(Utc::now() + Duration::seconds(7)))
+            let datetime = self.datetime.parse::<DateTime<Utc>>().ok()?;
+            Some(Scheduled::ScheduleOnce(datetime))
         }
     }
 
@@ -886,10 +877,14 @@ mod async_queue_tests {
 
         let mut test = AsyncQueueTest::builder().transaction(transaction).build();
 
-        let task = test
-            .schedule_task(&AsyncTaskSchedule { number: 1 })
-            .await
-            .unwrap();
+        let datetime = (Utc::now() + Duration::seconds(7)).round_subsecs(0);
+
+        let task = &AsyncTaskSchedule {
+            number: 1,
+            datetime: datetime.to_string(),
+        };
+
+        let task = test.schedule_task(task).await.unwrap();
 
         let metadata = task.metadata.as_object().unwrap();
         let number = metadata["number"].as_u64();
@@ -897,6 +892,7 @@ mod async_queue_tests {
 
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTaskSchedule"), type_task);
+        assert_eq!(task.scheduled_at, datetime);
     }
 
     #[tokio::test]

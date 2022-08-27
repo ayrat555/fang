@@ -30,7 +30,7 @@ async fn main() {
     pool.start().await;
     log::info!("Workers started ...");
 
-    let task = MyCronTask::new(5_000);
+    let task = MyCronTask {};
 
     queue
         .schedule_task(&task as &dyn AsyncRunnable)
