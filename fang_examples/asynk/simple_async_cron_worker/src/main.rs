@@ -3,9 +3,7 @@ use fang::asynk::async_queue::AsyncQueueable;
 use fang::asynk::async_worker_pool::AsyncWorkerPool;
 use fang::AsyncRunnable;
 use fang::NoTls;
-use simple_async_worker::MyCronTask;
-use simple_async_worker::MyFailingTask;
-use simple_async_worker::MyTask;
+use simple_async_cron_worker::MyCronTask;
 use std::time::Duration;
 
 #[tokio::main]
@@ -32,28 +30,10 @@ async fn main() {
     pool.start().await;
     log::info!("Workers started ...");
 
-    //let task1 = MyTask::new(0);
-    //let task2 = MyTask::new(20_000);
-    //let task3 = MyFailingTask::new(50_000);
-    let task4 = MyCronTask::new(5_000);
+    let task = MyCronTask::new(5_000);
 
-    /*queue
-        .insert_task(&task1 as &dyn AsyncRunnable)
-        .await
-        .unwrap();
-    */
-    /*queue
-        .insert_task(&task2 as &dyn AsyncRunnable)
-        .await
-        .unwrap();
-    */
-    /*queue
-        .insert_task(&task3 as &dyn AsyncRunnable)
-        .await
-        .unwrap();
-    */
     queue
-        .schedule_task(&task4 as &dyn AsyncRunnable)
+        .schedule_task(&task as &dyn AsyncRunnable)
         .await
         .unwrap();
 

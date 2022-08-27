@@ -105,22 +105,13 @@ where
                         serde_json::from_value(task.metadata.clone()).unwrap();
 
                     // check if task is scheduled or not
-                    self.sleep_params.maybe_reset_sleep_period();
-
-                    match actual_task.cron() {
-                        None => self.run(task, actual_task).await?,
-                        Some(scheduled) => {
-                            match scheduled {
-                                CronPattern(_) => {
-                                    // program task
-                                    self.queue.schedule_task(&*actual_task).await?;
-                                    // run scheduled task
-                                    self.run(task, actual_task).await?;
-                                }
-                                ScheduleOnce(_) => self.run(task, actual_task).await?,
-                            }
-                        }
+                    if let Some(CronPattern(_)) = actual_task.cron() {
+                        // program task
+                        self.queue.schedule_task(&*actual_task).await?;
                     }
+                    self.sleep_params.maybe_reset_sleep_period();
+                    // run scheduled task
+                    self.run(task, actual_task).await?;
                 }
                 Ok(None) => {
                     self.sleep().await;
@@ -227,21 +218,13 @@ impl<'a> AsyncWorkerTest<'a> {
                         serde_json::from_value(task.metadata.clone()).unwrap();
 
                     // check if task is scheduled or not
-                    self.sleep_params.maybe_reset_sleep_period();
-                    match actual_task.cron() {
-                        None => self.run(task, actual_task).await?,
-                        Some(scheduled) => {
-                            match scheduled {
-                                CronPattern(_) => {
-                                    // program task
-                                    self.queue.schedule_task(&*actual_task).await.unwrap();
-                                    // run scheduled task
-                                    self.run(task, actual_task).await?;
-                                }
-                                ScheduleOnce(_) => self.run(task, actual_task).await?,
-                            }
-                        }
+                    if let Some(CronPattern(_)) = actual_task.cron() {
+                        // program task
+                        self.queue.schedule_task(&*actual_task).await?;
                     }
+                    self.sleep_params.maybe_reset_sleep_period();
+                    // run scheduled task
+                    self.run(task, actual_task).await?;
                 }
                 Ok(None) => {
                     return Ok(());

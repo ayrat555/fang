@@ -77,6 +77,16 @@ pub struct Task {
 }
 
 #[derive(Debug, Error)]
+pub enum CronError {
+    #[error(transparent)]
+    LibraryError(#[from] cron::error::Error),
+    #[error("You have to implement method `cron()` in your AsyncRunnable")]
+    TaskNotSchedulableError,
+    #[error("No timestamps match with this cron pattern")]
+    NoTimestampsError,
+}
+
+#[derive(Debug, Error)]
 pub enum AsyncQueueError {
     #[error(transparent)]
     PoolError(#[from] RunError<bb8_postgres::tokio_postgres::Error>),
@@ -84,6 +94,8 @@ pub enum AsyncQueueError {
     PgError(#[from] bb8_postgres::tokio_postgres::Error),
     #[error(transparent)]
     SerdeError(#[from] serde_json::Error),
+    #[error(transparent)]
+    CronError(#[from] CronError),
     #[error("returned invalid result (expected {expected:?}, found {found:?})")]
     ResultError { expected: u64, found: u64 },
     #[error(
@@ -92,10 +104,12 @@ pub enum AsyncQueueError {
     NotConnectedError,
     #[error("Can not convert `std::time::Duration` to `chrono::Duration`")]
     TimeError,
-    #[error("You have to implement method `cron()` in your AsyncRunnable")]
-    TaskNotSchedulableError,
-    #[error("Cron pattern not valid")]
-    CronNotValidError,
+}
+
+impl From<cron::error::Error> for AsyncQueueError {
+    fn from(error: cron::error::Error) -> Self {
+        AsyncQueueError::CronError(CronError::LibraryError(error))
+    }
 }
 
 impl From<AsyncQueueError> for FangError {
@@ -215,17 +229,19 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         let scheduled_at = match task.cron() {
             Some(scheduled) => match scheduled {
                 CronPattern(cron_pattern) => {
-                    let schedule = match Schedule::from_str(&cron_pattern) {
-                        Ok(schedule) => Ok(schedule),
-                        Err(_) => Err(AsyncQueueError::CronNotValidError),
-                    }?;
+                    let schedule = Schedule::from_str(&cron_pattern)?;
                     let mut iterator = schedule.upcoming(Utc);
-                    iterator.next().unwrap()
+
+                    iterator
+                        .next()
+                        .ok_or(AsyncQueueError::CronError(CronError::NoTimestampsError))?
                 }
                 ScheduleOnce(datetime) => datetime,
             },
             None => {
-                return Err(AsyncQueueError::TaskNotSchedulableError);
+                return Err(AsyncQueueError::CronError(
+                    CronError::TaskNotSchedulableError,
+                ));
             }
         };
 
@@ -610,17 +626,18 @@ where
         let scheduled_at = match task.cron() {
             Some(scheduled) => match scheduled {
                 CronPattern(cron_pattern) => {
-                    let schedule = match Schedule::from_str(&cron_pattern) {
-                        Ok(schedule) => Ok(schedule),
-                        Err(_) => Err(AsyncQueueError::CronNotValidError),
-                    }?;
+                    let schedule = Schedule::from_str(&cron_pattern)?;
                     let mut iterator = schedule.upcoming(Utc);
-                    iterator.next().unwrap()
+                    iterator
+                        .next()
+                        .ok_or(AsyncQueueError::CronError(CronError::NoTimestampsError))?
                 }
                 ScheduleOnce(datetime) => datetime,
             },
             None => {
-                return Err(AsyncQueueError::TaskNotSchedulableError);
+                return Err(AsyncQueueError::CronError(
+                    CronError::TaskNotSchedulableError,
+                ));
             }
         };
 
