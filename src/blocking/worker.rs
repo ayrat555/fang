@@ -267,6 +267,7 @@ mod executor_tests {
 
         let mut worker = Worker::<Queue>::builder()
             .queue(queue)
+            .task_type(task1.task_type())
             .retention_mode(RetentionMode::KeepAll)
             .build();
 

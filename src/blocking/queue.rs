@@ -334,6 +334,7 @@ impl Queue {
     fn fetch_task_of_type_query(connection: &PgConnection, task_type: &str) -> Option<Task> {
         fang_tasks::table
             .order(fang_tasks::created_at.asc())
+            .order(fang_tasks::scheduled_at.asc())
             .limit(1)
             .filter(fang_tasks::scheduled_at.le(Utc::now()))
             .filter(fang_tasks::state.eq(FangTaskState::New))
@@ -343,6 +344,7 @@ impl Queue {
             .get_result::<Task>(connection)
             .ok()
     }
+
     fn find_task_by_uniq_hash_query(connection: &PgConnection, uniq_hash: &str) -> Option<Task> {
         fang_tasks::table
             .filter(fang_tasks::uniq_hash.eq(uniq_hash))
