@@ -1,6 +1,22 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use std::time::Duration;
+use thiserror::Error;
+
+pub enum Scheduled {
+    CronPattern(String),
+    ScheduleOnce(DateTime<Utc>),
+}
+
+#[derive(Debug, Error)]
+pub enum CronError {
+    #[error(transparent)]
+    LibraryError(#[from] cron::error::Error),
+    #[error("You have to implement method `cron()` in your AsyncRunnable")]
+    TaskNotSchedulableError,
+    #[error("No timestamps match with this cron pattern")]
+    NoTimestampsError,
+}
 
 #[derive(Clone, Debug)]
 pub enum RetentionMode {

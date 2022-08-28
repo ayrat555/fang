@@ -1,3 +1,4 @@
+use crate::blocking::queue::QueueError;
 use std::io::Error as IoError;
 use std::sync::PoisonError;
 use thiserror::Error;
@@ -6,7 +7,8 @@ use thiserror::Error;
 pub enum FangError {
     #[error("The shared state in an executor thread became poisoned")]
     PoisonedLock,
-
+    #[error(transparent)]
+    QueueError(#[from] QueueError),
     #[error("Failed to create executor thread")]
     ExecutorThreadCreationFailed {
         #[from]

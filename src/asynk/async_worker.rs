@@ -1,10 +1,10 @@
-use crate::async_runnable::Scheduled::*;
 use crate::asynk::async_queue::AsyncQueueable;
 use crate::asynk::async_queue::FangTaskState;
 use crate::asynk::async_queue::Task;
 use crate::asynk::async_queue::DEFAULT_TASK_TYPE;
 use crate::asynk::async_runnable::AsyncRunnable;
 use crate::asynk::AsyncError as Error;
+use crate::Scheduled::*;
 use crate::{RetentionMode, SleepParams};
 use log::error;
 use typed_builder::TypedBuilder;

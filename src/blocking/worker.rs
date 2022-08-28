@@ -4,16 +4,16 @@ use crate::queue::Task;
 use crate::runnable::Runnable;
 use crate::runnable::COMMON_TYPE;
 use crate::schema::FangTaskState;
+use crate::Scheduled::*;
 use crate::{RetentionMode, SleepParams};
 use log::error;
 use std::thread;
 use typed_builder::TypedBuilder;
 
-// TODO Check if this executes well
 #[derive(TypedBuilder)]
 pub struct Worker<BQueue>
 where
-    BQueue: Queueable,
+    BQueue: Queueable + Clone + Sync + Send + 'static,
 {
     #[builder(setter(into))]
     pub queue: BQueue,
@@ -32,7 +32,7 @@ pub struct Error {
 
 impl<BQueue> Worker<BQueue>
 where
-    BQueue: Queueable,
+    BQueue: Queueable + Clone + Sync + Send + 'static,
 {
     pub fn run(&self, task: Task) {
         let result = self.execute_task(task);
@@ -43,6 +43,15 @@ where
         loop {
             match self.queue.fetch_and_touch_task(self.task_type.clone()) {
                 Ok(Some(task)) => {
+                    let actual_task: Box<dyn Runnable> =
+                        serde_json::from_value(task.metadata.clone()).unwrap();
+
+                    // check if task is scheduled or not
+                    if let Some(CronPattern(_)) = actual_task.cron() {
+                        // program task
+                        self.queue.schedule_task(&*actual_task)?;
+                    }
+
                     self.maybe_reset_sleep_period();
                     self.run(task);
                 }
@@ -50,6 +59,35 @@ where
                     self.sleep();
                 }
 
+                Err(error) => {
+                    error!("Failed to fetch a task {:?}", error);
+
+                    self.sleep();
+                }
+            };
+        }
+    }
+
+    #[cfg(test)]
+    pub fn run_tasks_until_none(&mut self) -> Result<(), FangError> {
+        loop {
+            match self.queue.fetch_and_touch_task(self.task_type.clone()) {
+                Ok(Some(task)) => {
+                    let actual_task: Box<dyn Runnable> =
+                        serde_json::from_value(task.metadata.clone()).unwrap();
+
+                    // check if task is scheduled or not
+                    if let Some(CronPattern(_)) = actual_task.cron() {
+                        // program task
+                        self.queue.schedule_task(&*actual_task)?;
+                    }
+
+                    self.maybe_reset_sleep_period();
+                    self.run(task);
+                }
+                Ok(None) => {
+                    return Ok(());
+                }
                 Err(error) => {
                     error!("Failed to fetch a task {:?}", error);
 
@@ -108,30 +146,31 @@ where
     }
 }
 
-//TODO fix tests
 #[cfg(test)]
 mod executor_tests {
     use super::Error;
-    use super::Executor;
     use super::RetentionMode;
     use super::Runnable;
+    use super::Worker;
     use crate::queue::Queue;
+    use crate::queue::Queueable;
     use crate::schema::FangTaskState;
     use crate::typetag;
     use crate::NewTask;
+    use chrono::Utc;
     use diesel::connection::Connection;
     use diesel::pg::PgConnection;
     use diesel::r2d2::{ConnectionManager, PooledConnection};
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]
-    struct ExecutorTaskTest {
+    struct WorkerTaskTest {
         pub number: u16,
     }
 
     #[typetag::serde]
-    impl Runnable for ExecutorTaskTest {
-        fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
+    impl Runnable for WorkerTaskTest {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), Error> {
             println!("the number is {}", self.number);
 
             Ok(())
@@ -145,7 +184,7 @@ mod executor_tests {
 
     #[typetag::serde]
     impl Runnable for FailedTask {
-        fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), Error> {
             let message = format!("the number is {}", self.number);
 
             Err(Error {
@@ -159,7 +198,7 @@ mod executor_tests {
 
     #[typetag::serde]
     impl Runnable for TaskType1 {
-        fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), Error> {
             Ok(())
         }
 
@@ -173,7 +212,7 @@ mod executor_tests {
 
     #[typetag::serde]
     impl Runnable for TaskType2 {
-        fn run(&self, _connection: &PgConnection) -> Result<(), Error> {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), Error> {
             Ok(())
         }
 
@@ -188,111 +227,109 @@ mod executor_tests {
 
     #[test]
     fn executes_and_finishes_task() {
-        let job = ExecutorTaskTest { number: 10 };
+        let task = WorkerTaskTest { number: 10 };
 
-        let new_task = NewTask {
-            metadata: serialize(&job),
-            task_type: "common".to_string(),
-        };
+        let pool = Queue::connection_pool(5);
 
-        let mut executor = Executor::new(pooled_connection());
-        executor.set_retention_mode(RetentionMode::KeepAll);
+        let queue = Queue::builder().connection_pool(pool).build();
 
-        executor
-            .pooled_connection
-            .test_transaction::<(), Error, _>(|| {
-                let task = Queue::insert_query(&executor.pooled_connection, &new_task).unwrap();
+        let worker = Worker::<Queue>::builder()
+            .queue(queue)
+            .retention_mode(RetentionMode::KeepAll)
+            .build();
 
-                assert_eq!(FangTaskState::New, task.state);
+        let worker_pooled_connection = pooled_connection();
+        let pooled_connection = pooled_connection();
 
-                executor.run(task.clone());
+        worker_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task = Queue::insert_query(&pooled_connection, &task, Utc::now()).unwrap();
 
-                let found_task =
-                    Queue::find_task_by_id_query(&executor.pooled_connection, task.id).unwrap();
+            assert_eq!(FangTaskState::New, task.state);
 
-                assert_eq!(FangTaskState::Finished, found_task.state);
+            worker.run(task.clone());
 
-                Ok(())
-            });
+            let found_task = Queue::find_task_by_id_query(&pooled_connection, task.id).unwrap();
+
+            assert_eq!(FangTaskState::Finished, found_task.state);
+
+            Ok(())
+        });
     }
 
     #[test]
-    #[ignore]
     fn executes_task_only_of_specific_type() {
         let task1 = TaskType1 {};
         let task2 = TaskType2 {};
 
-        let new_task1 = NewTask {
-            metadata: serialize(&task1),
-            task_type: "type1".to_string(),
-        };
+        let pool = Queue::connection_pool(5);
 
-        let new_task2 = NewTask {
-            metadata: serialize(&task2),
-            task_type: "type2".to_string(),
-        };
+        let queue = Queue::builder().connection_pool(pool).build();
 
-        let executor = Executor::new(pooled_connection());
+        let mut worker = Worker::<Queue>::builder()
+            .queue(queue)
+            .retention_mode(RetentionMode::KeepAll)
+            .build();
 
-        let task1 = Queue::insert_query(&executor.pooled_connection, &new_task1).unwrap();
-        let task2 = Queue::insert_query(&executor.pooled_connection, &new_task2).unwrap();
+        let worker_pooled_connection = pooled_connection();
+        let pooled_connection = pooled_connection();
 
-        assert_eq!(FangTaskState::New, task1.state);
-        assert_eq!(FangTaskState::New, task2.state);
+        worker_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task1 = Queue::insert_query(&pooled_connection, &task1, Utc::now()).unwrap();
+            let task2 = Queue::insert_query(&pooled_connection, &task2, Utc::now()).unwrap();
 
-        std::thread::spawn(move || {
-            let mut executor = Executor::new(pooled_connection());
-            executor.set_retention_mode(RetentionMode::KeepAll);
-            executor.set_task_type("type1".to_string());
+            assert_eq!(FangTaskState::New, task1.state);
+            assert_eq!(FangTaskState::New, task2.state);
 
-            executor.run_tasks().unwrap();
+            worker.run_tasks_until_none().unwrap();
+
+            std::thread::sleep(std::time::Duration::from_millis(1000));
+
+            let found_task1 = Queue::find_task_by_id_query(&pooled_connection, task1.id).unwrap();
+            assert_eq!(FangTaskState::Finished, found_task1.state);
+
+            let found_task2 = Queue::find_task_by_id_query(&pooled_connection, task2.id).unwrap();
+            assert_eq!(FangTaskState::New, found_task2.state);
+
+            Ok(())
         });
-
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-
-        let found_task1 =
-            Queue::find_task_by_id_query(&executor.pooled_connection, task1.id).unwrap();
-        assert_eq!(FangTaskState::Finished, found_task1.state);
-
-        let found_task2 =
-            Queue::find_task_by_id_query(&executor.pooled_connection, task2.id).unwrap();
-        assert_eq!(FangTaskState::New, found_task2.state);
     }
 
     #[test]
     fn saves_error_for_failed_task() {
         let task = FailedTask { number: 10 };
 
-        let new_task = NewTask {
-            metadata: serialize(&task),
-            task_type: "common".to_string(),
-        };
+        let pool = Queue::connection_pool(5);
 
-        let executor = Executor::new(pooled_connection());
+        let queue = Queue::builder().connection_pool(pool).build();
 
-        executor
-            .pooled_connection
-            .test_transaction::<(), Error, _>(|| {
-                let task = Queue::insert_query(&executor.pooled_connection, &new_task).unwrap();
+        let worker = Worker::<Queue>::builder()
+            .queue(queue)
+            .retention_mode(RetentionMode::KeepAll)
+            .build();
 
-                assert_eq!(FangTaskState::New, task.state);
+        let worker_pooled_connection = pooled_connection();
+        let pooled_connection = pooled_connection();
 
-                executor.run(task.clone());
+        worker_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task = Queue::insert_query(&pooled_connection, &task, Utc::now()).unwrap();
 
-                let found_task =
-                    Queue::find_task_by_id_query(&executor.pooled_connection, task.id).unwrap();
+            assert_eq!(FangTaskState::New, task.state);
 
-                assert_eq!(FangTaskState::Failed, found_task.state);
-                assert_eq!(
-                    "the number is 10".to_string(),
-                    found_task.error_message.unwrap()
-                );
+            worker.run(task.clone());
 
-                Ok(())
-            });
+            let found_task = Queue::find_task_by_id_query(&pooled_connection, task.id).unwrap();
+
+            assert_eq!(FangTaskState::Failed, found_task.state);
+            assert_eq!(
+                "the number is 10".to_string(),
+                found_task.error_message.unwrap()
+            );
+
+            Ok(())
+        });
     }
 
     fn pooled_connection() -> PooledConnection<ConnectionManager<PgConnection>> {
-        Queue::connection_pool(5).get().unwrap()
+        Queue::connection_pool(1).get().unwrap()
     }
 }

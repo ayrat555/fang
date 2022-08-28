@@ -77,16 +77,6 @@ pub struct Task {
 }
 
 #[derive(Debug, Error)]
-pub enum CronError {
-    #[error(transparent)]
-    LibraryError(#[from] cron::error::Error),
-    #[error("You have to implement method `cron()` in your AsyncRunnable")]
-    TaskNotSchedulableError,
-    #[error("No timestamps match with this cron pattern")]
-    NoTimestampsError,
-}
-
-#[derive(Debug, Error)]
 pub enum AsyncQueueError {
     #[error(transparent)]
     PoolError(#[from] RunError<bb8_postgres::tokio_postgres::Error>),

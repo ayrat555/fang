@@ -1,14 +1,8 @@
 use crate::queue::Queueable;
 use crate::Error;
-use chrono::DateTime;
-use chrono::Utc;
+use crate::Scheduled;
 
 pub const COMMON_TYPE: &str = "common";
-
-pub enum Scheduled {
-    CronPattern(String),
-    ScheduleOnce(DateTime<Utc>),
-}
 
 #[typetag::serde(tag = "type")]
 pub trait Runnable {
