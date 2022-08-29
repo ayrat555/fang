@@ -242,7 +242,6 @@ impl<'a> AsyncWorkerTest<'a> {
 #[cfg(test)]
 mod async_worker_tests {
     use super::AsyncWorkerTest;
-    use crate::async_runnable::Scheduled;
     use crate::asynk::async_queue::AsyncQueueTest;
     use crate::asynk::async_queue::AsyncQueueable;
     use crate::asynk::async_queue::FangTaskState;
@@ -250,6 +249,7 @@ mod async_worker_tests {
     use crate::asynk::AsyncError as Error;
     use crate::asynk::AsyncRunnable;
     use crate::RetentionMode;
+    use crate::Scheduled;
     use async_trait::async_trait;
     use bb8_postgres::bb8::Pool;
     use bb8_postgres::tokio_postgres::NoTls;
@@ -283,7 +283,7 @@ mod async_worker_tests {
             Ok(())
         }
         fn cron(&self) -> Option<Scheduled> {
-            Some(Scheduled::ScheduleOnce(Utc::now() + Duration::seconds(7)))
+            Some(Scheduled::ScheduleOnce(Utc::now() + Duration::seconds(1)))
         }
     }
 
@@ -383,7 +383,7 @@ mod async_worker_tests {
         assert_eq!(id, task.id);
         assert_eq!(FangTaskState::New, task.state);
 
-        tokio::time::sleep(core::time::Duration::from_secs(10)).await;
+        tokio::time::sleep(core::time::Duration::from_secs(3)).await;
 
         worker.run_tasks_until_none().await.unwrap();
 

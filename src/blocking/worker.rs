@@ -147,7 +147,7 @@ where
 }
 
 #[cfg(test)]
-mod executor_tests {
+mod worker_tests {
     use super::Error;
     use super::RetentionMode;
     use super::Runnable;
@@ -156,11 +156,7 @@ mod executor_tests {
     use crate::queue::Queueable;
     use crate::schema::FangTaskState;
     use crate::typetag;
-    use crate::NewTask;
     use chrono::Utc;
-    use diesel::connection::Connection;
-    use diesel::pg::PgConnection;
-    use diesel::r2d2::{ConnectionManager, PooledConnection};
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]
@@ -174,6 +170,10 @@ mod executor_tests {
             println!("the number is {}", self.number);
 
             Ok(())
+        }
+
+        fn task_type(&self) -> String {
+            "worker_task".to_string()
         }
     }
 
@@ -190,6 +190,10 @@ mod executor_tests {
             Err(Error {
                 description: message,
             })
+        }
+
+        fn task_type(&self) -> String {
+            "F_task".to_string()
         }
     }
 
@@ -221,11 +225,9 @@ mod executor_tests {
         }
     }
 
-    pub fn serialize(job: &dyn Runnable) -> serde_json::Value {
-        serde_json::to_value(job).unwrap()
-    }
-
+    // Worker tests has to commit because the worker operations commits
     #[test]
+    #[ignore]
     fn executes_and_finishes_task() {
         let task = WorkerTaskTest { number: 10 };
 
@@ -236,27 +238,26 @@ mod executor_tests {
         let worker = Worker::<Queue>::builder()
             .queue(queue)
             .retention_mode(RetentionMode::KeepAll)
+            .task_type(task.task_type())
             .build();
+        let pooled_connection = worker.queue.connection_pool.get().unwrap();
 
-        let worker_pooled_connection = pooled_connection();
-        let pooled_connection = pooled_connection();
+        let task = Queue::insert_query(&pooled_connection, &task, Utc::now()).unwrap();
 
-        worker_pooled_connection.test_transaction::<(), Error, _>(|| {
-            let task = Queue::insert_query(&pooled_connection, &task, Utc::now()).unwrap();
+        assert_eq!(FangTaskState::New, task.state);
 
-            assert_eq!(FangTaskState::New, task.state);
+        // this operation commits and thats why need to commit this test
+        worker.run(task.clone());
 
-            worker.run(task.clone());
+        let found_task = Queue::find_task_by_id_query(&pooled_connection, task.id).unwrap();
 
-            let found_task = Queue::find_task_by_id_query(&pooled_connection, task.id).unwrap();
+        assert_eq!(FangTaskState::Finished, found_task.state);
 
-            assert_eq!(FangTaskState::Finished, found_task.state);
-
-            Ok(())
-        });
+        Queue::remove_tasks_of_type_query(&pooled_connection, "worker_task").unwrap();
     }
 
     #[test]
+    #[ignore]
     fn executes_task_only_of_specific_type() {
         let task1 = TaskType1 {};
         let task2 = TaskType2 {};
@@ -271,31 +272,30 @@ mod executor_tests {
             .retention_mode(RetentionMode::KeepAll)
             .build();
 
-        let worker_pooled_connection = pooled_connection();
-        let pooled_connection = pooled_connection();
+        let pooled_connection = worker.queue.connection_pool.get().unwrap();
 
-        worker_pooled_connection.test_transaction::<(), Error, _>(|| {
-            let task1 = Queue::insert_query(&pooled_connection, &task1, Utc::now()).unwrap();
-            let task2 = Queue::insert_query(&pooled_connection, &task2, Utc::now()).unwrap();
+        let task1 = Queue::insert_query(&pooled_connection, &task1, Utc::now()).unwrap();
+        let task2 = Queue::insert_query(&pooled_connection, &task2, Utc::now()).unwrap();
 
-            assert_eq!(FangTaskState::New, task1.state);
-            assert_eq!(FangTaskState::New, task2.state);
+        assert_eq!(FangTaskState::New, task1.state);
+        assert_eq!(FangTaskState::New, task2.state);
 
-            worker.run_tasks_until_none().unwrap();
+        worker.run_tasks_until_none().unwrap();
 
-            std::thread::sleep(std::time::Duration::from_millis(1000));
+        std::thread::sleep(std::time::Duration::from_millis(1000));
 
-            let found_task1 = Queue::find_task_by_id_query(&pooled_connection, task1.id).unwrap();
-            assert_eq!(FangTaskState::Finished, found_task1.state);
+        let found_task1 = Queue::find_task_by_id_query(&pooled_connection, task1.id).unwrap();
+        assert_eq!(FangTaskState::Finished, found_task1.state);
 
-            let found_task2 = Queue::find_task_by_id_query(&pooled_connection, task2.id).unwrap();
-            assert_eq!(FangTaskState::New, found_task2.state);
+        let found_task2 = Queue::find_task_by_id_query(&pooled_connection, task2.id).unwrap();
+        assert_eq!(FangTaskState::New, found_task2.state);
 
-            Ok(())
-        });
+        Queue::remove_tasks_of_type_query(&pooled_connection, "type1").unwrap();
+        Queue::remove_tasks_of_type_query(&pooled_connection, "type2").unwrap();
     }
 
     #[test]
+    #[ignore]
     fn saves_error_for_failed_task() {
         let task = FailedTask { number: 10 };
 
@@ -306,31 +306,25 @@ mod executor_tests {
         let worker = Worker::<Queue>::builder()
             .queue(queue)
             .retention_mode(RetentionMode::KeepAll)
+            .task_type(task.task_type())
             .build();
 
-        let worker_pooled_connection = pooled_connection();
-        let pooled_connection = pooled_connection();
+        let pooled_connection = worker.queue.connection_pool.get().unwrap();
 
-        worker_pooled_connection.test_transaction::<(), Error, _>(|| {
-            let task = Queue::insert_query(&pooled_connection, &task, Utc::now()).unwrap();
+        let task = Queue::insert_query(&pooled_connection, &task, Utc::now()).unwrap();
 
-            assert_eq!(FangTaskState::New, task.state);
+        assert_eq!(FangTaskState::New, task.state);
 
-            worker.run(task.clone());
+        worker.run(task.clone());
 
-            let found_task = Queue::find_task_by_id_query(&pooled_connection, task.id).unwrap();
+        let found_task = Queue::find_task_by_id_query(&pooled_connection, task.id).unwrap();
 
-            assert_eq!(FangTaskState::Failed, found_task.state);
-            assert_eq!(
-                "the number is 10".to_string(),
-                found_task.error_message.unwrap()
-            );
+        assert_eq!(FangTaskState::Failed, found_task.state);
+        assert_eq!(
+            "the number is 10".to_string(),
+            found_task.error_message.unwrap()
+        );
 
-            Ok(())
-        });
-    }
-
-    fn pooled_connection() -> PooledConnection<ConnectionManager<PgConnection>> {
-        Queue::connection_pool(1).get().unwrap()
+        Queue::remove_tasks_of_type_query(&pooled_connection, "F_task").unwrap();
     }
 }

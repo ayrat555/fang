@@ -1,8 +1,6 @@
 use crate::asynk::async_queue::AsyncQueueable;
 use crate::Scheduled;
 use async_trait::async_trait;
-use chrono::DateTime;
-use chrono::Utc;
 
 const COMMON_TYPE: &str = "common";
 

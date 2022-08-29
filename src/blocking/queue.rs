@@ -13,16 +13,19 @@ use diesel::r2d2::ConnectionManager;
 use diesel::r2d2::PoolError;
 use diesel::r2d2::PooledConnection;
 use diesel::result::Error as DieselError;
-use dotenv::dotenv;
 use sha2::Digest;
 use sha2::Sha256;
-use std::env;
 use std::str::FromStr;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-type PoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
+#[cfg(test)]
+use dotenv::dotenv;
+#[cfg(test)]
+use std::env;
+
+pub type PoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
 
 #[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone, TypedBuilder)]
 #[table_name = "fang_tasks"]
@@ -192,6 +195,13 @@ impl Queue {
         Self::insert_query(connection, params, scheduled_at)
     }
 
+    fn calculate_hash(json: String) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(json.as_bytes());
+        let result = hasher.finalize();
+        hex::encode(result)
+    }
+
     pub fn insert_query(
         connection: &PgConnection,
         params: &dyn Runnable,
@@ -211,10 +221,7 @@ impl Queue {
         } else {
             let metadata = serde_json::to_value(params).unwrap();
 
-            let mut hasher = Sha256::new();
-            hasher.update(metadata.to_string().as_bytes());
-            let result = hasher.finalize();
-            let uniq_hash = hex::encode(result);
+            let uniq_hash = Self::calculate_hash(metadata.to_string());
 
             match Self::find_task_by_uniq_hash_query(connection, &uniq_hash) {
                 Some(task) => Ok(task),
@@ -348,11 +355,7 @@ impl Queue {
     fn find_task_by_uniq_hash_query(connection: &PgConnection, uniq_hash: &str) -> Option<Task> {
         fang_tasks::table
             .filter(fang_tasks::uniq_hash.eq(uniq_hash))
-            .filter(
-                fang_tasks::state
-                    .eq(FangTaskState::New)
-                    .or(fang_tasks::state.eq(FangTaskState::InProgress)),
-            )
+            .filter(fang_tasks::state.eq(FangTaskState::New))
             .first::<Task>(connection)
             .ok()
     }
@@ -362,289 +365,16 @@ impl Queue {
 mod queue_tests {
     use super::Queue;
     use super::Queueable;
-    use super::Task;
     use crate::runnable::Runnable;
-    use crate::schema::fang_tasks;
+    use crate::runnable::COMMON_TYPE;
     use crate::schema::FangTaskState;
     use crate::typetag;
-    use crate::worker::Error as ExecutorError;
-    use crate::NewTask;
-    use chrono::prelude::*;
-    use chrono::{DateTime, Duration, Utc};
+    use crate::worker::Error as WorkerError;
+    use chrono::Utc;
     use diesel::connection::Connection;
-    use diesel::prelude::*;
     use diesel::result::Error;
     use serde::{Deserialize, Serialize};
-    use std::time::Duration as StdDuration;
-    /*
-        #[test]
-        fn insert_inserts_task() {
-            let queue = Queue::new();
 
-            let new_task = NewTask {
-                metadata: serde_json::json!(true),
-                task_type: "common".to_string(),
-                scheduled_at: Utc::now()
-            };
-
-            let result = queue
-                .connection
-                .test_transaction::<Task, Error, _>(|| queue.insert(&new_task));
-
-            assert_eq!(result.state, FangTaskState::New);
-            assert_eq!(result.error_message, None);
-        }
-    */
-    /*    #[test]
-        fn fetch_task_fetches_the_oldest_task() {
-            let queue = Queue::new();
-
-            queue.connection.test_transaction::<(), Error, _>(|| {
-                let timestamp1 = Utc::now() - Duration::hours(40);
-
-                let task1 = insert_task(serde_json::json!(true), timestamp1, &queue.connection);
-
-                let timestamp2 = Utc::now() - Duration::hours(20);
-
-                insert_task(serde_json::json!(false), timestamp2, &queue.connection);
-
-                let found_task = queue.fetch_task(&None).unwrap();
-
-                assert_eq!(found_task.id, task1.id);
-
-                Ok(())
-            });
-        }
-    */
-    /*  #[test]
-        fn finish_task_updates_state_field() {
-            let queue = Queue::new();
-
-            queue.connection.test_transaction::<(), Error, _>(|| {
-                let task = insert_new_task(&queue.connection);
-
-                let updated_task = queue.finish_task(&task).unwrap();
-
-                assert_eq!(FangTaskState::Finished, updated_task.state);
-
-                Ok(())
-            });
-        }
-    */
-    /*  #[test]
-        fn fail_task_updates_state_field_and_sets_error_message() {
-            let queue = Queue::new();
-
-            queue.connection.test_transaction::<(), Error, _>(|| {
-                let task = insert_new_task(&queue.connection);
-                let error = "Failed".to_string();
-
-                let updated_task = queue.fail_task(&task, error.clone()).unwrap();
-
-                assert_eq!(FangTaskState::Failed, updated_task.state);
-                assert_eq!(error, updated_task.error_message.unwrap());
-
-                Ok(())
-            });
-        }
-    */
-    /*  #[test]
-        fn fetch_and_touch_updates_state() {
-            let queue = Queue::new();
-
-            queue.connection.test_transaction::<(), Error, _>(|| {
-                let _task = insert_new_task(&queue.connection);
-
-                let updated_task = queue.fetch_and_touch(&None).unwrap().unwrap();
-
-                assert_eq!(FangTaskState::InProgress, updated_task.state);
-
-                Ok(())
-            });
-        }
-    */
-    /*  #[test]
-        fn fetch_and_touch_returns_none() {
-            let queue = Queue::new();
-
-            queue.connection.test_transaction::<(), Error, _>(|| {
-                let task = queue.fetch_and_touch(&None).unwrap();
-
-                assert_eq!(None, task);
-
-                Ok(())
-            });
-        }
-    */
-    /*  #[test]
-        fn push_task_serializes_and_inserts_task() {
-            let queue = Queue::new();
-
-            queue.connection.test_transaction::<(), Error, _>(|| {
-                let task = PepeTask { number: 10 };
-                let task = queue.push_task(&task).unwrap();
-
-                let mut m = serde_json::value::Map::new();
-                m.insert(
-                    "number".to_string(),
-                    serde_json::value::Value::Number(10.into()),
-                );
-                m.insert(
-                    "type".to_string(),
-                    serde_json::value::Value::String("PepeTask".to_string()),
-                );
-
-                assert_eq!(task.metadata, serde_json::value::Value::Object(m));
-
-                Ok(())
-            });
-        }
-    */
-    /*  #[test]
-        fn push_task_does_not_insert_the_same_task() {
-            let queue = Queue::new();
-
-            queue.connection.test_transaction::<(), Error, _>(|| {
-                let task = PepeTask { number: 10 };
-                let task2 = queue.push_task(&task).unwrap();
-
-                let task1 = queue.push_task(&task).unwrap();
-
-                assert_eq!(task1.id, task2.id);
-
-                Ok(())
-            });
-        }
-    */
-    /*  #[test]
-        fn remove_all_tasks() {
-            let queue = Queue::new();
-
-            queue.connection.test_transaction::<(), Error, _>(|| {
-                let task = insert_task(serde_json::json!(true), Utc::now(), &queue.connection);
-                let result = queue.remove_all_tasks().unwrap();
-
-                assert_eq!(1, result);
-
-                assert_eq!(None, queue.find_task_by_id(task.id));
-
-                Ok(())
-            });
-        }
-    */
-    /*  #[test]
-        fn remove_task() {
-            let queue = Queue::new();
-
-            let new_task1 = NewTask {
-                metadata: serde_json::json!(true),
-                task_type: "common".to_string(),
-            };
-
-            let new_task2 = NewTask {
-                metadata: serde_json::json!(true),
-                task_type: "common".to_string(),
-            };
-
-            queue.connection.test_transaction::<(), Error, _>(|| {
-                let task1 = queue.insert(&new_task1).unwrap();
-                assert!(queue.find_task_by_id(task1.id).is_some());
-
-                let task2 = queue.insert(&new_task2).unwrap();
-                assert!(queue.find_task_by_id(task2.id).is_some());
-
-                queue.remove_task(task1.id).unwrap();
-                assert!(queue.find_task_by_id(task1.id).is_none());
-                assert!(queue.find_task_by_id(task2.id).is_some());
-
-                queue.remove_task(task2.id).unwrap();
-                assert!(queue.find_task_by_id(task2.id).is_none());
-
-                Ok(())
-            });
-        }
-    */
-    /*  #[test]
-        fn remove_task_of_type() {
-            let queue = Queue::new();
-
-            let new_task1 = NewTask {
-                metadata: serde_json::json!(true),
-                task_type: "type1".to_string(),
-            };
-
-            let new_task2 = NewTask {
-                metadata: serde_json::json!(true),
-                task_type: "type2".to_string(),
-            };
-
-            queue.connection.test_transaction::<(), Error, _>(|| {
-                let task1 = queue.insert(&new_task1).unwrap();
-                assert!(queue.find_task_by_id(task1.id).is_some());
-
-                let task2 = queue.insert(&new_task2).unwrap();
-                assert!(queue.find_task_by_id(task2.id).is_some());
-
-                queue.remove_tasks_of_type("type1").unwrap();
-                assert!(queue.find_task_by_id(task1.id).is_none());
-                assert!(queue.find_task_by_id(task2.id).is_some());
-
-                Ok(())
-            });
-        }
-    */
-    /*  // this test is ignored because it commits data to the db
-        #[test]
-        #[ignore]
-        fn fetch_task_locks_the_record() {
-            let queue = Queue::new();
-            let timestamp1 = Utc::now() - Duration::hours(40);
-
-            let task1 = insert_task(
-                serde_json::json!(PepeTask { number: 12 }),
-                timestamp1,
-                &queue.connection,
-            );
-
-            let task1_id = task1.id;
-
-            let timestamp2 = Utc::now() - Duration::hours(20);
-
-            let task2 = insert_task(
-                serde_json::json!(PepeTask { number: 11 }),
-                timestamp2,
-                &queue.connection,
-            );
-
-            let thread = std::thread::spawn(move || {
-                let queue = Queue::new();
-
-                queue.connection.transaction::<(), Error, _>(|| {
-                    let found_task = queue.fetch_task(&None).unwrap();
-
-                    assert_eq!(found_task.id, task1.id);
-
-                    std::thread::sleep(std::time::Duration::from_millis(5000));
-
-                    Ok(())
-                })
-            });
-
-            std::thread::sleep(std::time::Duration::from_millis(1000));
-
-            let found_task = queue.fetch_task(&None).unwrap();
-
-            assert_eq!(found_task.id, task2.id);
-
-            let _result = thread.join();
-
-            // returns unlocked record
-
-            let found_task = queue.fetch_task(&None).unwrap();
-
-            assert_eq!(found_task.id, task1_id);
-        }
-    */
     #[derive(Serialize, Deserialize)]
     struct PepeTask {
         pub number: u16,
@@ -652,31 +382,301 @@ mod queue_tests {
 
     #[typetag::serde]
     impl Runnable for PepeTask {
-        fn run(&self, _queue: &dyn Queueable) -> Result<(), ExecutorError> {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), WorkerError> {
             println!("the number is {}", self.number);
 
             Ok(())
         }
+        fn uniq(&self) -> bool {
+            true
+        }
     }
 
-    fn insert_task(
-        metadata: serde_json::Value,
-        timestamp: DateTime<Utc>,
-        connection: &PgConnection,
-    ) -> Task {
-        diesel::insert_into(fang_tasks::table)
-            .values(&vec![(
-                fang_tasks::metadata.eq(metadata),
-                fang_tasks::created_at.eq(timestamp),
-            )])
-            .get_result::<Task>(connection)
-            .unwrap()
+    #[derive(Serialize, Deserialize)]
+    struct AyratTask {
+        pub number: u16,
     }
 
-    fn insert_new_task(connection: &PgConnection) -> Task {
-        diesel::insert_into(fang_tasks::table)
-            .values(&vec![(fang_tasks::metadata.eq(serde_json::json!(true)),)])
-            .get_result::<Task>(connection)
-            .unwrap()
+    #[typetag::serde]
+    impl Runnable for AyratTask {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), WorkerError> {
+            println!("the number is {}", self.number);
+
+            Ok(())
+        }
+        fn uniq(&self) -> bool {
+            true
+        }
+
+        fn task_type(&self) -> String {
+            "weirdo".to_string()
+        }
+    }
+
+    #[test]
+    fn insert_inserts_task() {
+        let task = PepeTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task = Queue::insert_query(&queue_pooled_connection, &task, Utc::now()).unwrap();
+
+            let metadata = task.metadata.as_object().unwrap();
+            let number = metadata["number"].as_u64();
+            let type_task = metadata["type"].as_str();
+
+            assert_eq!(task.error_message, None);
+            assert_eq!(FangTaskState::New, task.state);
+            assert_eq!(Some(10), number);
+            assert_eq!(Some("PepeTask"), type_task);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn fetch_task_fetches_the_oldest_task() {
+        let task1 = PepeTask { number: 10 };
+        let task2 = PepeTask { number: 11 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task1 = Queue::insert_query(&queue_pooled_connection, &task1, Utc::now()).unwrap();
+            let _task2 = Queue::insert_query(&queue_pooled_connection, &task2, Utc::now()).unwrap();
+
+            let found_task =
+                Queue::fetch_task_query(&queue_pooled_connection, COMMON_TYPE.to_string()).unwrap();
+            assert_eq!(found_task.id, task1.id);
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn update_task_state_test() {
+        let task = PepeTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task = Queue::insert_query(&queue_pooled_connection, &task, Utc::now()).unwrap();
+
+            let found_task = Queue::update_task_state_query(
+                &queue_pooled_connection,
+                &task,
+                FangTaskState::Finished,
+            )
+            .unwrap();
+
+            let metadata = found_task.metadata.as_object().unwrap();
+            let number = metadata["number"].as_u64();
+            let type_task = metadata["type"].as_str();
+
+            assert_eq!(found_task.id, task.id);
+            assert_eq!(found_task.state, FangTaskState::Finished);
+            assert_eq!(Some(10), number);
+            assert_eq!(Some("PepeTask"), type_task);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn fail_task_updates_state_field_and_sets_error_message() {
+        let task = PepeTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task = Queue::insert_query(&queue_pooled_connection, &task, Utc::now()).unwrap();
+
+            let error = "Failed".to_string();
+
+            let found_task =
+                Queue::fail_task_query(&queue_pooled_connection, &task, error.clone()).unwrap();
+
+            let metadata = found_task.metadata.as_object().unwrap();
+            let number = metadata["number"].as_u64();
+            let type_task = metadata["type"].as_str();
+
+            assert_eq!(found_task.id, task.id);
+            assert_eq!(found_task.state, FangTaskState::Failed);
+            assert_eq!(Some(10), number);
+            assert_eq!(Some("PepeTask"), type_task);
+            assert_eq!(found_task.error_message.unwrap(), error);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn fetch_and_touch_updates_state() {
+        let task = PepeTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task = Queue::insert_query(&queue_pooled_connection, &task, Utc::now()).unwrap();
+
+            let found_task =
+                Queue::fetch_and_touch_query(&queue_pooled_connection, COMMON_TYPE.to_string())
+                    .unwrap()
+                    .unwrap();
+
+            let metadata = found_task.metadata.as_object().unwrap();
+            let number = metadata["number"].as_u64();
+            let type_task = metadata["type"].as_str();
+
+            assert_eq!(found_task.id, task.id);
+            assert_eq!(found_task.state, FangTaskState::InProgress);
+            assert_eq!(Some(10), number);
+            assert_eq!(Some("PepeTask"), type_task);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn fetch_and_touch_returns_none() {
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let found_task =
+                Queue::fetch_and_touch_query(&queue_pooled_connection, COMMON_TYPE.to_string())
+                    .unwrap();
+
+            assert_eq!(None, found_task);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn insert_task_uniq_test() {
+        let task = PepeTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task1 = Queue::insert_query(&queue_pooled_connection, &task, Utc::now()).unwrap();
+            let task2 = Queue::insert_query(&queue_pooled_connection, &task, Utc::now()).unwrap();
+
+            assert_eq!(task2.id, task1.id);
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn remove_all_tasks_test() {
+        let task1 = PepeTask { number: 10 };
+        let task2 = PepeTask { number: 11 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task1 = Queue::insert_query(&queue_pooled_connection, &task1, Utc::now()).unwrap();
+            let task2 = Queue::insert_query(&queue_pooled_connection, &task2, Utc::now()).unwrap();
+
+            let result = Queue::remove_all_tasks_query(&queue_pooled_connection).unwrap();
+
+            assert_eq!(2, result);
+            assert_eq!(
+                None,
+                Queue::find_task_by_id_query(&queue_pooled_connection, task1.id)
+            );
+            assert_eq!(
+                None,
+                Queue::find_task_by_id_query(&queue_pooled_connection, task2.id)
+            );
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn remove_task() {
+        let task1 = PepeTask { number: 10 };
+        let task2 = PepeTask { number: 11 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task1 = Queue::insert_query(&queue_pooled_connection, &task1, Utc::now()).unwrap();
+            let task2 = Queue::insert_query(&queue_pooled_connection, &task2, Utc::now()).unwrap();
+
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task1.id).is_some());
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task2.id).is_some());
+
+            Queue::remove_task_query(&queue_pooled_connection, task1.id).unwrap();
+
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task1.id).is_none());
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task2.id).is_some());
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn remove_task_of_type() {
+        let task1 = PepeTask { number: 10 };
+        let task2 = AyratTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task1 = Queue::insert_query(&queue_pooled_connection, &task1, Utc::now()).unwrap();
+            let task2 = Queue::insert_query(&queue_pooled_connection, &task2, Utc::now()).unwrap();
+
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task1.id).is_some());
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task2.id).is_some());
+
+            Queue::remove_tasks_of_type_query(&queue_pooled_connection, "weirdo").unwrap();
+
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task1.id).is_some());
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task2.id).is_none());
+
+            Ok(())
+        });
     }
 }
