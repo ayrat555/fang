@@ -66,7 +66,7 @@ impl<BQueue> WorkerThread<BQueue>
 where
     BQueue: Queueable + Clone + Sync + Send + 'static,
 {
-    fn spawn(self) -> Result<thread::JoinHandle<()>, FangError> {
+    fn spawn(self) -> Result<(), FangError> {
         info!(
             "starting a worker thread {}, number of restarts {}",
             self.name, self.restarts
@@ -91,7 +91,9 @@ where
                     );
                 }
             })
-            .map_err(FangError::from)
+            .map_err(FangError::from)?;
+
+        Ok(())
     }
 }
 
@@ -100,6 +102,13 @@ where
     BQueue: Queueable + Clone + Sync + Send + 'static,
 {
     fn drop(&mut self) {
+        self.restarts += 1;
+
+        error!(
+            "Worker {} stopped. Restarting. The number of restarts {}",
+            self.name, self.restarts,
+        );
+
         self.clone().spawn().unwrap();
     }
 }
