@@ -1,6 +1,7 @@
-use crate::async_runnable::Scheduled::*;
 use crate::asynk::async_runnable::AsyncRunnable;
 use crate::asynk::async_runnable::Error as FangError;
+use crate::CronError;
+use crate::Scheduled::*;
 use async_trait::async_trait;
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::bb8::RunError;
@@ -74,16 +75,6 @@ pub struct Task {
     pub created_at: DateTime<Utc>,
     #[builder(setter(into))]
     pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Error)]
-pub enum CronError {
-    #[error(transparent)]
-    LibraryError(#[from] cron::error::Error),
-    #[error("You have to implement method `cron()` in your AsyncRunnable")]
-    TaskNotSchedulableError,
-    #[error("No timestamps match with this cron pattern")]
-    NoTimestampsError,
 }
 
 #[derive(Debug, Error)]
@@ -717,9 +708,9 @@ mod async_queue_tests {
     use super::AsyncQueueable;
     use super::FangTaskState;
     use super::Task;
-    use crate::async_runnable::Scheduled;
     use crate::asynk::AsyncError as Error;
     use crate::asynk::AsyncRunnable;
+    use crate::Scheduled;
     use async_trait::async_trait;
     use bb8_postgres::bb8::Pool;
     use bb8_postgres::tokio_postgres::NoTls;

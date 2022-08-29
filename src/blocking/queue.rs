@@ -1,181 +1,270 @@
-use crate::executor::Runnable;
-use crate::schema::fang_periodic_tasks;
+use crate::runnable::Runnable;
 use crate::schema::fang_tasks;
 use crate::schema::FangTaskState;
+use crate::CronError;
+use crate::Scheduled::*;
 use chrono::DateTime;
-use chrono::Duration;
 use chrono::Utc;
+use cron::Schedule;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2;
-use diesel::result::Error;
-use dotenv::dotenv;
-use std::env;
-use std::time::Duration as StdDuration;
+use diesel::r2d2::ConnectionManager;
+use diesel::r2d2::PoolError;
+use diesel::r2d2::PooledConnection;
+use diesel::result::Error as DieselError;
+use sha2::Digest;
+use sha2::Sha256;
+use std::str::FromStr;
+use thiserror::Error;
+use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
-#[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone)]
+#[cfg(test)]
+use dotenv::dotenv;
+#[cfg(test)]
+use std::env;
+
+pub type PoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
+
+#[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone, TypedBuilder)]
 #[table_name = "fang_tasks"]
 pub struct Task {
+    #[builder(setter(into))]
     pub id: Uuid,
+    #[builder(setter(into))]
     pub metadata: serde_json::Value,
+    #[builder(setter(into))]
     pub error_message: Option<String>,
+    #[builder(setter(into))]
     pub state: FangTaskState,
+    #[builder(setter(into))]
     pub task_type: String,
+    #[builder(setter(into))]
+    pub uniq_hash: Option<String>,
+    #[builder(setter(into))]
+    pub scheduled_at: DateTime<Utc>,
+    #[builder(setter(into))]
     pub created_at: DateTime<Utc>,
+    #[builder(setter(into))]
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone)]
-#[table_name = "fang_periodic_tasks"]
-pub struct PeriodicTask {
-    pub id: Uuid,
-    pub metadata: serde_json::Value,
-    pub period_in_millis: i64,
-    pub scheduled_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Insertable)]
+#[derive(Insertable, Debug, Eq, PartialEq, Clone, TypedBuilder)]
 #[table_name = "fang_tasks"]
 pub struct NewTask {
-    pub metadata: serde_json::Value,
-    pub task_type: String,
+    #[builder(setter(into))]
+    metadata: serde_json::Value,
+    #[builder(setter(into))]
+    task_type: String,
+    #[builder(setter(into))]
+    uniq_hash: Option<String>,
+    #[builder(setter(into))]
+    scheduled_at: DateTime<Utc>,
 }
 
-#[derive(Insertable)]
-#[table_name = "fang_periodic_tasks"]
-pub struct NewPeriodicTask {
-    pub metadata: serde_json::Value,
-    pub period_in_millis: i64,
+#[derive(Debug, Error)]
+pub enum QueueError {
+    #[error(transparent)]
+    DieselError(#[from] DieselError),
+    #[error(transparent)]
+    PoolError(#[from] PoolError),
+    #[error(transparent)]
+    CronError(#[from] CronError),
 }
 
+impl From<cron::error::Error> for QueueError {
+    fn from(error: cron::error::Error) -> Self {
+        QueueError::CronError(CronError::LibraryError(error))
+    }
+}
+
+pub trait Queueable {
+    fn fetch_and_touch_task(&self, task_type: String) -> Result<Option<Task>, QueueError>;
+
+    fn insert_task(&self, params: &dyn Runnable) -> Result<Task, QueueError>;
+
+    fn remove_all_tasks(&self) -> Result<usize, QueueError>;
+
+    fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, QueueError>;
+
+    fn remove_task(&self, id: Uuid) -> Result<usize, QueueError>;
+
+    fn find_task_by_id(&self, id: Uuid) -> Option<Task>;
+
+    fn update_task_state(&self, task: &Task, state: FangTaskState) -> Result<Task, QueueError>;
+
+    fn fail_task(&self, task: &Task, error: String) -> Result<Task, QueueError>;
+
+    fn schedule_task(&self, task: &dyn Runnable) -> Result<Task, QueueError>;
+}
+
+#[derive(Clone, TypedBuilder)]
 pub struct Queue {
-    pub connection: PgConnection,
+    #[builder(setter(into))]
+    pub connection_pool: r2d2::Pool<r2d2::ConnectionManager<PgConnection>>,
 }
 
-impl Default for Queue {
-    fn default() -> Self {
-        Self::new()
+impl Queueable for Queue {
+    fn fetch_and_touch_task(&self, task_type: String) -> Result<Option<Task>, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::fetch_and_touch_query(&connection, task_type)
+    }
+
+    fn insert_task(&self, params: &dyn Runnable) -> Result<Task, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::insert_query(&connection, params, Utc::now())
+    }
+    fn schedule_task(&self, params: &dyn Runnable) -> Result<Task, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::schedule_task_query(&connection, params)
+    }
+    fn remove_all_tasks(&self) -> Result<usize, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::remove_all_tasks_query(&connection)
+    }
+
+    fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::remove_tasks_of_type_query(&connection, task_type)
+    }
+
+    fn remove_task(&self, id: Uuid) -> Result<usize, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::remove_task_query(&connection, id)
+    }
+
+    fn update_task_state(&self, task: &Task, state: FangTaskState) -> Result<Task, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::update_task_state_query(&connection, task, state)
+    }
+
+    fn fail_task(&self, task: &Task, error: String) -> Result<Task, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::fail_task_query(&connection, task, error)
+    }
+
+    fn find_task_by_id(&self, id: Uuid) -> Option<Task> {
+        let connection = self.get_connection().unwrap();
+
+        Self::find_task_by_id_query(&connection, id)
     }
 }
 
 impl Queue {
-    pub fn new() -> Self {
-        let connection = Self::pg_connection(None);
+    pub fn get_connection(&self) -> Result<PoolConnection, QueueError> {
+        let result = self.connection_pool.get();
 
-        Self { connection }
-    }
-
-    pub fn new_with_url(database_url: String) -> Self {
-        let connection = Self::pg_connection(Some(database_url));
-
-        Self { connection }
-    }
-
-    pub fn new_with_connection(connection: PgConnection) -> Self {
-        Self { connection }
-    }
-
-    pub fn push_task(&self, task: &dyn Runnable) -> Result<Task, Error> {
-        Self::push_task_query(&self.connection, task)
-    }
-
-    pub fn push_task_query(connection: &PgConnection, task: &dyn Runnable) -> Result<Task, Error> {
-        let json_task = serde_json::to_value(task).unwrap();
-
-        match Self::find_task_by_metadata_query(connection, &json_task) {
-            Some(task) => Ok(task),
-            None => {
-                let new_task = NewTask {
-                    metadata: json_task.clone(),
-                    task_type: task.task_type(),
-                };
-                Self::insert_query(connection, &new_task)
-            }
+        if let Err(err) = result {
+            log::error!("Failed to get a db connection {:?}", err);
+            return Err(QueueError::PoolError(err));
         }
+
+        Ok(result.unwrap())
     }
 
-    pub fn push_periodic_task(
-        &self,
-        task: &dyn Runnable,
-        period: i64,
-    ) -> Result<PeriodicTask, Error> {
-        Self::push_periodic_task_query(&self.connection, task, period)
-    }
-
-    pub fn push_periodic_task_query(
+    pub fn schedule_task_query(
         connection: &PgConnection,
-        task: &dyn Runnable,
-        period: i64,
-    ) -> Result<PeriodicTask, Error> {
-        let json_task = serde_json::to_value(task).unwrap();
+        params: &dyn Runnable,
+    ) -> Result<Task, QueueError> {
+        let scheduled_at = match params.cron() {
+            Some(scheduled) => match scheduled {
+                CronPattern(cron_pattern) => {
+                    let schedule = Schedule::from_str(&cron_pattern)?;
+                    let mut iterator = schedule.upcoming(Utc);
 
-        match Self::find_periodic_task_by_metadata_query(connection, &json_task) {
-            Some(task) => Ok(task),
+                    iterator
+                        .next()
+                        .ok_or(QueueError::CronError(CronError::NoTimestampsError))?
+                }
+                ScheduleOnce(datetime) => datetime,
+            },
             None => {
-                let new_task = NewPeriodicTask {
-                    metadata: json_task,
-                    period_in_millis: period,
-                };
+                return Err(QueueError::CronError(CronError::TaskNotSchedulableError));
+            }
+        };
 
-                diesel::insert_into(fang_periodic_tasks::table)
-                    .values(new_task)
-                    .get_result::<PeriodicTask>(connection)
+        Self::insert_query(connection, params, scheduled_at)
+    }
+
+    fn calculate_hash(json: String) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(json.as_bytes());
+        let result = hasher.finalize();
+        hex::encode(result)
+    }
+
+    pub fn insert_query(
+        connection: &PgConnection,
+        params: &dyn Runnable,
+        scheduled_at: DateTime<Utc>,
+    ) -> Result<Task, QueueError> {
+        if !params.uniq() {
+            let new_task = NewTask::builder()
+                .scheduled_at(scheduled_at)
+                .uniq_hash(None)
+                .task_type(params.task_type())
+                .metadata(serde_json::to_value(params).unwrap())
+                .build();
+
+            Ok(diesel::insert_into(fang_tasks::table)
+                .values(new_task)
+                .get_result::<Task>(connection)?)
+        } else {
+            let metadata = serde_json::to_value(params).unwrap();
+
+            let uniq_hash = Self::calculate_hash(metadata.to_string());
+
+            match Self::find_task_by_uniq_hash_query(connection, &uniq_hash) {
+                Some(task) => Ok(task),
+                None => {
+                    let new_task = NewTask::builder()
+                        .scheduled_at(scheduled_at)
+                        .uniq_hash(Some(uniq_hash))
+                        .task_type(params.task_type())
+                        .metadata(serde_json::to_value(params).unwrap())
+                        .build();
+
+                    Ok(diesel::insert_into(fang_tasks::table)
+                        .values(new_task)
+                        .get_result::<Task>(connection)?)
+                }
             }
         }
     }
 
-    pub fn enqueue_task(task: &dyn Runnable) -> Result<Task, Error> {
-        Self::new().push_task(task)
-    }
-
-    pub fn insert(&self, params: &NewTask) -> Result<Task, Error> {
-        Self::insert_query(&self.connection, params)
-    }
-
-    pub fn insert_query(connection: &PgConnection, params: &NewTask) -> Result<Task, Error> {
-        diesel::insert_into(fang_tasks::table)
-            .values(params)
-            .get_result::<Task>(connection)
-    }
-
-    pub fn fetch_task(&self, task_type: &Option<String>) -> Option<Task> {
-        Self::fetch_task_query(&self.connection, task_type)
-    }
-
-    pub fn fetch_task_query(connection: &PgConnection, task_type: &Option<String>) -> Option<Task> {
-        match task_type {
-            None => Self::fetch_any_task_query(connection),
-            Some(task_type_str) => Self::fetch_task_of_type_query(connection, task_type_str),
-        }
-    }
-
-    pub fn fetch_and_touch(&self, task_type: &Option<String>) -> Result<Option<Task>, Error> {
-        Self::fetch_and_touch_query(&self.connection, task_type)
+    pub fn fetch_task_query(connection: &PgConnection, task_type: String) -> Option<Task> {
+        Self::fetch_task_of_type_query(connection, &task_type)
     }
 
     pub fn fetch_and_touch_query(
         connection: &PgConnection,
-        task_type: &Option<String>,
-    ) -> Result<Option<Task>, Error> {
-        connection.transaction::<Option<Task>, Error, _>(|| {
+        task_type: String,
+    ) -> Result<Option<Task>, QueueError> {
+        connection.transaction::<Option<Task>, QueueError, _>(|| {
             let found_task = Self::fetch_task_query(connection, task_type);
 
             if found_task.is_none() {
                 return Ok(None);
             }
 
-            match Self::start_processing_task_query(connection, &found_task.unwrap()) {
+            match Self::update_task_state_query(
+                connection,
+                &found_task.unwrap(),
+                FangTaskState::InProgress,
+            ) {
                 Ok(updated_task) => Ok(Some(updated_task)),
                 Err(err) => Err(err),
             }
         })
-    }
-
-    pub fn find_task_by_id(&self, id: Uuid) -> Option<Task> {
-        Self::find_task_by_id_query(&self.connection, id)
     }
 
     pub fn find_task_by_id_query(connection: &PgConnection, id: Uuid) -> Option<Task> {
@@ -185,144 +274,57 @@ impl Queue {
             .ok()
     }
 
-    pub fn find_periodic_task_by_id(&self, id: Uuid) -> Option<PeriodicTask> {
-        Self::find_periodic_task_by_id_query(&self.connection, id)
-    }
-
-    pub fn find_periodic_task_by_id_query(
-        connection: &PgConnection,
-        id: Uuid,
-    ) -> Option<PeriodicTask> {
-        fang_periodic_tasks::table
-            .filter(fang_periodic_tasks::id.eq(id))
-            .first::<PeriodicTask>(connection)
-            .ok()
-    }
-
-    pub fn fetch_periodic_tasks(&self, error_margin: StdDuration) -> Option<Vec<PeriodicTask>> {
-        Self::fetch_periodic_tasks_query(&self.connection, error_margin)
-    }
-
-    pub fn fetch_periodic_tasks_query(
-        connection: &PgConnection,
-        error_margin: StdDuration,
-    ) -> Option<Vec<PeriodicTask>> {
-        let current_time = Self::current_time();
-
-        let margin = Duration::from_std(error_margin).unwrap();
-
-        let low_limit = current_time - margin;
-        let high_limit = current_time + margin;
-
-        fang_periodic_tasks::table
-            .filter(
-                fang_periodic_tasks::scheduled_at
-                    .gt(low_limit)
-                    .and(fang_periodic_tasks::scheduled_at.lt(high_limit)),
-            )
-            .or_filter(fang_periodic_tasks::scheduled_at.is_null())
-            .load::<PeriodicTask>(connection)
-            .ok()
-    }
-
-    pub fn schedule_next_task_execution(&self, task: &PeriodicTask) -> Result<PeriodicTask, Error> {
-        let current_time = Self::current_time();
-        let scheduled_at = current_time + Duration::milliseconds(task.period_in_millis);
-
-        diesel::update(task)
-            .set((
-                fang_periodic_tasks::scheduled_at.eq(scheduled_at),
-                fang_periodic_tasks::updated_at.eq(current_time),
-            ))
-            .get_result::<PeriodicTask>(&self.connection)
-    }
-
-    pub fn remove_all_tasks(&self) -> Result<usize, Error> {
-        Self::remove_all_tasks_query(&self.connection)
-    }
-
-    pub fn remove_all_tasks_query(connection: &PgConnection) -> Result<usize, Error> {
-        diesel::delete(fang_tasks::table).execute(connection)
-    }
-
-    pub fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, Error> {
-        Self::remove_tasks_of_type_query(&self.connection, task_type)
+    pub fn remove_all_tasks_query(connection: &PgConnection) -> Result<usize, QueueError> {
+        Ok(diesel::delete(fang_tasks::table).execute(connection)?)
     }
 
     pub fn remove_tasks_of_type_query(
         connection: &PgConnection,
         task_type: &str,
-    ) -> Result<usize, Error> {
+    ) -> Result<usize, QueueError> {
         let query = fang_tasks::table.filter(fang_tasks::task_type.eq(task_type));
 
-        diesel::delete(query).execute(connection)
+        Ok(diesel::delete(query).execute(connection)?)
     }
 
-    pub fn remove_all_periodic_tasks(&self) -> Result<usize, Error> {
-        Self::remove_all_periodic_tasks_query(&self.connection)
-    }
-
-    pub fn remove_all_periodic_tasks_query(connection: &PgConnection) -> Result<usize, Error> {
-        diesel::delete(fang_periodic_tasks::table).execute(connection)
-    }
-
-    pub fn remove_task(&self, id: Uuid) -> Result<usize, Error> {
-        Self::remove_task_query(&self.connection, id)
-    }
-
-    pub fn remove_task_query(connection: &PgConnection, id: Uuid) -> Result<usize, Error> {
+    pub fn remove_task_query(connection: &PgConnection, id: Uuid) -> Result<usize, QueueError> {
         let query = fang_tasks::table.filter(fang_tasks::id.eq(id));
 
-        diesel::delete(query).execute(connection)
+        Ok(diesel::delete(query).execute(connection)?)
     }
 
-    pub fn finish_task(&self, task: &Task) -> Result<Task, Error> {
-        Self::finish_task_query(&self.connection, task)
-    }
-
-    pub fn finish_task_query(connection: &PgConnection, task: &Task) -> Result<Task, Error> {
-        diesel::update(task)
-            .set((
-                fang_tasks::state.eq(FangTaskState::Finished),
-                fang_tasks::updated_at.eq(Self::current_time()),
-            ))
-            .get_result::<Task>(connection)
-    }
-
-    pub fn start_processing_task(&self, task: &Task) -> Result<Task, Error> {
-        Self::start_processing_task_query(&self.connection, task)
-    }
-
-    pub fn start_processing_task_query(
+    pub fn update_task_state_query(
         connection: &PgConnection,
         task: &Task,
-    ) -> Result<Task, Error> {
-        diesel::update(task)
+        state: FangTaskState,
+    ) -> Result<Task, QueueError> {
+        Ok(diesel::update(task)
             .set((
-                fang_tasks::state.eq(FangTaskState::InProgress),
+                fang_tasks::state.eq(state),
                 fang_tasks::updated_at.eq(Self::current_time()),
             ))
-            .get_result::<Task>(connection)
-    }
-
-    pub fn fail_task(&self, task: &Task, error: String) -> Result<Task, Error> {
-        Self::fail_task_query(&self.connection, task, error)
+            .get_result::<Task>(connection)?)
     }
 
     pub fn fail_task_query(
         connection: &PgConnection,
         task: &Task,
         error: String,
-    ) -> Result<Task, Error> {
-        diesel::update(task)
+    ) -> Result<Task, QueueError> {
+        Ok(diesel::update(task)
             .set((
                 fang_tasks::state.eq(FangTaskState::Failed),
                 fang_tasks::error_message.eq(error),
                 fang_tasks::updated_at.eq(Self::current_time()),
             ))
-            .get_result::<Task>(connection)
+            .get_result::<Task>(connection)?)
     }
 
+    fn current_time() -> DateTime<Utc> {
+        Utc::now()
+    }
+
+    #[cfg(test)]
     pub fn connection_pool(pool_size: u32) -> r2d2::Pool<r2d2::ConnectionManager<PgConnection>> {
         dotenv().ok();
 
@@ -336,36 +338,12 @@ impl Queue {
             .unwrap()
     }
 
-    fn current_time() -> DateTime<Utc> {
-        Utc::now()
-    }
-
-    fn pg_connection(database_url: Option<String>) -> PgConnection {
-        dotenv().ok();
-
-        let url = match database_url {
-            Some(string_url) => string_url,
-            None => env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
-        };
-
-        PgConnection::establish(&url).unwrap_or_else(|_| panic!("Error connecting to {}", url))
-    }
-
-    fn fetch_any_task_query(connection: &PgConnection) -> Option<Task> {
-        fang_tasks::table
-            .order(fang_tasks::created_at.asc())
-            .limit(1)
-            .filter(fang_tasks::state.eq(FangTaskState::New))
-            .for_update()
-            .skip_locked()
-            .get_result::<Task>(connection)
-            .ok()
-    }
-
     fn fetch_task_of_type_query(connection: &PgConnection, task_type: &str) -> Option<Task> {
         fang_tasks::table
             .order(fang_tasks::created_at.asc())
+            .order(fang_tasks::scheduled_at.asc())
             .limit(1)
+            .filter(fang_tasks::scheduled_at.le(Utc::now()))
             .filter(fang_tasks::state.eq(FangTaskState::New))
             .filter(fang_tasks::task_type.eq(task_type))
             .for_update()
@@ -374,27 +352,10 @@ impl Queue {
             .ok()
     }
 
-    fn find_periodic_task_by_metadata_query(
-        connection: &PgConnection,
-        metadata: &serde_json::Value,
-    ) -> Option<PeriodicTask> {
-        fang_periodic_tasks::table
-            .filter(fang_periodic_tasks::metadata.eq(metadata))
-            .first::<PeriodicTask>(connection)
-            .ok()
-    }
-
-    fn find_task_by_metadata_query(
-        connection: &PgConnection,
-        metadata: &serde_json::Value,
-    ) -> Option<Task> {
+    fn find_task_by_uniq_hash_query(connection: &PgConnection, uniq_hash: &str) -> Option<Task> {
         fang_tasks::table
-            .filter(fang_tasks::metadata.eq(metadata))
-            .filter(
-                fang_tasks::state
-                    .eq(FangTaskState::New)
-                    .or(fang_tasks::state.eq(FangTaskState::InProgress)),
-            )
+            .filter(fang_tasks::uniq_hash.eq(uniq_hash))
+            .filter(fang_tasks::state.eq(FangTaskState::New))
             .first::<Task>(connection)
             .ok()
     }
@@ -402,422 +363,17 @@ impl Queue {
 
 #[cfg(test)]
 mod queue_tests {
-    use super::NewTask;
-    use super::PeriodicTask;
     use super::Queue;
-    use super::Task;
-    use crate::executor::Error as ExecutorError;
-    use crate::executor::Runnable;
-    use crate::schema::fang_periodic_tasks;
-    use crate::schema::fang_tasks;
+    use super::Queueable;
+    use crate::runnable::Runnable;
+    use crate::runnable::COMMON_TYPE;
     use crate::schema::FangTaskState;
     use crate::typetag;
-    use chrono::prelude::*;
-    use chrono::{DateTime, Duration, Utc};
+    use crate::worker::Error as WorkerError;
+    use chrono::Utc;
     use diesel::connection::Connection;
-    use diesel::prelude::*;
     use diesel::result::Error;
     use serde::{Deserialize, Serialize};
-    use std::time::Duration as StdDuration;
-
-    #[test]
-    fn insert_inserts_task() {
-        let queue = Queue::new();
-
-        let new_task = NewTask {
-            metadata: serde_json::json!(true),
-            task_type: "common".to_string(),
-        };
-
-        let result = queue
-            .connection
-            .test_transaction::<Task, Error, _>(|| queue.insert(&new_task));
-
-        assert_eq!(result.state, FangTaskState::New);
-        assert_eq!(result.error_message, None);
-    }
-
-    #[test]
-    fn fetch_task_fetches_the_oldest_task() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let timestamp1 = Utc::now() - Duration::hours(40);
-
-            let task1 = insert_task(serde_json::json!(true), timestamp1, &queue.connection);
-
-            let timestamp2 = Utc::now() - Duration::hours(20);
-
-            insert_task(serde_json::json!(false), timestamp2, &queue.connection);
-
-            let found_task = queue.fetch_task(&None).unwrap();
-
-            assert_eq!(found_task.id, task1.id);
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn finish_task_updates_state_field() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = insert_new_task(&queue.connection);
-
-            let updated_task = queue.finish_task(&task).unwrap();
-
-            assert_eq!(FangTaskState::Finished, updated_task.state);
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn fail_task_updates_state_field_and_sets_error_message() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = insert_new_task(&queue.connection);
-            let error = "Failed".to_string();
-
-            let updated_task = queue.fail_task(&task, error.clone()).unwrap();
-
-            assert_eq!(FangTaskState::Failed, updated_task.state);
-            assert_eq!(error, updated_task.error_message.unwrap());
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn fetch_and_touch_updates_state() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let _task = insert_new_task(&queue.connection);
-
-            let updated_task = queue.fetch_and_touch(&None).unwrap().unwrap();
-
-            assert_eq!(FangTaskState::InProgress, updated_task.state);
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn fetch_and_touch_returns_none() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = queue.fetch_and_touch(&None).unwrap();
-
-            assert_eq!(None, task);
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn push_task_serializes_and_inserts_task() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = PepeTask { number: 10 };
-            let task = queue.push_task(&task).unwrap();
-
-            let mut m = serde_json::value::Map::new();
-            m.insert(
-                "number".to_string(),
-                serde_json::value::Value::Number(10.into()),
-            );
-            m.insert(
-                "type".to_string(),
-                serde_json::value::Value::String("PepeTask".to_string()),
-            );
-
-            assert_eq!(task.metadata, serde_json::value::Value::Object(m));
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn push_task_does_not_insert_the_same_task() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = PepeTask { number: 10 };
-            let task2 = queue.push_task(&task).unwrap();
-
-            let task1 = queue.push_task(&task).unwrap();
-
-            assert_eq!(task1.id, task2.id);
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn push_periodic_task() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = PepeTask { number: 10 };
-            let task = queue.push_periodic_task(&task, 60_i64).unwrap();
-
-            assert_eq!(task.period_in_millis, 60_i64);
-            assert!(queue.find_periodic_task_by_id(task.id).is_some());
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn push_periodic_task_returns_existing_task() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = PepeTask { number: 10 };
-            let task1 = queue.push_periodic_task(&task, 60).unwrap();
-
-            let task2 = queue.push_periodic_task(&task, 60).unwrap();
-
-            assert_eq!(task1.id, task2.id);
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn fetch_periodic_tasks_fetches_periodic_task_without_scheduled_at() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = PepeTask { number: 10 };
-            let task = queue.push_periodic_task(&task, 60).unwrap();
-
-            let schedule_in_future = Utc::now() + Duration::hours(100);
-
-            insert_periodic_task(
-                serde_json::json!(true),
-                schedule_in_future,
-                100,
-                &queue.connection,
-            );
-
-            let tasks = queue
-                .fetch_periodic_tasks(StdDuration::from_secs(100))
-                .unwrap();
-
-            assert_eq!(tasks.len(), 1);
-            assert_eq!(tasks[0].id, task.id);
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn schedule_next_task_execution() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = insert_periodic_task(
-                serde_json::json!(true),
-                Utc::now(),
-                100000,
-                &queue.connection,
-            );
-
-            let updated_task = queue.schedule_next_task_execution(&task).unwrap();
-
-            let next_schedule = (task.scheduled_at.unwrap()
-                + Duration::milliseconds(task.period_in_millis))
-            .round_subsecs(0);
-
-            assert_eq!(
-                next_schedule,
-                updated_task.scheduled_at.unwrap().round_subsecs(0)
-            );
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn remove_all_periodic_tasks() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task =
-                insert_periodic_task(serde_json::json!(true), Utc::now(), 100, &queue.connection);
-
-            let result = queue.remove_all_periodic_tasks().unwrap();
-
-            assert_eq!(1, result);
-
-            assert_eq!(None, queue.find_periodic_task_by_id(task.id));
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn remove_all_tasks() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task = insert_task(serde_json::json!(true), Utc::now(), &queue.connection);
-            let result = queue.remove_all_tasks().unwrap();
-
-            assert_eq!(1, result);
-
-            assert_eq!(None, queue.find_task_by_id(task.id));
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn fetch_periodic_tasks() {
-        let queue = Queue::new();
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let schedule_in_future = Utc::now() + Duration::hours(100);
-
-            insert_periodic_task(
-                serde_json::json!(true),
-                schedule_in_future,
-                100,
-                &queue.connection,
-            );
-
-            let task =
-                insert_periodic_task(serde_json::json!(true), Utc::now(), 100, &queue.connection);
-
-            let tasks = queue
-                .fetch_periodic_tasks(StdDuration::from_secs(100))
-                .unwrap();
-
-            assert_eq!(tasks.len(), 1);
-            assert_eq!(tasks[0].id, task.id);
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn remove_task() {
-        let queue = Queue::new();
-
-        let new_task1 = NewTask {
-            metadata: serde_json::json!(true),
-            task_type: "common".to_string(),
-        };
-
-        let new_task2 = NewTask {
-            metadata: serde_json::json!(true),
-            task_type: "common".to_string(),
-        };
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task1 = queue.insert(&new_task1).unwrap();
-            assert!(queue.find_task_by_id(task1.id).is_some());
-
-            let task2 = queue.insert(&new_task2).unwrap();
-            assert!(queue.find_task_by_id(task2.id).is_some());
-
-            queue.remove_task(task1.id).unwrap();
-            assert!(queue.find_task_by_id(task1.id).is_none());
-            assert!(queue.find_task_by_id(task2.id).is_some());
-
-            queue.remove_task(task2.id).unwrap();
-            assert!(queue.find_task_by_id(task2.id).is_none());
-
-            Ok(())
-        });
-    }
-
-    #[test]
-    fn remove_task_of_type() {
-        let queue = Queue::new();
-
-        let new_task1 = NewTask {
-            metadata: serde_json::json!(true),
-            task_type: "type1".to_string(),
-        };
-
-        let new_task2 = NewTask {
-            metadata: serde_json::json!(true),
-            task_type: "type2".to_string(),
-        };
-
-        queue.connection.test_transaction::<(), Error, _>(|| {
-            let task1 = queue.insert(&new_task1).unwrap();
-            assert!(queue.find_task_by_id(task1.id).is_some());
-
-            let task2 = queue.insert(&new_task2).unwrap();
-            assert!(queue.find_task_by_id(task2.id).is_some());
-
-            queue.remove_tasks_of_type("type1").unwrap();
-            assert!(queue.find_task_by_id(task1.id).is_none());
-            assert!(queue.find_task_by_id(task2.id).is_some());
-
-            Ok(())
-        });
-    }
-
-    // this test is ignored because it commits data to the db
-    #[test]
-    #[ignore]
-    fn fetch_task_locks_the_record() {
-        let queue = Queue::new();
-        let timestamp1 = Utc::now() - Duration::hours(40);
-
-        let task1 = insert_task(
-            serde_json::json!(PepeTask { number: 12 }),
-            timestamp1,
-            &queue.connection,
-        );
-
-        let task1_id = task1.id;
-
-        let timestamp2 = Utc::now() - Duration::hours(20);
-
-        let task2 = insert_task(
-            serde_json::json!(PepeTask { number: 11 }),
-            timestamp2,
-            &queue.connection,
-        );
-
-        let thread = std::thread::spawn(move || {
-            let queue = Queue::new();
-
-            queue.connection.transaction::<(), Error, _>(|| {
-                let found_task = queue.fetch_task(&None).unwrap();
-
-                assert_eq!(found_task.id, task1.id);
-
-                std::thread::sleep(std::time::Duration::from_millis(5000));
-
-                Ok(())
-            })
-        });
-
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-
-        let found_task = queue.fetch_task(&None).unwrap();
-
-        assert_eq!(found_task.id, task2.id);
-
-        let _result = thread.join();
-
-        // returns unlocked record
-
-        let found_task = queue.fetch_task(&None).unwrap();
-
-        assert_eq!(found_task.id, task1_id);
-    }
 
     #[derive(Serialize, Deserialize)]
     struct PepeTask {
@@ -826,47 +382,301 @@ mod queue_tests {
 
     #[typetag::serde]
     impl Runnable for PepeTask {
-        fn run(&self, _connection: &PgConnection) -> Result<(), ExecutorError> {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), WorkerError> {
             println!("the number is {}", self.number);
 
             Ok(())
         }
+        fn uniq(&self) -> bool {
+            true
+        }
     }
 
-    fn insert_task(
-        metadata: serde_json::Value,
-        timestamp: DateTime<Utc>,
-        connection: &PgConnection,
-    ) -> Task {
-        diesel::insert_into(fang_tasks::table)
-            .values(&vec![(
-                fang_tasks::metadata.eq(metadata),
-                fang_tasks::created_at.eq(timestamp),
-            )])
-            .get_result::<Task>(connection)
-            .unwrap()
+    #[derive(Serialize, Deserialize)]
+    struct AyratTask {
+        pub number: u16,
     }
 
-    fn insert_periodic_task(
-        metadata: serde_json::Value,
-        timestamp: DateTime<Utc>,
-        period_in_millis: i64,
-        connection: &PgConnection,
-    ) -> PeriodicTask {
-        diesel::insert_into(fang_periodic_tasks::table)
-            .values(&vec![(
-                fang_periodic_tasks::metadata.eq(metadata),
-                fang_periodic_tasks::scheduled_at.eq(timestamp),
-                fang_periodic_tasks::period_in_millis.eq(period_in_millis),
-            )])
-            .get_result::<PeriodicTask>(connection)
-            .unwrap()
+    #[typetag::serde]
+    impl Runnable for AyratTask {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), WorkerError> {
+            println!("the number is {}", self.number);
+
+            Ok(())
+        }
+        fn uniq(&self) -> bool {
+            true
+        }
+
+        fn task_type(&self) -> String {
+            "weirdo".to_string()
+        }
     }
 
-    fn insert_new_task(connection: &PgConnection) -> Task {
-        diesel::insert_into(fang_tasks::table)
-            .values(&vec![(fang_tasks::metadata.eq(serde_json::json!(true)),)])
-            .get_result::<Task>(connection)
-            .unwrap()
+    #[test]
+    fn insert_inserts_task() {
+        let task = PepeTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task = Queue::insert_query(&queue_pooled_connection, &task, Utc::now()).unwrap();
+
+            let metadata = task.metadata.as_object().unwrap();
+            let number = metadata["number"].as_u64();
+            let type_task = metadata["type"].as_str();
+
+            assert_eq!(task.error_message, None);
+            assert_eq!(FangTaskState::New, task.state);
+            assert_eq!(Some(10), number);
+            assert_eq!(Some("PepeTask"), type_task);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn fetch_task_fetches_the_oldest_task() {
+        let task1 = PepeTask { number: 10 };
+        let task2 = PepeTask { number: 11 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task1 = Queue::insert_query(&queue_pooled_connection, &task1, Utc::now()).unwrap();
+            let _task2 = Queue::insert_query(&queue_pooled_connection, &task2, Utc::now()).unwrap();
+
+            let found_task =
+                Queue::fetch_task_query(&queue_pooled_connection, COMMON_TYPE.to_string()).unwrap();
+            assert_eq!(found_task.id, task1.id);
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn update_task_state_test() {
+        let task = PepeTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task = Queue::insert_query(&queue_pooled_connection, &task, Utc::now()).unwrap();
+
+            let found_task = Queue::update_task_state_query(
+                &queue_pooled_connection,
+                &task,
+                FangTaskState::Finished,
+            )
+            .unwrap();
+
+            let metadata = found_task.metadata.as_object().unwrap();
+            let number = metadata["number"].as_u64();
+            let type_task = metadata["type"].as_str();
+
+            assert_eq!(found_task.id, task.id);
+            assert_eq!(found_task.state, FangTaskState::Finished);
+            assert_eq!(Some(10), number);
+            assert_eq!(Some("PepeTask"), type_task);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn fail_task_updates_state_field_and_sets_error_message() {
+        let task = PepeTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task = Queue::insert_query(&queue_pooled_connection, &task, Utc::now()).unwrap();
+
+            let error = "Failed".to_string();
+
+            let found_task =
+                Queue::fail_task_query(&queue_pooled_connection, &task, error.clone()).unwrap();
+
+            let metadata = found_task.metadata.as_object().unwrap();
+            let number = metadata["number"].as_u64();
+            let type_task = metadata["type"].as_str();
+
+            assert_eq!(found_task.id, task.id);
+            assert_eq!(found_task.state, FangTaskState::Failed);
+            assert_eq!(Some(10), number);
+            assert_eq!(Some("PepeTask"), type_task);
+            assert_eq!(found_task.error_message.unwrap(), error);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn fetch_and_touch_updates_state() {
+        let task = PepeTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task = Queue::insert_query(&queue_pooled_connection, &task, Utc::now()).unwrap();
+
+            let found_task =
+                Queue::fetch_and_touch_query(&queue_pooled_connection, COMMON_TYPE.to_string())
+                    .unwrap()
+                    .unwrap();
+
+            let metadata = found_task.metadata.as_object().unwrap();
+            let number = metadata["number"].as_u64();
+            let type_task = metadata["type"].as_str();
+
+            assert_eq!(found_task.id, task.id);
+            assert_eq!(found_task.state, FangTaskState::InProgress);
+            assert_eq!(Some(10), number);
+            assert_eq!(Some("PepeTask"), type_task);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn fetch_and_touch_returns_none() {
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let found_task =
+                Queue::fetch_and_touch_query(&queue_pooled_connection, COMMON_TYPE.to_string())
+                    .unwrap();
+
+            assert_eq!(None, found_task);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn insert_task_uniq_test() {
+        let task = PepeTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task1 = Queue::insert_query(&queue_pooled_connection, &task, Utc::now()).unwrap();
+            let task2 = Queue::insert_query(&queue_pooled_connection, &task, Utc::now()).unwrap();
+
+            assert_eq!(task2.id, task1.id);
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn remove_all_tasks_test() {
+        let task1 = PepeTask { number: 10 };
+        let task2 = PepeTask { number: 11 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task1 = Queue::insert_query(&queue_pooled_connection, &task1, Utc::now()).unwrap();
+            let task2 = Queue::insert_query(&queue_pooled_connection, &task2, Utc::now()).unwrap();
+
+            let result = Queue::remove_all_tasks_query(&queue_pooled_connection).unwrap();
+
+            assert_eq!(2, result);
+            assert_eq!(
+                None,
+                Queue::find_task_by_id_query(&queue_pooled_connection, task1.id)
+            );
+            assert_eq!(
+                None,
+                Queue::find_task_by_id_query(&queue_pooled_connection, task2.id)
+            );
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn remove_task() {
+        let task1 = PepeTask { number: 10 };
+        let task2 = PepeTask { number: 11 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task1 = Queue::insert_query(&queue_pooled_connection, &task1, Utc::now()).unwrap();
+            let task2 = Queue::insert_query(&queue_pooled_connection, &task2, Utc::now()).unwrap();
+
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task1.id).is_some());
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task2.id).is_some());
+
+            Queue::remove_task_query(&queue_pooled_connection, task1.id).unwrap();
+
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task1.id).is_none());
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task2.id).is_some());
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn remove_task_of_type() {
+        let task1 = PepeTask { number: 10 };
+        let task2 = AyratTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let task1 = Queue::insert_query(&queue_pooled_connection, &task1, Utc::now()).unwrap();
+            let task2 = Queue::insert_query(&queue_pooled_connection, &task2, Utc::now()).unwrap();
+
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task1.id).is_some());
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task2.id).is_some());
+
+            Queue::remove_tasks_of_type_query(&queue_pooled_connection, "weirdo").unwrap();
+
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task1.id).is_some());
+            assert!(Queue::find_task_by_id_query(&queue_pooled_connection, task2.id).is_none());
+
+            Ok(())
+        });
     }
 }
