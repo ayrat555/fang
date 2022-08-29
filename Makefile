@@ -4,6 +4,8 @@ db:
   -e POSTGRES_USER=postgres \
   -e POSTGRES_PASSWORD=postgres \
   postgres:latest
+clippy:
+	cargo clippy --all-features
 diesel:
 	DATABASE_URL=postgres://postgres:postgres@localhost/fang diesel migration run
 stop:
