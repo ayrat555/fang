@@ -27,6 +27,8 @@ const INSERT_TASK_UNIQ_QUERY: &str = include_str!("queries/insert_task_uniq.sql"
 const UPDATE_TASK_STATE_QUERY: &str = include_str!("queries/update_task_state.sql");
 const FAIL_TASK_QUERY: &str = include_str!("queries/fail_task.sql");
 const REMOVE_ALL_TASK_QUERY: &str = include_str!("queries/remove_all_tasks.sql");
+const REMOVE_ALL_SCHEDULED_TASK_QUERY: &str =
+    include_str!("queries/remove_all_scheduled_tasks.sql");
 const REMOVE_TASK_QUERY: &str = include_str!("queries/remove_task.sql");
 const REMOVE_TASKS_TYPE_QUERY: &str = include_str!("queries/remove_tasks_type.sql");
 const FETCH_TASK_TYPE_QUERY: &str = include_str!("queries/fetch_task_type.sql");
@@ -112,6 +114,8 @@ pub trait AsyncQueueable: Send {
     async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
 
     async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError>;
+
+    async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError>;
 
     async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError>;
 
@@ -249,6 +253,12 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         AsyncQueue::<NoTls>::remove_all_tasks_query(transaction).await
     }
 
+    async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError> {
+        let transaction = &mut self.transaction;
+
+        AsyncQueue::<NoTls>::remove_all_scheduled_tasks_query(transaction).await
+    }
+
     async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
@@ -312,6 +322,18 @@ where
         transaction: &mut Transaction<'_>,
     ) -> Result<u64, AsyncQueueError> {
         Self::execute_query(transaction, REMOVE_ALL_TASK_QUERY, &[], None).await
+    }
+
+    async fn remove_all_scheduled_tasks_query(
+        transaction: &mut Transaction<'_>,
+    ) -> Result<u64, AsyncQueueError> {
+        Self::execute_query(
+            transaction,
+            REMOVE_ALL_SCHEDULED_TASK_QUERY,
+            &[&Utc::now()],
+            None,
+        )
+        .await
     }
 
     async fn remove_task_query(
@@ -637,6 +659,18 @@ where
         Ok(result)
     }
 
+    async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError> {
+        self.check_if_connection()?;
+        let mut connection = self.pool.as_ref().unwrap().get().await?;
+        let mut transaction = connection.transaction().await?;
+
+        let result = Self::remove_all_scheduled_tasks_query(&mut transaction).await?;
+
+        transaction.commit().await?;
+
+        Ok(result)
+    }
+
     async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
         let mut connection = self.pool.as_ref().unwrap().get().await?;
@@ -874,6 +908,34 @@ mod async_queue_tests {
         assert_eq!(Some(1), number);
         assert_eq!(Some("AsyncTaskSchedule"), type_task);
         assert_eq!(task.scheduled_at, datetime);
+    }
+
+    #[tokio::test]
+    async fn remove_all_scheduled_tasks_test() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
+
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+
+        let datetime = (Utc::now() + Duration::seconds(7)).round_subsecs(0);
+
+        let task1 = &AsyncTaskSchedule {
+            number: 1,
+            datetime: datetime.to_string(),
+        };
+
+        let task2 = &AsyncTaskSchedule {
+            number: 2,
+            datetime: datetime.to_string(),
+        };
+
+        test.schedule_task(task1).await.unwrap();
+        test.schedule_task(task2).await.unwrap();
+
+        let number = test.remove_all_scheduled_tasks().await.unwrap();
+
+        assert_eq!(2, number);
     }
 
     #[tokio::test]

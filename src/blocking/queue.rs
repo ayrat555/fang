@@ -86,6 +86,8 @@ pub trait Queueable {
 
     fn remove_all_tasks(&self) -> Result<usize, QueueError>;
 
+    fn remove_all_scheduled_tasks(&self) -> Result<usize, QueueError>;
+
     fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, QueueError>;
 
     fn remove_task(&self, id: Uuid) -> Result<usize, QueueError>;
@@ -122,6 +124,13 @@ impl Queueable for Queue {
 
         Self::schedule_task_query(&connection, params)
     }
+
+    fn remove_all_scheduled_tasks(&self) -> Result<usize, QueueError> {
+        let connection = self.get_connection()?;
+
+        Self::remove_all_scheduled_tasks_query(&connection)
+    }
+
     fn remove_all_tasks(&self) -> Result<usize, QueueError> {
         let connection = self.get_connection()?;
 
@@ -278,6 +287,14 @@ impl Queue {
         Ok(diesel::delete(fang_tasks::table).execute(connection)?)
     }
 
+    pub fn remove_all_scheduled_tasks_query(
+        connection: &PgConnection,
+    ) -> Result<usize, QueueError> {
+        let query = fang_tasks::table.filter(fang_tasks::scheduled_at.gt(Utc::now()));
+
+        Ok(diesel::delete(query).execute(connection)?)
+    }
+
     pub fn remove_tasks_of_type_query(
         connection: &PgConnection,
         task_type: &str,
@@ -365,11 +382,15 @@ impl Queue {
 mod queue_tests {
     use super::Queue;
     use super::Queueable;
+    use crate::chrono::SubsecRound;
     use crate::runnable::Runnable;
     use crate::runnable::COMMON_TYPE;
     use crate::schema::FangTaskState;
     use crate::typetag;
     use crate::FangError;
+    use crate::Scheduled;
+    use chrono::DateTime;
+    use chrono::Duration;
     use chrono::Utc;
     use diesel::connection::Connection;
     use diesel::result::Error;
@@ -410,6 +431,33 @@ mod queue_tests {
 
         fn task_type(&self) -> String {
             "weirdo".to_string()
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct ScheduledPepeTask {
+        pub number: u16,
+        pub datetime: String,
+    }
+
+    #[typetag::serde]
+    impl Runnable for ScheduledPepeTask {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
+            println!("the number is {}", self.number);
+
+            Ok(())
+        }
+        fn uniq(&self) -> bool {
+            true
+        }
+
+        fn task_type(&self) -> String {
+            "scheduled".to_string()
+        }
+
+        fn cron(&self) -> Option<Scheduled> {
+            let datetime = self.datetime.parse::<DateTime<Utc>>().ok()?;
+            Some(Scheduled::ScheduleOnce(datetime))
         }
     }
 
@@ -591,6 +639,66 @@ mod queue_tests {
             let task2 = Queue::insert_query(&queue_pooled_connection, &task, Utc::now()).unwrap();
 
             assert_eq!(task2.id, task1.id);
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn schedule_task_test() {
+        let pool = Queue::connection_pool(5);
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let datetime = (Utc::now() + Duration::seconds(7)).round_subsecs(0);
+
+            let task = &ScheduledPepeTask {
+                number: 10,
+                datetime: datetime.to_string(),
+            };
+
+            let task = Queue::schedule_task_query(&queue_pooled_connection, task).unwrap();
+
+            let metadata = task.metadata.as_object().unwrap();
+            let number = metadata["number"].as_u64();
+            let type_task = metadata["type"].as_str();
+
+            assert_eq!(Some(10), number);
+            assert_eq!(Some("ScheduledPepeTask"), type_task);
+            assert_eq!(task.scheduled_at, datetime);
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn remove_all_scheduled_tasks_test() {
+        let pool = Queue::connection_pool(5);
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|| {
+            let datetime = (Utc::now() + Duration::seconds(7)).round_subsecs(0);
+
+            let task1 = &ScheduledPepeTask {
+                number: 10,
+                datetime: datetime.to_string(),
+            };
+
+            let task2 = &ScheduledPepeTask {
+                number: 11,
+                datetime: datetime.to_string(),
+            };
+
+            Queue::schedule_task_query(&queue_pooled_connection, task1).unwrap();
+            Queue::schedule_task_query(&queue_pooled_connection, task2).unwrap();
+
+            let number = Queue::remove_all_scheduled_tasks_query(&queue_pooled_connection).unwrap();
+
+            assert_eq!(2, number);
+
             Ok(())
         });
     }
