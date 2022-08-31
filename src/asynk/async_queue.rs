@@ -1,5 +1,4 @@
 use crate::asynk::async_runnable::AsyncRunnable;
-use crate::asynk::async_runnable::Error as FangError;
 use crate::CronError;
 use crate::Scheduled::*;
 use async_trait::async_trait;
@@ -100,15 +99,6 @@ pub enum AsyncQueueError {
 impl From<cron::error::Error> for AsyncQueueError {
     fn from(error: cron::error::Error) -> Self {
         AsyncQueueError::CronError(CronError::LibraryError(error))
-    }
-}
-
-impl From<AsyncQueueError> for FangError {
-    fn from(error: AsyncQueueError) -> Self {
-        let message = format!("{:?}", error);
-        FangError {
-            description: message,
-        }
     }
 }
 
@@ -708,8 +698,8 @@ mod async_queue_tests {
     use super::AsyncQueueable;
     use super::FangTaskState;
     use super::Task;
-    use crate::asynk::AsyncError as Error;
     use crate::asynk::AsyncRunnable;
+    use crate::FangError as Error;
     use crate::Scheduled;
     use async_trait::async_trait;
     use bb8_postgres::bb8::Pool;

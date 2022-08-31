@@ -3,7 +3,7 @@ use crate::asynk::async_queue::FangTaskState;
 use crate::asynk::async_queue::Task;
 use crate::asynk::async_queue::DEFAULT_TASK_TYPE;
 use crate::asynk::async_runnable::AsyncRunnable;
-use crate::asynk::AsyncError as Error;
+use crate::FangError as Error;
 use crate::Scheduled::*;
 use crate::{RetentionMode, SleepParams};
 use log::error;
@@ -246,8 +246,8 @@ mod async_worker_tests {
     use crate::asynk::async_queue::AsyncQueueable;
     use crate::asynk::async_queue::FangTaskState;
     use crate::asynk::async_worker::Task;
-    use crate::asynk::AsyncError as Error;
     use crate::asynk::AsyncRunnable;
+    use crate::FangError as Error;
     use crate::RetentionMode;
     use crate::Scheduled;
     use async_trait::async_trait;

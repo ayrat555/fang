@@ -369,7 +369,7 @@ mod queue_tests {
     use crate::runnable::COMMON_TYPE;
     use crate::schema::FangTaskState;
     use crate::typetag;
-    use crate::worker::Error as WorkerError;
+    use crate::FangError;
     use chrono::Utc;
     use diesel::connection::Connection;
     use diesel::result::Error;
@@ -382,7 +382,7 @@ mod queue_tests {
 
     #[typetag::serde]
     impl Runnable for PepeTask {
-        fn run(&self, _queue: &dyn Queueable) -> Result<(), WorkerError> {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
             println!("the number is {}", self.number);
 
             Ok(())
@@ -399,7 +399,7 @@ mod queue_tests {
 
     #[typetag::serde]
     impl Runnable for AyratTask {
-        fn run(&self, _queue: &dyn Queueable) -> Result<(), WorkerError> {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
             println!("the number is {}", self.number);
 
             Ok(())

@@ -1,9 +1,9 @@
-use crate::error::FangError;
 use crate::queue::Queueable;
 use crate::queue::Task;
 use crate::runnable::Runnable;
 use crate::runnable::COMMON_TYPE;
 use crate::schema::FangTaskState;
+use crate::FangError as Error;
 use crate::Scheduled::*;
 use crate::{RetentionMode, SleepParams};
 use log::error;
@@ -25,11 +25,6 @@ where
     pub retention_mode: RetentionMode,
 }
 
-#[derive(Debug)]
-pub struct Error {
-    pub description: String,
-}
-
 impl<BQueue> Worker<BQueue>
 where
     BQueue: Queueable + Clone + Sync + Send + 'static,
@@ -39,7 +34,7 @@ where
         self.finalize_task(result)
     }
 
-    pub fn run_tasks(&mut self) -> Result<(), FangError> {
+    pub fn run_tasks(&mut self) -> Result<(), Error> {
         loop {
             match self.queue.fetch_and_touch_task(self.task_type.clone()) {
                 Ok(Some(task)) => {
@@ -69,7 +64,7 @@ where
     }
 
     #[cfg(test)]
-    pub fn run_tasks_until_none(&mut self) -> Result<(), FangError> {
+    pub fn run_tasks_until_none(&mut self) -> Result<(), Error> {
         loop {
             match self.queue.fetch_and_touch_task(self.task_type.clone()) {
                 Ok(Some(task)) => {
@@ -148,7 +143,6 @@ where
 
 #[cfg(test)]
 mod worker_tests {
-    use super::Error;
     use super::RetentionMode;
     use super::Runnable;
     use super::Worker;
@@ -156,6 +150,7 @@ mod worker_tests {
     use crate::queue::Queueable;
     use crate::schema::FangTaskState;
     use crate::typetag;
+    use crate::FangError as Error;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
 
