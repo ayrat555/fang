@@ -5,7 +5,6 @@ pub mod schema;
 pub mod worker;
 pub mod worker_pool;
 
-pub use error::FangError;
 pub use queue::*;
 pub use runnable::Runnable;
 pub use schema::*;

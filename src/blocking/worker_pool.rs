@@ -1,6 +1,6 @@
-use crate::error::FangError;
 use crate::queue::Queueable;
 use crate::worker::Worker;
+use crate::FangError;
 use crate::RetentionMode;
 use crate::SleepParams;
 use log::error;

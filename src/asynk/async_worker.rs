@@ -3,7 +3,7 @@ use crate::asynk::async_queue::FangTaskState;
 use crate::asynk::async_queue::Task;
 use crate::asynk::async_queue::DEFAULT_TASK_TYPE;
 use crate::asynk::async_runnable::AsyncRunnable;
-use crate::asynk::AsyncError as Error;
+use crate::FangError;
 use crate::Scheduled::*;
 use crate::{RetentionMode, SleepParams};
 use log::error;
@@ -32,7 +32,7 @@ where
         &mut self,
         task: Task,
         actual_task: Box<dyn AsyncRunnable>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), FangError> {
         let result = self.execute_task(task, actual_task).await;
         self.finalize_task(result).await
     }
@@ -49,7 +49,10 @@ where
         }
     }
 
-    async fn finalize_task(&mut self, result: Result<Task, (Task, String)>) -> Result<(), Error> {
+    async fn finalize_task(
+        &mut self,
+        result: Result<Task, (Task, String)>,
+    ) -> Result<(), FangError> {
         match self.retention_mode {
             RetentionMode::KeepAll => match result {
                 Ok(task) => {
@@ -92,7 +95,7 @@ where
         tokio::time::sleep(self.sleep_params.sleep_period).await;
     }
 
-    pub async fn run_tasks(&mut self) -> Result<(), Error> {
+    pub async fn run_tasks(&mut self) -> Result<(), FangError> {
         loop {
             //fetch task
             match self
@@ -146,7 +149,7 @@ impl<'a> AsyncWorkerTest<'a> {
         &mut self,
         task: Task,
         actual_task: Box<dyn AsyncRunnable>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), FangError> {
         let result = self.execute_task(task, actual_task).await;
         self.finalize_task(result).await
     }
@@ -163,7 +166,10 @@ impl<'a> AsyncWorkerTest<'a> {
         }
     }
 
-    async fn finalize_task(&mut self, result: Result<Task, (Task, String)>) -> Result<(), Error> {
+    async fn finalize_task(
+        &mut self,
+        result: Result<Task, (Task, String)>,
+    ) -> Result<(), FangError> {
         match self.retention_mode {
             RetentionMode::KeepAll => match result {
                 Ok(task) => {
@@ -206,7 +212,7 @@ impl<'a> AsyncWorkerTest<'a> {
         tokio::time::sleep(self.sleep_params.sleep_period).await;
     }
 
-    pub async fn run_tasks_until_none(&mut self) -> Result<(), Error> {
+    pub async fn run_tasks_until_none(&mut self) -> Result<(), FangError> {
         loop {
             match self
                 .queue
@@ -246,8 +252,8 @@ mod async_worker_tests {
     use crate::asynk::async_queue::AsyncQueueable;
     use crate::asynk::async_queue::FangTaskState;
     use crate::asynk::async_worker::Task;
-    use crate::asynk::AsyncError as Error;
     use crate::asynk::AsyncRunnable;
+    use crate::FangError;
     use crate::RetentionMode;
     use crate::Scheduled;
     use async_trait::async_trait;
@@ -266,7 +272,7 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for WorkerAsyncTask {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
             Ok(())
         }
     }
@@ -279,7 +285,7 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for WorkerAsyncTaskSchedule {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
             Ok(())
         }
         fn cron(&self) -> Option<Scheduled> {
@@ -295,10 +301,10 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for AsyncFailedTask {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
             let message = format!("number {} is wrong :(", self.number);
 
-            Err(Error {
+            Err(FangError {
                 description: message,
             })
         }
@@ -310,7 +316,7 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for AsyncTaskType1 {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
             Ok(())
         }
 
@@ -325,7 +331,7 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for AsyncTaskType2 {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
             Ok(())
         }
 

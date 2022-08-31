@@ -1,9 +1,9 @@
-use crate::error::FangError;
 use crate::queue::Queueable;
 use crate::queue::Task;
 use crate::runnable::Runnable;
 use crate::runnable::COMMON_TYPE;
 use crate::schema::FangTaskState;
+use crate::FangError;
 use crate::Scheduled::*;
 use crate::{RetentionMode, SleepParams};
 use log::error;
@@ -23,11 +23,6 @@ where
     pub sleep_params: SleepParams,
     #[builder(default, setter(into))]
     pub retention_mode: RetentionMode,
-}
-
-#[derive(Debug)]
-pub struct Error {
-    pub description: String,
 }
 
 impl<BQueue> Worker<BQueue>
@@ -148,7 +143,6 @@ where
 
 #[cfg(test)]
 mod worker_tests {
-    use super::Error;
     use super::RetentionMode;
     use super::Runnable;
     use super::Worker;
@@ -156,6 +150,7 @@ mod worker_tests {
     use crate::queue::Queueable;
     use crate::schema::FangTaskState;
     use crate::typetag;
+    use crate::FangError;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
 
@@ -166,7 +161,7 @@ mod worker_tests {
 
     #[typetag::serde]
     impl Runnable for WorkerTaskTest {
-        fn run(&self, _queue: &dyn Queueable) -> Result<(), Error> {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
             println!("the number is {}", self.number);
 
             Ok(())
@@ -184,10 +179,10 @@ mod worker_tests {
 
     #[typetag::serde]
     impl Runnable for FailedTask {
-        fn run(&self, _queue: &dyn Queueable) -> Result<(), Error> {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
             let message = format!("the number is {}", self.number);
 
-            Err(Error {
+            Err(FangError {
                 description: message,
             })
         }
@@ -202,7 +197,7 @@ mod worker_tests {
 
     #[typetag::serde]
     impl Runnable for TaskType1 {
-        fn run(&self, _queue: &dyn Queueable) -> Result<(), Error> {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
             Ok(())
         }
 
@@ -216,7 +211,7 @@ mod worker_tests {
 
     #[typetag::serde]
     impl Runnable for TaskType2 {
-        fn run(&self, _queue: &dyn Queueable) -> Result<(), Error> {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
             Ok(())
         }
 
