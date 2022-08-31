@@ -699,7 +699,7 @@ mod async_queue_tests {
     use super::FangTaskState;
     use super::Task;
     use crate::asynk::AsyncRunnable;
-    use crate::FangError as Error;
+    use crate::FangError;
     use crate::Scheduled;
     use async_trait::async_trait;
     use bb8_postgres::bb8::Pool;
@@ -719,7 +719,7 @@ mod async_queue_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for AsyncTask {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
             Ok(())
         }
     }
@@ -733,7 +733,7 @@ mod async_queue_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for AsyncTaskSchedule {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
             Ok(())
         }
 

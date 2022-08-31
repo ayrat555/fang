@@ -3,7 +3,7 @@ use crate::queue::Task;
 use crate::runnable::Runnable;
 use crate::runnable::COMMON_TYPE;
 use crate::schema::FangTaskState;
-use crate::FangError as Error;
+use crate::FangError;
 use crate::Scheduled::*;
 use crate::{RetentionMode, SleepParams};
 use log::error;
@@ -34,7 +34,7 @@ where
         self.finalize_task(result)
     }
 
-    pub fn run_tasks(&mut self) -> Result<(), Error> {
+    pub fn run_tasks(&mut self) -> Result<(), FangError> {
         loop {
             match self.queue.fetch_and_touch_task(self.task_type.clone()) {
                 Ok(Some(task)) => {
@@ -64,7 +64,7 @@ where
     }
 
     #[cfg(test)]
-    pub fn run_tasks_until_none(&mut self) -> Result<(), Error> {
+    pub fn run_tasks_until_none(&mut self) -> Result<(), FangError> {
         loop {
             match self.queue.fetch_and_touch_task(self.task_type.clone()) {
                 Ok(Some(task)) => {
@@ -150,7 +150,7 @@ mod worker_tests {
     use crate::queue::Queueable;
     use crate::schema::FangTaskState;
     use crate::typetag;
-    use crate::FangError as Error;
+    use crate::FangError;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
 
@@ -161,7 +161,7 @@ mod worker_tests {
 
     #[typetag::serde]
     impl Runnable for WorkerTaskTest {
-        fn run(&self, _queue: &dyn Queueable) -> Result<(), Error> {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
             println!("the number is {}", self.number);
 
             Ok(())
@@ -179,10 +179,10 @@ mod worker_tests {
 
     #[typetag::serde]
     impl Runnable for FailedTask {
-        fn run(&self, _queue: &dyn Queueable) -> Result<(), Error> {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
             let message = format!("the number is {}", self.number);
 
-            Err(Error {
+            Err(FangError {
                 description: message,
             })
         }
@@ -197,7 +197,7 @@ mod worker_tests {
 
     #[typetag::serde]
     impl Runnable for TaskType1 {
-        fn run(&self, _queue: &dyn Queueable) -> Result<(), Error> {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
             Ok(())
         }
 
@@ -211,7 +211,7 @@ mod worker_tests {
 
     #[typetag::serde]
     impl Runnable for TaskType2 {
-        fn run(&self, _queue: &dyn Queueable) -> Result<(), Error> {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
             Ok(())
         }
 
