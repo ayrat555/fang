@@ -1,7 +1,7 @@
 [package]
 name = "simple_worker"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -10,4 +10,4 @@ fang = { path = "../../../" , features = ["blocking"]}
 dotenv = "0.15.0"
 env_logger = "0.9.0"
 log = "0.4.0"
-diesel = "1.4.8"
+diesel = { version = "2", features = ["postgres", "r2d2"] }

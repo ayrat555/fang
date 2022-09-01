@@ -5,7 +5,7 @@ use fang::Queue;
 use fang::Queueable;
 use fang::RetentionMode;
 use fang::WorkerPool;
-use simple_worker::MyCronTask;
+use simple_cron_worker::MyCronTask;
 use std::env;
 use std::thread::sleep;
 use std::time::Duration;

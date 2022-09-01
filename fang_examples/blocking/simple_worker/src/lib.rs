@@ -1,7 +1,7 @@
 use fang::runnable::Runnable;
 use fang::serde::{Deserialize, Serialize};
 use fang::typetag;
-use fang::Error;
+use fang::FangError;
 use fang::Queueable;
 use std::thread;
 use std::time::Duration;
@@ -27,9 +27,7 @@ impl MyTask {
 
 #[typetag::serde]
 impl Runnable for MyTask {
-    fn run(&self, queue: &dyn Queueable) -> Result<(), Error> {
-        thread::sleep(Duration::from_secs(3));
-
+    fn run(&self, queue: &dyn Queueable) -> Result<(), FangError> {
         let new_task = MyTask::new(self.number + 1);
 
         log::info!(
@@ -39,6 +37,8 @@ impl Runnable for MyTask {
         );
 
         queue.insert_task(&new_task).unwrap();
+
+        thread::sleep(Duration::from_secs(2));
 
         Ok(())
     }
@@ -68,7 +68,7 @@ impl MyFailingTask {
 
 #[typetag::serde]
 impl Runnable for MyFailingTask {
-    fn run(&self, queue: &dyn Queueable) -> Result<(), Error> {
+    fn run(&self, queue: &dyn Queueable) -> Result<(), FangError> {
         let new_task = MyFailingTask::new(self.number + 1);
 
         queue.insert_task(&new_task).unwrap();

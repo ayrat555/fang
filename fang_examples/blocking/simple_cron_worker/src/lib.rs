@@ -1,7 +1,7 @@
 use fang::runnable::Runnable;
 use fang::serde::{Deserialize, Serialize};
 use fang::typetag;
-use fang::Error;
+use fang::FangError;
 use fang::Queueable;
 use fang::Scheduled;
 
@@ -11,7 +11,7 @@ pub struct MyCronTask {}
 
 #[typetag::serde]
 impl Runnable for MyCronTask {
-    fn run(&self, _queue: &dyn Queueable) -> Result<(), Error> {
+    fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
         log::info!("CRON !!!!!!!!!!!!!!!!!");
 
         Ok(())
