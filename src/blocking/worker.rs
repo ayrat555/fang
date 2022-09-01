@@ -235,20 +235,20 @@ mod worker_tests {
             .retention_mode(RetentionMode::KeepAll)
             .task_type(task.task_type())
             .build();
-        let pooled_connection = worker.queue.connection_pool.get().unwrap();
+        let mut pooled_connection = worker.queue.connection_pool.get().unwrap();
 
-        let task = Queue::insert_query(&pooled_connection, &task, Utc::now()).unwrap();
+        let task = Queue::insert_query(&mut pooled_connection, &task, Utc::now()).unwrap();
 
         assert_eq!(FangTaskState::New, task.state);
 
         // this operation commits and thats why need to commit this test
         worker.run(task.clone());
 
-        let found_task = Queue::find_task_by_id_query(&pooled_connection, task.id).unwrap();
+        let found_task = Queue::find_task_by_id_query(&mut pooled_connection, task.id).unwrap();
 
         assert_eq!(FangTaskState::Finished, found_task.state);
 
-        Queue::remove_tasks_of_type_query(&pooled_connection, "worker_task").unwrap();
+        Queue::remove_tasks_of_type_query(&mut pooled_connection, "worker_task").unwrap();
     }
 
     #[test]
@@ -267,10 +267,10 @@ mod worker_tests {
             .retention_mode(RetentionMode::KeepAll)
             .build();
 
-        let pooled_connection = worker.queue.connection_pool.get().unwrap();
+        let mut pooled_connection = worker.queue.connection_pool.get().unwrap();
 
-        let task1 = Queue::insert_query(&pooled_connection, &task1, Utc::now()).unwrap();
-        let task2 = Queue::insert_query(&pooled_connection, &task2, Utc::now()).unwrap();
+        let task1 = Queue::insert_query(&mut pooled_connection, &task1, Utc::now()).unwrap();
+        let task2 = Queue::insert_query(&mut pooled_connection, &task2, Utc::now()).unwrap();
 
         assert_eq!(FangTaskState::New, task1.state);
         assert_eq!(FangTaskState::New, task2.state);
@@ -279,14 +279,14 @@ mod worker_tests {
 
         std::thread::sleep(std::time::Duration::from_millis(1000));
 
-        let found_task1 = Queue::find_task_by_id_query(&pooled_connection, task1.id).unwrap();
+        let found_task1 = Queue::find_task_by_id_query(&mut pooled_connection, task1.id).unwrap();
         assert_eq!(FangTaskState::Finished, found_task1.state);
 
-        let found_task2 = Queue::find_task_by_id_query(&pooled_connection, task2.id).unwrap();
+        let found_task2 = Queue::find_task_by_id_query(&mut pooled_connection, task2.id).unwrap();
         assert_eq!(FangTaskState::New, found_task2.state);
 
-        Queue::remove_tasks_of_type_query(&pooled_connection, "type1").unwrap();
-        Queue::remove_tasks_of_type_query(&pooled_connection, "type2").unwrap();
+        Queue::remove_tasks_of_type_query(&mut pooled_connection, "type1").unwrap();
+        Queue::remove_tasks_of_type_query(&mut pooled_connection, "type2").unwrap();
     }
 
     #[test]
@@ -304,15 +304,15 @@ mod worker_tests {
             .task_type(task.task_type())
             .build();
 
-        let pooled_connection = worker.queue.connection_pool.get().unwrap();
+        let mut pooled_connection = worker.queue.connection_pool.get().unwrap();
 
-        let task = Queue::insert_query(&pooled_connection, &task, Utc::now()).unwrap();
+        let task = Queue::insert_query(&mut pooled_connection, &task, Utc::now()).unwrap();
 
         assert_eq!(FangTaskState::New, task.state);
 
         worker.run(task.clone());
 
-        let found_task = Queue::find_task_by_id_query(&pooled_connection, task.id).unwrap();
+        let found_task = Queue::find_task_by_id_query(&mut pooled_connection, task.id).unwrap();
 
         assert_eq!(FangTaskState::Failed, found_task.state);
         assert_eq!(
@@ -320,6 +320,6 @@ mod worker_tests {
             found_task.error_message.unwrap()
         );
 
-        Queue::remove_tasks_of_type_query(&pooled_connection, "F_task").unwrap();
+        Queue::remove_tasks_of_type_query(&mut pooled_connection, "F_task").unwrap();
     }
 }
