@@ -1,5 +1,5 @@
 [package]
-name = "simple_async_cron_worker"
+name = "simple_cron_async_worker"
 version = "0.1.0"
 edition = "2021"
 

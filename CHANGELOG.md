@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.9.0 (2022-09-2)
+
+###  [#69](https://github.com/ayrat555/fang/pull/69)
+
+### Added
+
+- Added cron support for scheduled tasks.
+
+### Improved
+- Major refactoring of the blocking module.
+- Delete the graceful shutdown in blocking module.
+- Simplify database schema.
+- Re-write scheduled tasks in asynk module.
+- Re-write the errors in both modules.
+- Update diesel crate to 2.0 version.
+- Update uuid crate to 1.1 version.
+
 ## 0.8.0 (2022-08-18)
 
 - Use Duration in SleepParams and schedulers - [#67](https://github.com/ayrat555/fang/pull/67)
