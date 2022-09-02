@@ -3,7 +3,8 @@ use crate::asynk::async_queue::FangTaskState;
 use crate::asynk::async_queue::Task;
 use crate::asynk::async_queue::DEFAULT_TASK_TYPE;
 use crate::asynk::async_runnable::AsyncRunnable;
-use crate::asynk::AsyncError as Error;
+use crate::FangError;
+use crate::Scheduled::*;
 use crate::{RetentionMode, SleepParams};
 use log::error;
 use typed_builder::TypedBuilder;
@@ -27,15 +28,20 @@ impl<AQueue> AsyncWorker<AQueue>
 where
     AQueue: AsyncQueueable + Clone + Sync + 'static,
 {
-    pub async fn run(&mut self, task: Task) -> Result<(), Error> {
-        let result = self.execute_task(task).await;
+    pub async fn run(
+        &mut self,
+        task: Task,
+        actual_task: Box<dyn AsyncRunnable>,
+    ) -> Result<(), FangError> {
+        let result = self.execute_task(task, actual_task).await;
         self.finalize_task(result).await
     }
 
-    async fn execute_task(&mut self, task: Task) -> Result<Task, (Task, String)> {
-        let actual_task: Box<dyn AsyncRunnable> =
-            serde_json::from_value(task.metadata.clone()).unwrap();
-
+    async fn execute_task(
+        &mut self,
+        task: Task,
+        actual_task: Box<dyn AsyncRunnable>,
+    ) -> Result<Task, (Task, String)> {
         let task_result = actual_task.run(&mut self.queue).await;
         match task_result {
             Ok(()) => Ok(task),
@@ -43,7 +49,10 @@ where
         }
     }
 
-    async fn finalize_task(&mut self, result: Result<Task, (Task, String)>) -> Result<(), Error> {
+    async fn finalize_task(
+        &mut self,
+        result: Result<Task, (Task, String)>,
+    ) -> Result<(), FangError> {
         match self.retention_mode {
             RetentionMode::KeepAll => match result {
                 Ok(task) => {
@@ -86,16 +95,26 @@ where
         tokio::time::sleep(self.sleep_params.sleep_period).await;
     }
 
-    pub async fn run_tasks(&mut self) -> Result<(), Error> {
+    pub async fn run_tasks(&mut self) -> Result<(), FangError> {
         loop {
+            //fetch task
             match self
                 .queue
                 .fetch_and_touch_task(Some(self.task_type.clone()))
                 .await
             {
                 Ok(Some(task)) => {
+                    let actual_task: Box<dyn AsyncRunnable> =
+                        serde_json::from_value(task.metadata.clone()).unwrap();
+
+                    // check if task is scheduled or not
+                    if let Some(CronPattern(_)) = actual_task.cron() {
+                        // program task
+                        self.queue.schedule_task(&*actual_task).await?;
+                    }
                     self.sleep_params.maybe_reset_sleep_period();
-                    self.run(task).await?
+                    // run scheduled task
+                    self.run(task, actual_task).await?;
                 }
                 Ok(None) => {
                     self.sleep().await;
@@ -126,15 +145,20 @@ pub struct AsyncWorkerTest<'a> {
 
 #[cfg(test)]
 impl<'a> AsyncWorkerTest<'a> {
-    pub async fn run(&mut self, task: Task) -> Result<(), Error> {
-        let result = self.execute_task(task).await;
+    pub async fn run(
+        &mut self,
+        task: Task,
+        actual_task: Box<dyn AsyncRunnable>,
+    ) -> Result<(), FangError> {
+        let result = self.execute_task(task, actual_task).await;
         self.finalize_task(result).await
     }
 
-    async fn execute_task(&mut self, task: Task) -> Result<Task, (Task, String)> {
-        let actual_task: Box<dyn AsyncRunnable> =
-            serde_json::from_value(task.metadata.clone()).unwrap();
-
+    async fn execute_task(
+        &mut self,
+        task: Task,
+        actual_task: Box<dyn AsyncRunnable>,
+    ) -> Result<Task, (Task, String)> {
         let task_result = actual_task.run(self.queue).await;
         match task_result {
             Ok(()) => Ok(task),
@@ -142,7 +166,10 @@ impl<'a> AsyncWorkerTest<'a> {
         }
     }
 
-    async fn finalize_task(&mut self, result: Result<Task, (Task, String)>) -> Result<(), Error> {
+    async fn finalize_task(
+        &mut self,
+        result: Result<Task, (Task, String)>,
+    ) -> Result<(), FangError> {
         match self.retention_mode {
             RetentionMode::KeepAll => match result {
                 Ok(task) => {
@@ -185,7 +212,7 @@ impl<'a> AsyncWorkerTest<'a> {
         tokio::time::sleep(self.sleep_params.sleep_period).await;
     }
 
-    pub async fn run_tasks_until_none(&mut self) -> Result<(), Error> {
+    pub async fn run_tasks_until_none(&mut self) -> Result<(), FangError> {
         loop {
             match self
                 .queue
@@ -193,8 +220,17 @@ impl<'a> AsyncWorkerTest<'a> {
                 .await
             {
                 Ok(Some(task)) => {
+                    let actual_task: Box<dyn AsyncRunnable> =
+                        serde_json::from_value(task.metadata.clone()).unwrap();
+
+                    // check if task is scheduled or not
+                    if let Some(CronPattern(_)) = actual_task.cron() {
+                        // program task
+                        self.queue.schedule_task(&*actual_task).await?;
+                    }
                     self.sleep_params.maybe_reset_sleep_period();
-                    self.run(task).await?
+                    // run scheduled task
+                    self.run(task, actual_task).await?;
                 }
                 Ok(None) => {
                     return Ok(());
@@ -216,13 +252,16 @@ mod async_worker_tests {
     use crate::asynk::async_queue::AsyncQueueable;
     use crate::asynk::async_queue::FangTaskState;
     use crate::asynk::async_worker::Task;
-    use crate::asynk::AsyncError as Error;
     use crate::asynk::AsyncRunnable;
+    use crate::FangError;
     use crate::RetentionMode;
+    use crate::Scheduled;
     use async_trait::async_trait;
     use bb8_postgres::bb8::Pool;
     use bb8_postgres::tokio_postgres::NoTls;
     use bb8_postgres::PostgresConnectionManager;
+    use chrono::Duration;
+    use chrono::Utc;
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize)]
@@ -233,10 +272,27 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for WorkerAsyncTask {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
             Ok(())
         }
     }
+
+    #[derive(Serialize, Deserialize)]
+    struct WorkerAsyncTaskSchedule {
+        pub number: u16,
+    }
+
+    #[typetag::serde]
+    #[async_trait]
+    impl AsyncRunnable for WorkerAsyncTaskSchedule {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+            Ok(())
+        }
+        fn cron(&self) -> Option<Scheduled> {
+            Some(Scheduled::ScheduleOnce(Utc::now() + Duration::seconds(1)))
+        }
+    }
+
     #[derive(Serialize, Deserialize)]
     struct AsyncFailedTask {
         pub number: u16,
@@ -245,10 +301,10 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for AsyncFailedTask {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
             let message = format!("number {} is wrong :(", self.number);
 
-            Err(Error {
+            Err(FangError {
                 description: message,
             })
         }
@@ -260,7 +316,7 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for AsyncTaskType1 {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
             Ok(())
         }
 
@@ -275,7 +331,7 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for AsyncTaskType2 {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
             Ok(())
         }
 
@@ -290,8 +346,9 @@ mod async_worker_tests {
         let transaction = connection.transaction().await.unwrap();
 
         let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+        let actual_task = WorkerAsyncTask { number: 1 };
 
-        let task = insert_task(&mut test, &WorkerAsyncTask { number: 1 }).await;
+        let task = insert_task(&mut test, &actual_task).await;
         let id = task.id;
 
         let mut worker = AsyncWorkerTest::builder()
@@ -299,12 +356,48 @@ mod async_worker_tests {
             .retention_mode(RetentionMode::KeepAll)
             .build();
 
-        worker.run(task).await.unwrap();
+        worker.run(task, Box::new(actual_task)).await.unwrap();
         let task_finished = test.find_task_by_id(id).await.unwrap();
         assert_eq!(id, task_finished.id);
         assert_eq!(FangTaskState::Finished, task_finished.state);
         test.transaction.rollback().await.unwrap();
     }
+
+    #[tokio::test]
+    async fn schedule_task_test() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
+
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+
+        let actual_task = WorkerAsyncTaskSchedule { number: 1 };
+
+        let task = test.schedule_task(&actual_task).await.unwrap();
+
+        let id = task.id;
+
+        let mut worker = AsyncWorkerTest::builder()
+            .queue(&mut test as &mut dyn AsyncQueueable)
+            .retention_mode(RetentionMode::KeepAll)
+            .build();
+
+        worker.run_tasks_until_none().await.unwrap();
+
+        let task = worker.queue.find_task_by_id(id).await.unwrap();
+
+        assert_eq!(id, task.id);
+        assert_eq!(FangTaskState::New, task.state);
+
+        tokio::time::sleep(core::time::Duration::from_secs(3)).await;
+
+        worker.run_tasks_until_none().await.unwrap();
+
+        let task = test.find_task_by_id(id).await.unwrap();
+        assert_eq!(id, task.id);
+        assert_eq!(FangTaskState::Finished, task.state);
+    }
+
     #[tokio::test]
     async fn saves_error_for_failed_task() {
         let pool = pool().await;
@@ -312,8 +405,9 @@ mod async_worker_tests {
         let transaction = connection.transaction().await.unwrap();
 
         let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+        let failed_task = AsyncFailedTask { number: 1 };
 
-        let task = insert_task(&mut test, &AsyncFailedTask { number: 1 }).await;
+        let task = insert_task(&mut test, &failed_task).await;
         let id = task.id;
 
         let mut worker = AsyncWorkerTest::builder()
@@ -321,7 +415,7 @@ mod async_worker_tests {
             .retention_mode(RetentionMode::KeepAll)
             .build();
 
-        worker.run(task).await.unwrap();
+        worker.run(task, Box::new(failed_task)).await.unwrap();
         let task_finished = test.find_task_by_id(id).await.unwrap();
 
         assert_eq!(id, task_finished.id);
@@ -367,6 +461,7 @@ mod async_worker_tests {
         assert_eq!(FangTaskState::New, task2.state);
         test.transaction.rollback().await.unwrap();
     }
+
     #[tokio::test]
     async fn remove_when_finished() {
         let pool = pool().await;

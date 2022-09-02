@@ -1,21 +1,31 @@
+use crate::blocking::queue::QueueError;
+use crate::FangError;
+use diesel::r2d2::PoolError;
+use diesel::result::Error as DieselError;
 use std::io::Error as IoError;
-use std::sync::PoisonError;
-use thiserror::Error;
 
-#[derive(Error, Debug)]
-pub enum FangError {
-    #[error("The shared state in an executor thread became poisoned")]
-    PoisonedLock,
-
-    #[error("Failed to create executor thread")]
-    ExecutorThreadCreationFailed {
-        #[from]
-        source: IoError,
-    },
+impl From<IoError> for FangError {
+    fn from(error: IoError) -> Self {
+        let description = format!("{:?}", error);
+        FangError { description }
+    }
 }
 
-impl<T> From<PoisonError<T>> for FangError {
-    fn from(_: PoisonError<T>) -> Self {
-        Self::PoisonedLock
+impl From<QueueError> for FangError {
+    fn from(error: QueueError) -> Self {
+        let description = format!("{:?}", error);
+        FangError { description }
+    }
+}
+
+impl From<DieselError> for FangError {
+    fn from(error: DieselError) -> Self {
+        Self::from(QueueError::DieselError(error))
+    }
+}
+
+impl From<PoolError> for FangError {
+    fn from(error: PoolError) -> Self {
+        Self::from(QueueError::PoolError(error))
     }
 }

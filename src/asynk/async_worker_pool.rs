@@ -1,7 +1,7 @@
 use crate::asynk::async_queue::AsyncQueueable;
 use crate::asynk::async_queue::DEFAULT_TASK_TYPE;
 use crate::asynk::async_worker::AsyncWorker;
-use crate::asynk::AsyncError as Error;
+use crate::FangError;
 use crate::{RetentionMode, SleepParams};
 use async_recursion::async_recursion;
 use log::error;
@@ -61,7 +61,7 @@ where
         sleep_params: SleepParams,
         retention_mode: RetentionMode,
         task_type: String,
-    ) -> JoinHandle<Result<(), Error>> {
+    ) -> JoinHandle<Result<(), FangError>> {
         tokio::spawn(async move {
             Self::run_worker(queue, sleep_params, retention_mode, task_type).await
         })
@@ -71,7 +71,7 @@ where
         sleep_params: SleepParams,
         retention_mode: RetentionMode,
         task_type: String,
-    ) -> Result<(), Error> {
+    ) -> Result<(), FangError> {
         let mut worker: AsyncWorker<AQueue> = AsyncWorker::builder()
             .queue(queue)
             .sleep_params(sleep_params)

@@ -1,6 +1,22 @@
 #![allow(clippy::extra_unused_lifetimes)]
 
 use std::time::Duration;
+use thiserror::Error;
+
+pub enum Scheduled {
+    CronPattern(String),
+    ScheduleOnce(DateTime<Utc>),
+}
+
+#[derive(Debug, Error)]
+pub enum CronError {
+    #[error(transparent)]
+    LibraryError(#[from] cron::error::Error),
+    #[error("You have to implement method `cron()` in your AsyncRunnable")]
+    TaskNotSchedulableError,
+    #[error("No timestamps match with this cron pattern")]
+    NoTimestampsError,
+}
 
 #[derive(Clone, Debug)]
 pub enum RetentionMode {
@@ -46,6 +62,11 @@ impl Default for SleepParams {
     }
 }
 
+#[derive(Debug)]
+pub struct FangError {
+    pub description: String,
+}
+
 #[macro_use]
 #[cfg(feature = "blocking")]
 extern crate diesel;
@@ -61,7 +82,14 @@ pub use typetag;
 pub extern crate serde;
 
 #[doc(hidden)]
+pub extern crate chrono;
+
+#[doc(hidden)]
 pub use serde_derive::{Deserialize, Serialize};
+
+pub use chrono::DateTime;
+pub use chrono::Utc;
+pub use cron::Schedule;
 
 #[cfg(feature = "blocking")]
 pub mod blocking;
