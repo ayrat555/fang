@@ -3,7 +3,7 @@ use fang::asynk::async_queue::AsyncQueueable;
 use fang::asynk::async_worker_pool::AsyncWorkerPool;
 use fang::AsyncRunnable;
 use fang::NoTls;
-use simple_async_cron_worker::MyCronTask;
+use simple_cron_async_worker::MyCronTask;
 use std::time::Duration;
 
 #[tokio::main]
