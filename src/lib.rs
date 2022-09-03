@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 #![allow(clippy::extra_unused_lifetimes)]
 
 use std::time::Duration;
@@ -87,9 +88,10 @@ pub extern crate chrono;
 #[doc(hidden)]
 pub use serde_derive::{Deserialize, Serialize};
 
+#[doc(hidden)]
 pub use chrono::DateTime;
+#[doc(hidden)]
 pub use chrono::Utc;
-pub use cron::Schedule;
 
 #[cfg(feature = "blocking")]
 pub mod blocking;

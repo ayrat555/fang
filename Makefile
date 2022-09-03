@@ -15,3 +15,6 @@ tests:
 
 ignored:
 	DATABASE_URL=postgres://postgres:postgres@localhost/fang cargo test --all-features -- --color always --nocapture --ignored
+
+doc:
+	cargo doc --open
