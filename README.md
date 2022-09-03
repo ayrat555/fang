@@ -63,18 +63,18 @@ impl Runnable for MyTask {
 
         Ok(())
     }
-    
+
     // If you want to make the tasks of this type uniq.
     fn uniq(&self) -> bool {
       true
     }
-    
+
     // This will be useful if you want to filter tasks.
     // default value: "common".to_string()
     fn task_type(&self) -> String {
       "my_task".to_string()
     }
-    
+
     // This will be useful if you would like to schedule tasks.
     // default value: None (task is not schedule just executes when it is fetched)
     fn cron(&self) -> Option<Scheduled> {
@@ -231,6 +231,8 @@ use fang::Queue;
 let mut worker_pool = WorkerPool::<Queue>::builder()
     .queue(queue)
     .number_of_workers(3_u32)
+     // if you want to run tasks of the specific kind
+    .task_type("my_task_type")
     .build();
 
 worker_pool.start();
@@ -249,6 +251,8 @@ use fang::asynk::async_worker_pool::AsyncWorkerPool;
 let mut pool: AsyncWorkerPool<AsyncQueue<NoTls>> = AsyncWorkerPool::builder()
         .number_of_workers(max_pool_size)
         .queue(queue.clone())
+         // if you want to run tasks of the specific kind
+        .task_type("my_task_type")
         .build();
 
 pool.start().await;
