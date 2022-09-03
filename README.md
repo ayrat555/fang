@@ -1,4 +1,4 @@
-<p align="center"><img src="logo.png" alt="fang" height="300px"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/ayrat555/fang/master/logo.png" alt="fang" height="300px"></p>
 
 [![Crates.io][s1]][ci] [![docs page][docs-badge]][docs] ![test][ga-test] ![style][ga-style]
 
@@ -288,9 +288,9 @@ There are three retention modes you can use:
 
 ```rust
 pub enum RetentionMode {
-    KeepAll,        \\ doesn't remove tasks
-    RemoveAll,      \\ removes all tasks
-    RemoveFinished, \\ default value
+    KeepAll,        // doesn't remove tasks
+    RemoveAll,      // removes all tasks
+    RemoveFinished, // default value
 }
 ```
 
@@ -304,10 +304,10 @@ You can use use `SleepParams` to confugure sleep values:
 
 ```rust
 pub struct SleepParams {
-    pub sleep_period: Duration,     \\ default value is 5 seconds
-    pub max_sleep_period: Duration, \\ default value is 15 seconds
-    pub min_sleep_period: Duration, \\ default value is 5 seconds
-    pub sleep_step: Duration,       \\ default value is 5 seconds
+    pub sleep_period: Duration,     // default value is 5 seconds
+    pub max_sleep_period: Duration, // default value is 15 seconds
+    pub min_sleep_period: Duration, // default value is 5 seconds
+    pub sleep_step: Duration,       // default value is 5 seconds
 }
 ```
 
