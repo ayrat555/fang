@@ -11,6 +11,9 @@ rust-version = "1.62"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+doctest = false
+
 [features]
 default = ["blocking", "asynk"]
 blocking = ["diesel", "diesel-derive-enum", "dotenv"]
