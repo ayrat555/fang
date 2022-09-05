@@ -24,14 +24,6 @@ weight = 10
 name = "CHANGELOG"
 section = "docs"
 url = "/docs/changelog/changelog"
-=======
-# Menu items
-[[extra.menu.main]]
-name = "Docs"
-section = "docs"
-url = "/docs/getting-started/introduction/"
-
-weight = 10
 
 [[extra.menu.main]]
 name = "Blog"
