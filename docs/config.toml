@@ -27,7 +27,7 @@ taxonomies = [
 # Whether to build a search index to be used later on by a JavaScript library
 # When set to "true", a search index is built from the pages and section
 # content for `default_language`.
-build_search_index = true
+build_search_index = false
 
 [search]
 # Whether to include the title of the page/section in the index
@@ -110,13 +110,3 @@ weight = 20
 # Footer contents
 [extra.footer]
 info = 'Built with ❤️ by <a href="https://github.com/ayrat555">Ayrat Badykov</a> and <a href="https://github.com/pxp9">Pepe Márquez</a>'
-
-[[extra.footer.nav]]
-name = "Privacy"
-url = "/privacy-policy/"
-weight = 10
-
-[[extra.footer.nav]]
-name = "Code of Conduct"
-url = "/docs/contributing/code-of-conduct/"
-weight = 20
