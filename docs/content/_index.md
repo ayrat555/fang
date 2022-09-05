@@ -5,12 +5,13 @@ title = "FANG"
 # The homepage contents
 [extra]
 lead = '<b>Fang</b> is a background task processing for Rust. It uses Postgres DB as a task queue.'
+
 url = "/docs/readme/readme"
+
 url_button = "Get started"
 repo_version = "GitHub v0.9.0"
 repo_license = "Open-source MIT License."
 repo_url = "https://github.com/ayrat555/fang"
-
 
 # Menu items
 [[extra.menu.main]]
@@ -23,6 +24,13 @@ weight = 10
 name = "CHANGELOG"
 section = "docs"
 url = "/docs/changelog/changelog"
+=======
+# Menu items
+[[extra.menu.main]]
+name = "Docs"
+section = "docs"
+url = "/docs/getting-started/introduction/"
+
 weight = 10
 
 [[extra.menu.main]]
@@ -48,4 +56,3 @@ title = "Unique tasks"
 content = 'Tasks are not duplicated in the queue if they are unique'
 +++
 
-+++
