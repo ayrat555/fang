@@ -1,0 +1,579 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
+	<title>Fang</title>
+	<subtitle>Fang is a background task processing for Rust. It uses Postgres DB as a task queue.</subtitle>
+	<link href="https://adidoks.netlify.com/atom.xml" rel="self" type="application/atom+xml"/>
+  <link href="https://adidoks.netlify.com"/>
+	<generator uri="https://www.getzola.org/">Zola</generator>
+	<updated>2025-05-01T08:00:00+00:00</updated>
+	<id>https://adidoks.netlify.com/atom.xml</id>
+	<entry xml:lang="en">
+		<title>Fang, async background processing for Rust</title>
+		<published>2025-05-01T08:00:00+00:00</published>
+		<updated>2021-05-01T08:00:00+00:00</updated>
+		<link rel="alternate" href="https://adidoks.netlify.com/blog/async-processing/" type="text/html"/>
+		<id>https://adidoks.netlify.com/blog/async-processing/</id>
+		<content type="html">&lt;p&gt;Even though the first stable version of Rust was released in 2015, there are still some holes in its ecosystem for solving common tasks. One of which is background processing.&lt;&#x2F;p&gt;
+&lt;p&gt;In software engineering background processing is a common approach for solving several problems:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Carry out periodic tasks. For example, deliver notifications, update cached values.&lt;&#x2F;li&gt;
+&lt;li&gt;Defer expensive work so your application stays responsive while performing calculations in the background&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;Most programming languages have go-to background processing frameworks&#x2F;libraries. For example:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Ruby - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;mperham&#x2F;sidekiq&quot;&gt;sidekiq&lt;&#x2F;a&gt;. It uses Redis as a job queue.&lt;&#x2F;li&gt;
+&lt;li&gt;Python - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;Bogdanp&#x2F;dramatiq&quot;&gt;dramatiq&lt;&#x2F;a&gt;. It uses RabbitMQ as a job queue.&lt;&#x2F;li&gt;
+&lt;li&gt;Elixir - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;sorentwo&#x2F;oban&quot;&gt;oban&lt;&#x2F;a&gt;. It uses a Postgres DB as a job queue.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;The async programming (async&#x2F;await) can be used for background processing but it has several major disadvantages if used directly:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;It doesn&#x27;t give control of the number of tasks that are being executed at any given time. So a lot of spawned tasks can overload a thread&#x2F;threads that they&#x27;re started on.&lt;&#x2F;li&gt;
+&lt;li&gt;It doesn&#x27;t provide any monitoring which can be useful to investigate your system and find bottlenecks&lt;&#x2F;li&gt;
+&lt;li&gt;Tasks are not persistent. So all enqueued tasks are lost on every application restart&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;To solve these shortcomings of the async programming we implemented the async processing in &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&quot;&gt;the fang library&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;threaded-fang&quot;&gt;Threaded Fang&lt;&#x2F;h2&gt;
+&lt;p&gt;Fang is a background processing library for rust. The first version of Fang was released exactly one year ago. Its key features were:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Each worker is started in a separate thread&lt;&#x2F;li&gt;
+&lt;li&gt;A Postgres table is used as the task queue&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;This implementation was written for a specific use case - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;el_monitorro&quot;&gt;el monitorro bot&lt;&#x2F;a&gt;. This specific implementation of background processing was proved by time. Each day it processes more and more feeds every minute (the current number is more than 3000). Some users host the bot on their infrastructure.&lt;&#x2F;p&gt;
+&lt;p&gt;You can find out more about the threaded processing in fang in &lt;a href=&quot;https:&#x2F;&#x2F;www.badykov.com&#x2F;rust&#x2F;fang&#x2F;&quot;&gt;this blog post&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;async-fang&quot;&gt;Async Fang&lt;&#x2F;h2&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;
+Async provides significantly reduced CPU and memory overhead, especially for workloads with a large amount of IO-bound tasks, such as servers and databases. All else equal, you can have orders of magnitude more tasks than OS threads, because an async runtime uses a small amount of (expensive) threads to handle a large amount of (cheap) tasks
+  &lt;&#x2F;p&gt;
+  &lt;footer&gt;&lt;cite title=&quot;Async book&quot;&gt;From the Rust&#x27;s Async book&lt;&#x2F;cite&gt;&lt;&#x2F;footer&gt;
+&lt;&#x2F;blockquote&gt;
+&lt;p&gt;For some lightweight background tasks, it&#x27;s cheaper to run them on the same thread using async instead of starting one thread per worker. That&#x27;s why we implemented this kind of processing in fang. Its key features:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Each worker is started as a tokio task&lt;&#x2F;li&gt;
+&lt;li&gt;If any worker fails during task execution, it&#x27;s restarted&lt;&#x2F;li&gt;
+&lt;li&gt;Tasks are saved to a Postgres database. Instead of diesel, &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;sfackler&#x2F;rust-postgres&quot;&gt;tokio-postgres&lt;&#x2F;a&gt; is used to interact with a db. The threaded processing uses the &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;diesel-rs&#x2F;diesel&quot;&gt;diesel&lt;&#x2F;a&gt; ORM which blocks the thread.&lt;&#x2F;li&gt;
+&lt;li&gt;The implementation is based on traits so it&#x27;s easy to implement additional backends (redis, in-memory) to store tasks.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;usage&quot;&gt;Usage&lt;&#x2F;h2&gt;
+&lt;p&gt;The usage is straightforward:&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;Define a serializable task by adding &lt;code&gt;serde&lt;&#x2F;code&gt; derives to a task struct.&lt;&#x2F;li&gt;
+&lt;li&gt;Implement &lt;code&gt;AsyncRunnable&lt;&#x2F;code&gt; runnable trait for fang to be able to run it.&lt;&#x2F;li&gt;
+&lt;li&gt;Start workers.&lt;&#x2F;li&gt;
+&lt;li&gt;Enqueue tasks.&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;p&gt;Let&#x27;s go over each step.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;define-a-job&quot;&gt;Define a job&lt;&#x2F;h3&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::serde::{Deserialize, Serialize};
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;derive&lt;&#x2F;span&gt;&lt;span&gt;(Serialize, Deserialize)]
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;serde&lt;&#x2F;span&gt;&lt;span&gt;(crate = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;fang::serde&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;)]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub struct &lt;&#x2F;span&gt;&lt;span&gt;MyTask {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;number&lt;&#x2F;span&gt;&lt;span&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u16&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;impl &lt;&#x2F;span&gt;&lt;span&gt;MyTask {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;new&lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;number&lt;&#x2F;span&gt;&lt;span&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u16&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;Self &lt;&#x2F;span&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;Self &lt;&#x2F;span&gt;&lt;span&gt;{ number }
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Fang re-exports &lt;code&gt;serde&lt;&#x2F;code&gt; so it&#x27;s not required to add it to the &lt;code&gt;Cargo.toml&lt;&#x2F;code&gt; file&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;implement-the-asyncrunnable-trait&quot;&gt;Implement the AsyncRunnable trait&lt;&#x2F;h3&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::async_trait;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::typetag;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::AsyncRunnable;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;std::time::Duration;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;async_trait&lt;&#x2F;span&gt;&lt;span&gt;]
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;typetag&lt;&#x2F;span&gt;&lt;span&gt;::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;serde&lt;&#x2F;span&gt;&lt;span&gt;]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;impl &lt;&#x2F;span&gt;&lt;span&gt;AsyncRunnable &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;for &lt;&#x2F;span&gt;&lt;span&gt;MyTask {
+&lt;&#x2F;span&gt;&lt;span&gt;    async &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;run&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;queue&lt;&#x2F;span&gt;&lt;span&gt;: &amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut&lt;&#x2F;span&gt;&lt;span&gt; dyn AsyncQueueable) -&amp;gt; Result&amp;lt;(), Error&amp;gt; {
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; new_task = MyTask::new(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;.number + &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;);
+&lt;&#x2F;span&gt;&lt;span&gt;        queue
+&lt;&#x2F;span&gt;&lt;span&gt;            .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;insert_task&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;new_task as &amp;amp;dyn AsyncRunnable)
+&lt;&#x2F;span&gt;&lt;span&gt;            .await
+&lt;&#x2F;span&gt;&lt;span&gt;            .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;        log::info!(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;the current number is {}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;.number);
+&lt;&#x2F;span&gt;&lt;span&gt;        tokio::time::sleep(Duration::from_secs(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;3&lt;&#x2F;span&gt;&lt;span&gt;)).await;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;        Ok(())
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;ul&gt;
+&lt;li&gt;Fang uses the &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;dtolnay&#x2F;typetag&quot;&gt;typetag library&lt;&#x2F;a&gt; to serialize trait objects and save them to the queue.&lt;&#x2F;li&gt;
+&lt;li&gt;The &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;dtolnay&#x2F;async-trait&quot;&gt;async-trait&lt;&#x2F;a&gt; is used for implementing async traits&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h3 id=&quot;init-queue&quot;&gt;Init queue&lt;&#x2F;h3&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::asynk::async_queue::AsyncQueue;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; max_pool_size: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32 &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;2&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let mut&lt;&#x2F;span&gt;&lt;span&gt; queue = AsyncQueue::builder()
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;uri&lt;&#x2F;span&gt;&lt;span&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;postgres:&#x2F;&#x2F;postgres:postgres@localhost&#x2F;fang&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;)
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;max_pool_size&lt;&#x2F;span&gt;&lt;span&gt;(max_pool_size)
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;duplicated_tasks&lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;)
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;build&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h3 id=&quot;start-workers&quot;&gt;Start workers&lt;&#x2F;h3&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::asynk::async_worker_pool::AsyncWorkerPool;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::NoTls;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let mut&lt;&#x2F;span&gt;&lt;span&gt; pool: AsyncWorkerPool&amp;lt;AsyncQueue&amp;lt;NoTls&amp;gt;&amp;gt; = AsyncWorkerPool::builder()
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;number_of_workers&lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;10_&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32&lt;&#x2F;span&gt;&lt;span&gt;)
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;queue&lt;&#x2F;span&gt;&lt;span&gt;(queue.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;clone&lt;&#x2F;span&gt;&lt;span&gt;())
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;build&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;pool.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;start&lt;&#x2F;span&gt;&lt;span&gt;().await;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h3 id=&quot;insert-tasks&quot;&gt;Insert tasks&lt;&#x2F;h3&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; task = MyTask::new(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;);
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;queue
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;insert_task&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;task1 as &amp;amp;dyn AsyncRunnable)
+&lt;&#x2F;span&gt;&lt;span&gt;    .await
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h2 id=&quot;pitfalls&quot;&gt;Pitfalls&lt;&#x2F;h2&gt;
+&lt;p&gt;The async processing is suitable for lightweight tasks. But for heavier tasks it&#x27;s advised to use one of the following approaches:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;start a separate tokio runtime to run fang workers&lt;&#x2F;li&gt;
+&lt;li&gt;use the threaded processing feature implemented in fang instead of the async processing&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;future-directions&quot;&gt;Future directions&lt;&#x2F;h2&gt;
+&lt;p&gt;There are a couple of features planned for fang:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Retries with different backoff modes&lt;&#x2F;li&gt;
+&lt;li&gt;Additional backends (in-memory, redis)&lt;&#x2F;li&gt;
+&lt;li&gt;Graceful shutdown for async workers (for the threaded processing this feature is implemented)&lt;&#x2F;li&gt;
+&lt;li&gt;Cron jobs&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;conclusion&quot;&gt;Conclusion&lt;&#x2F;h2&gt;
+&lt;p&gt;The project is available on &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&quot;&gt;GitHub&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;The async feature and this post is written in collaboration between &lt;a href=&quot;https:&#x2F;&#x2F;www.badykov.com&#x2F;&quot;&gt;Ayrat Badykov&lt;&#x2F;a&gt; (&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&quot;&gt;github&lt;&#x2F;a&gt;) and &lt;a href=&quot;https:&#x2F;&#x2F;pxp9.github.io&#x2F;&quot;&gt;Pepe Márquez Romero&lt;&#x2F;a&gt; (&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;pxp9&quot;&gt;github&lt;&#x2F;a&gt;)&lt;&#x2F;p&gt;
+</content>
+	</entry>
+	<entry xml:lang="en">
+		<title>CHANGELOG</title>
+		<published>2021-05-01T18:10:00+00:00</published>
+		<updated>2021-05-01T18:10:00+00:00</updated>
+		<link rel="alternate" href="https://adidoks.netlify.com/docs/changelog/changelog/" type="text/html"/>
+		<id>https://adidoks.netlify.com/docs/changelog/changelog/</id>
+		<content type="html">&lt;h1 id=&quot;changelog&quot;&gt;Changelog&lt;&#x2F;h1&gt;
+&lt;h2 id=&quot;0-9-0-2022-09-2&quot;&gt;0.9.0 (2022-09-2)&lt;&#x2F;h2&gt;
+&lt;h3 id=&quot;69&quot;&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;69&quot;&gt;#69&lt;&#x2F;a&gt;&lt;&#x2F;h3&gt;
+&lt;h3 id=&quot;added&quot;&gt;Added&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Added cron support for scheduled tasks.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h3 id=&quot;improved&quot;&gt;Improved&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Major refactoring of the blocking module.&lt;&#x2F;li&gt;
+&lt;li&gt;Delete the graceful shutdown in blocking module.&lt;&#x2F;li&gt;
+&lt;li&gt;Simplify database schema.&lt;&#x2F;li&gt;
+&lt;li&gt;Re-write scheduled tasks in asynk module.&lt;&#x2F;li&gt;
+&lt;li&gt;Re-write the errors in both modules.&lt;&#x2F;li&gt;
+&lt;li&gt;Update diesel crate to 2.0 version.&lt;&#x2F;li&gt;
+&lt;li&gt;Update uuid crate to 1.1 version.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-8-0-2022-08-18&quot;&gt;0.8.0 (2022-08-18)&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Use Duration in SleepParams and schedulers - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;67&quot;&gt;#67&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-7-2-2022-08-16&quot;&gt;0.7.2 (2022-08-16)&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Set task_type when starting a worker pool - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;66&quot;&gt;#66&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-7-1-2022-08-04&quot;&gt;0.7.1 (2022-08-04)&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Fix a conflict in exports of the &lt;code&gt;blocking&lt;&#x2F;code&gt; and the &lt;code&gt;asynk&lt;&#x2F;code&gt; features - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;61&quot;&gt;#61&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-7-0-2022-08-03&quot;&gt;0.7.0 (2022-08-03)&lt;&#x2F;h2&gt;
+&lt;h3 id=&quot;21&quot;&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;21&quot;&gt;#21&lt;&#x2F;a&gt;&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Create a full functional async processing module for fang which uses &lt;code&gt;tokio&lt;&#x2F;code&gt; to summon processes that are more lighter than threads.&lt;&#x2F;li&gt;
+&lt;li&gt;Rename Job starting names into Task &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;29&quot;&gt;#29&lt;&#x2F;a&gt;.&lt;&#x2F;li&gt;
+&lt;li&gt;Export serde correctly - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;21&#x2F;commits&#x2F;cf2ce19c970e93d71e387526e882c67db53cea18&quot;&gt;commit&lt;&#x2F;a&gt;.&lt;&#x2F;li&gt;
+&lt;li&gt;Implement Postgres backend for async.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-6-0-2022-07-01&quot;&gt;0.6.0 (2022-07-01)&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Rust 1.62 is required for &lt;code&gt;typetag&lt;&#x2F;code&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-5-0-2021-12-05&quot;&gt;0.5.0 (2021-12-05)&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Add graceful shutdown - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;14&quot;&gt;#14&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-4-2-2021-11-30&quot;&gt;0.4.2 (2021-11-30)&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Bump deps - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;13&quot;&gt;#13&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-4-1-2021-08-22&quot;&gt;0.4.1 (2021-08-22)&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Do not use env-logger - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;11&quot;&gt;#11&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-4-0-2021-07-31&quot;&gt;0.4.0 (2021-07-31)&lt;&#x2F;h2&gt;
+&lt;h3 id=&quot;8&quot;&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;8&quot;&gt;#8&lt;&#x2F;a&gt;:&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Maintain ConnectionPool for Worker Threads&lt;&#x2F;li&gt;
+&lt;li&gt;Rename Postgres into Queue&lt;&#x2F;li&gt;
+&lt;li&gt;Pass PgConnection into run function&lt;&#x2F;li&gt;
+&lt;li&gt;Add function to remove all tasks of the specified type&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-3-1-2021-07-24&quot;&gt;0.3.1 (2021-07-24)&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Add periodic tasks - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;5&quot;&gt;#5&lt;&#x2F;a&gt;, &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;7&quot;&gt;#7&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-3-1-2021-07-11&quot;&gt;0.3.1 (2021-07-11)&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Simplify usage by re-exporting serde traits - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;3&quot;&gt;#3&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-3-0-2021-07-04&quot;&gt;0.3.0 (2021-07-04)&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Execute different types of tasks in separate workers - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;1&quot;&gt;#1&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;Add retention mode for tasks - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;2&quot;&gt;#2&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-2-0-2021-06-24&quot;&gt;0.2.0 (2021-06-24)&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;The first release on crates.io&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+</content>
+	</entry>
+	<entry xml:lang="en">
+		<title>README</title>
+		<published>2021-05-01T18:10:00+00:00</published>
+		<updated>2021-05-01T18:10:00+00:00</updated>
+		<link rel="alternate" href="https://adidoks.netlify.com/docs/readme/readme/" type="text/html"/>
+		<id>https://adidoks.netlify.com/docs/readme/readme/</id>
+		<content type="html">&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;raw.githubusercontent.com&#x2F;ayrat555&#x2F;fang&#x2F;master&#x2F;logo.png&quot; alt=&quot;fang&quot; height=&quot;300px&quot;&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;crates.io&#x2F;crates&#x2F;fang&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;img.shields.io&#x2F;crates&#x2F;v&#x2F;fang.svg&quot; alt=&quot;Crates.io&quot; &#x2F;&gt;&lt;&#x2F;a&gt; &lt;a href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;fang&#x2F;&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;img.shields.io&#x2F;badge&#x2F;docs-website-blue.svg&quot; alt=&quot;docs page&quot; &#x2F;&gt;&lt;&#x2F;a&gt; &lt;img src=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;actions&#x2F;workflows&#x2F;rust.yml&#x2F;badge.svg&quot; alt=&quot;test&quot; &#x2F;&gt; &lt;img src=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;actions&#x2F;workflows&#x2F;style.yml&#x2F;badge.svg&quot; alt=&quot;style&quot; &#x2F;&gt;&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;fang&quot;&gt;Fang&lt;&#x2F;h1&gt;
+&lt;p&gt;Background task processing library for Rust. It uses Postgres DB as a task queue.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;features&quot;&gt;Features&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Asynk feature uses &lt;code&gt;tokio&lt;&#x2F;code&gt;. Workers are started in tokio tasks.&lt;&#x2F;li&gt;
+&lt;li&gt;Blocking feature uses &lt;code&gt;std::thread&lt;&#x2F;code&gt;. Workers are started in a separated threads.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;installation&quot;&gt;Installation&lt;&#x2F;h2&gt;
+&lt;ol&gt;
+&lt;li&gt;Add this to your Cargo.toml&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;h4 id=&quot;blocking-feature&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
+&lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span&gt;[dependencies]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.9&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; , &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;features &lt;&#x2F;span&gt;&lt;span&gt;= [&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;blocking&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;default-features &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false &lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h4 id=&quot;asynk-feature&quot;&gt;Asynk feature&lt;&#x2F;h4&gt;
+&lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span&gt;[dependencies]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.9&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; , &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;features &lt;&#x2F;span&gt;&lt;span&gt;= [&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;asynk&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;default-features &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false &lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h4 id=&quot;both-features&quot;&gt;Both features&lt;&#x2F;h4&gt;
+&lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.9&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; }
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;&lt;em&gt;Supports rustc 1.62+&lt;&#x2F;em&gt;&lt;&#x2F;p&gt;
+&lt;ol start=&quot;2&quot;&gt;
+&lt;li&gt;Create &lt;code&gt;fang_tasks&lt;&#x2F;code&gt; table in the Postgres database. The migration can be found in &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;blob&#x2F;master&#x2F;migrations&#x2F;2022-08-20-151615_create_fang_tasks&#x2F;up.sql&quot;&gt;the migrations directory&lt;&#x2F;a&gt;.&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;h2 id=&quot;usage&quot;&gt;Usage&lt;&#x2F;h2&gt;
+&lt;h3 id=&quot;defining-a-task&quot;&gt;Defining a task&lt;&#x2F;h3&gt;
+&lt;h4 id=&quot;blocking-feature-1&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
+&lt;p&gt;Every task should implement &lt;code&gt;fang::Runnable&lt;&#x2F;code&gt; trait which is used by &lt;code&gt;fang&lt;&#x2F;code&gt; to execute it.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::Error;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::Runnable;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::typetag;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::PgConnection;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::serde::{Deserialize, Serialize};
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;derive&lt;&#x2F;span&gt;&lt;span&gt;(Serialize, Deserialize)]
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;serde&lt;&#x2F;span&gt;&lt;span&gt;(crate = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;fang::serde&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;)]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;struct &lt;&#x2F;span&gt;&lt;span&gt;MyTask {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;number&lt;&#x2F;span&gt;&lt;span&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u16&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;typetag&lt;&#x2F;span&gt;&lt;span&gt;::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;serde&lt;&#x2F;span&gt;&lt;span&gt;]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;impl &lt;&#x2F;span&gt;&lt;span&gt;Runnable &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;for &lt;&#x2F;span&gt;&lt;span&gt;MyTask {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;run&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;_queue&lt;&#x2F;span&gt;&lt;span&gt;: &amp;amp;dyn Queueable) -&amp;gt; Result&amp;lt;(), Error&amp;gt; {
+&lt;&#x2F;span&gt;&lt;span&gt;        println!(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;the number is &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;{}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;.number);
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;        Ok(())
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; If you want to make the tasks of this type uniq.
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;uniq&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;bool &lt;&#x2F;span&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; This will be useful if you want to filter tasks.
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; default value: &amp;quot;common&amp;quot;.to_string()
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;task_type&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; String {
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;my_task&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span&gt;()
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; This will be useful if you would like to schedule tasks.
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; default value: None (task is not schedule just executes when it is fetched)
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;cron&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; Option&amp;lt;Scheduled&amp;gt; {
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F;               sec  min   hour   day of month   month   day of week   year
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F;               be careful works only with UTC hour.
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F;               https:&#x2F;&#x2F;www.timeanddate.com&#x2F;worldclock&#x2F;timezone&#x2F;utc
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; expression = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0&#x2F;20 * * * Aug-Sep * 2022&#x2F;1&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        Some(Scheduled::CronPattern(expression.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span&gt;()))
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;As you can see from the example above, the trait implementation has &lt;code&gt;#[typetag::serde]&lt;&#x2F;code&gt; attribute which is used to deserialize the task.&lt;&#x2F;p&gt;
+&lt;p&gt;The second parameter  of the &lt;code&gt;run&lt;&#x2F;code&gt; function is a is an struct that implements fang::Queueable (fang::Queue for example), You can re-use it to manipulate the task queue, for example, to add a new job during the current job&#x27;s execution. If you don&#x27;t need it, just ignore it.&lt;&#x2F;p&gt;
+&lt;h4 id=&quot;asynk-feature-1&quot;&gt;Asynk feature&lt;&#x2F;h4&gt;
+&lt;p&gt;Every task should implement &lt;code&gt;fang::AsyncRunnable&lt;&#x2F;code&gt; trait which is used by &lt;code&gt;fang&lt;&#x2F;code&gt; to execute it.&lt;&#x2F;p&gt;
+&lt;p&gt;Also be careful to not to call with the same name two impl of AsyncRunnable, because will cause a fail with typetag.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::AsyncRunnable;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::asynk::async_queue::AsyncQueueable;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::serde::{Deserialize, Serialize};
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::async_trait;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;derive&lt;&#x2F;span&gt;&lt;span&gt;(Serialize, Deserialize)]
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;serde&lt;&#x2F;span&gt;&lt;span&gt;(crate = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;fang::serde&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;)]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;struct &lt;&#x2F;span&gt;&lt;span&gt;AsyncTask {
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;number&lt;&#x2F;span&gt;&lt;span&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u16&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;typetag&lt;&#x2F;span&gt;&lt;span&gt;::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;serde&lt;&#x2F;span&gt;&lt;span&gt;]
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;async_trait&lt;&#x2F;span&gt;&lt;span&gt;]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;impl &lt;&#x2F;span&gt;&lt;span&gt;AsyncRunnable &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;for &lt;&#x2F;span&gt;&lt;span&gt;AsyncTask {
+&lt;&#x2F;span&gt;&lt;span&gt;    async &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;run&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;_queueable&lt;&#x2F;span&gt;&lt;span&gt;: &amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut&lt;&#x2F;span&gt;&lt;span&gt; dyn AsyncQueueable) -&amp;gt; Result&amp;lt;(), Error&amp;gt; {
+&lt;&#x2F;span&gt;&lt;span&gt;        Ok(())
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; this func is optional to impl
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; Default task-type it is common
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;task_type&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; String {
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;my-task-type&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span&gt;()
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; If you want to make the tasks of this type uniq.
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;uniq&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;bool &lt;&#x2F;span&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; This will be useful if you would like to schedule tasks.
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; default value: None (task is not schedule just executes when it is fetched)
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;cron&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; Option&amp;lt;Scheduled&amp;gt; {
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F;               sec  min   hour   day of month   month   day of week   year
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F;               be careful works only with UTC hour.
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F;               https:&#x2F;&#x2F;www.timeanddate.com&#x2F;worldclock&#x2F;timezone&#x2F;utc
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; expression = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0&#x2F;20 * * * Aug-Sep * 2022&#x2F;1&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        Some(Scheduled::CronPattern(expression.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span&gt;()))
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;In both modules, tasks can be schedule to be execute once. Use &lt;code&gt;Scheduled::ScheduleOnce&lt;&#x2F;code&gt; enum variant to schedule in specific datetime.&lt;&#x2F;p&gt;
+&lt;p&gt;Datetimes and cron pattern are interpreted in UTC timezone. So you should introduce an offset to schedule in the desire hour.&lt;&#x2F;p&gt;
+&lt;p&gt;Example:&lt;&#x2F;p&gt;
+&lt;p&gt;If your hour is UTC + 2 and you would like to schedule at 11:00 all days, your expression will be this one.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span&gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; expression = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0 0 9 * * * *&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h3 id=&quot;enqueuing-a-task&quot;&gt;Enqueuing a task&lt;&#x2F;h3&gt;
+&lt;h4 id=&quot;blocking-feature-2&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
+&lt;p&gt;To enqueue a task use &lt;code&gt;Queue::enqueue_task&lt;&#x2F;code&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;For Postgres Backend.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::Queue;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; create a r2d2 pool
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; create a fang queue
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; queue = Queue::builder().&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;connection_pool&lt;&#x2F;span&gt;&lt;span&gt;(pool).&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;build&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; task_inserted = queue.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;insert_task&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;MyTask::new(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;)).&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;&lt;code&gt;Queue::insert_task&lt;&#x2F;code&gt; method will insert a task with uniqueness or not it depends on &lt;code&gt;uniq&lt;&#x2F;code&gt; method defined in a task.
+If uniq is set to true and the task is already in storage this will return the task in the storage.&lt;&#x2F;p&gt;
+&lt;h4 id=&quot;asynk-feature-2&quot;&gt;Asynk feature&lt;&#x2F;h4&gt;
+&lt;p&gt;To enqueue a task use &lt;code&gt;AsyncQueueable::insert_task&lt;&#x2F;code&gt;,
+depending of the backend that you prefer you will need to do it with a specific queue.&lt;&#x2F;p&gt;
+&lt;p&gt;For Postgres backend.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::asynk::async_queue::AsyncQueue;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::NoTls;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::AsyncRunnable;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; Create a AsyncQueue
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; max_pool_size: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32 &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;2&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let mut&lt;&#x2F;span&gt;&lt;span&gt; queue = AsyncQueue::builder()
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; Postgres database url
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;uri&lt;&#x2F;span&gt;&lt;span&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;postgres:&#x2F;&#x2F;postgres:postgres@localhost&#x2F;fang&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;)
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; Max number of connections that are allowed
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;max_pool_size&lt;&#x2F;span&gt;&lt;span&gt;(max_pool_size)
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;build&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; Always connect first in order to perform any operation
+&lt;&#x2F;span&gt;&lt;span&gt;queue.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;connect&lt;&#x2F;span&gt;&lt;span&gt;(NoTls).await.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;For easy example we are using NoTls type, if for some reason you would like to encrypt postgres traffic.&lt;&#x2F;p&gt;
+&lt;p&gt;You can implement a Tls type.&lt;&#x2F;p&gt;
+&lt;p&gt;It is well documented for &lt;a href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;postgres-openssl&#x2F;latest&#x2F;postgres_openssl&#x2F;&quot;&gt;openssl&lt;&#x2F;a&gt; and &lt;a href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;postgres-native-tls&#x2F;latest&#x2F;postgres_native_tls&#x2F;&quot;&gt;native-tls&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; AsyncTask from first example
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; task = AsyncTask { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;8 &lt;&#x2F;span&gt;&lt;span&gt;};
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; task_returned = queue
+&lt;&#x2F;span&gt;&lt;span&gt;  .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;insert_task&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;task as &amp;amp;dyn AsyncRunnable)
+&lt;&#x2F;span&gt;&lt;span&gt;  .await
+&lt;&#x2F;span&gt;&lt;span&gt;  .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h3 id=&quot;starting-workers&quot;&gt;Starting workers&lt;&#x2F;h3&gt;
+&lt;h4 id=&quot;blocking-feature-3&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
+&lt;p&gt;Every worker runs in a separate thread. In case of panic, they are always restarted.&lt;&#x2F;p&gt;
+&lt;p&gt;Use &lt;code&gt;WorkerPool&lt;&#x2F;code&gt; to start workers. Use &lt;code&gt;WorkerPool::builder&lt;&#x2F;code&gt; to create your worker pool and run tasks.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::WorkerPool;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::Queue;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; create a Queue
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let mut&lt;&#x2F;span&gt;&lt;span&gt; worker_pool = WorkerPool::&amp;lt;Queue&amp;gt;::builder()
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;queue&lt;&#x2F;span&gt;&lt;span&gt;(queue)
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;number_of_workers&lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;3_&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32&lt;&#x2F;span&gt;&lt;span&gt;)
+&lt;&#x2F;span&gt;&lt;span&gt;     &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; if you want to run tasks of the specific kind
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;task_type&lt;&#x2F;span&gt;&lt;span&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;my_task_type&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;)
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;build&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;worker_pool.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;start&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h4 id=&quot;asynk-feature-3&quot;&gt;Asynk feature&lt;&#x2F;h4&gt;
+&lt;p&gt;Every worker runs in a separate tokio task. In case of panic, they are always restarted.
+Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::asynk::async_worker_pool::AsyncWorkerPool;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; Need to create a queue
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; Also insert some tasks
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let mut&lt;&#x2F;span&gt;&lt;span&gt; pool: AsyncWorkerPool&amp;lt;AsyncQueue&amp;lt;NoTls&amp;gt;&amp;gt; = AsyncWorkerPool::builder()
+&lt;&#x2F;span&gt;&lt;span&gt;        .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;number_of_workers&lt;&#x2F;span&gt;&lt;span&gt;(max_pool_size)
+&lt;&#x2F;span&gt;&lt;span&gt;        .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;queue&lt;&#x2F;span&gt;&lt;span&gt;(queue.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;clone&lt;&#x2F;span&gt;&lt;span&gt;())
+&lt;&#x2F;span&gt;&lt;span&gt;         &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; if you want to run tasks of the specific kind
+&lt;&#x2F;span&gt;&lt;span&gt;        .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;task_type&lt;&#x2F;span&gt;&lt;span&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;my_task_type&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;)
+&lt;&#x2F;span&gt;&lt;span&gt;        .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;build&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;pool.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;start&lt;&#x2F;span&gt;&lt;span&gt;().await;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Check out:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;tree&#x2F;master&#x2F;fang_examples&#x2F;blocking&#x2F;simple_worker&quot;&gt;Simple Worker Example&lt;&#x2F;a&gt; - simple worker example&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;tree&#x2F;master&#x2F;fang_examples&#x2F;blocking&#x2F;simple_cron_worker&quot;&gt;Simple Cron Worker Example&lt;&#x2F;a&gt; - simple worker example&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;tree&#x2F;master&#x2F;fang_examples&#x2F;asynk&#x2F;simple_async_worker&quot;&gt;Simple Async Worker Example&lt;&#x2F;a&gt; - simple async worker example&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;tree&#x2F;master&#x2F;fang_examples&#x2F;asynk&#x2F;simple_cron_async_worker&quot;&gt;Simple Cron Async Worker Example&lt;&#x2F;a&gt; - simple async worker example&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;el_monitorro&quot;&gt;El Monitorro&lt;&#x2F;a&gt; - telegram feed reader. It uses Fang blocking module to synchronize feeds and deliver updates to users.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;pxp9&#x2F;weather_bot_rust&quot;&gt;weather_bot_rust&lt;&#x2F;a&gt; - A bot that provides weather info. It uses Fang asynk module to process updates from Telegram users and schedule weather info.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h3 id=&quot;configuration&quot;&gt;Configuration&lt;&#x2F;h3&gt;
+&lt;h4 id=&quot;blocking-feature-4&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
+&lt;p&gt;Just use &lt;code&gt;TypeBuilder&lt;&#x2F;code&gt; done for &lt;code&gt;WorkerPool&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;h4 id=&quot;asynk-feature-4&quot;&gt;Asynk feature&lt;&#x2F;h4&gt;
+&lt;p&gt;Just use &lt;code&gt;TypeBuilder&lt;&#x2F;code&gt; done for &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;configuring-the-type-of-workers&quot;&gt;Configuring the type of workers&lt;&#x2F;h3&gt;
+&lt;h3 id=&quot;configuring-retention-mode&quot;&gt;Configuring retention mode&lt;&#x2F;h3&gt;
+&lt;p&gt;By default, all successfully finished tasks are removed from the DB, failed tasks aren&#x27;t.&lt;&#x2F;p&gt;
+&lt;p&gt;There are three retention modes you can use:&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub enum &lt;&#x2F;span&gt;&lt;span&gt;RetentionMode {
+&lt;&#x2F;span&gt;&lt;span&gt;    KeepAll,        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; doesn&amp;#39;t remove tasks
+&lt;&#x2F;span&gt;&lt;span&gt;    RemoveAll,      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; removes all tasks
+&lt;&#x2F;span&gt;&lt;span&gt;    RemoveFinished, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; default value
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Set retention mode with worker pools &lt;code&gt;TypeBuilder&lt;&#x2F;code&gt; in both modules.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;configuring-sleep-values&quot;&gt;Configuring sleep values&lt;&#x2F;h3&gt;
+&lt;h4 id=&quot;blocking-feature-5&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
+&lt;p&gt;You can use use &lt;code&gt;SleepParams&lt;&#x2F;code&gt; to confugure sleep values:&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub struct &lt;&#x2F;span&gt;&lt;span&gt;SleepParams {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;sleep_period&lt;&#x2F;span&gt;&lt;span&gt;: Duration,     &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; default value is 5 seconds
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;max_sleep_period&lt;&#x2F;span&gt;&lt;span&gt;: Duration, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; default value is 15 seconds
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;min_sleep_period&lt;&#x2F;span&gt;&lt;span&gt;: Duration, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; default value is 5 seconds
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;sleep_step&lt;&#x2F;span&gt;&lt;span&gt;: Duration,       &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; default value is 5 seconds
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;If there are no tasks in the DB, a worker sleeps for &lt;code&gt;sleep_period&lt;&#x2F;code&gt; and each time this value increases by &lt;code&gt;sleep_step&lt;&#x2F;code&gt; until it reaches &lt;code&gt;max_sleep_period&lt;&#x2F;code&gt;. &lt;code&gt;min_sleep_period&lt;&#x2F;code&gt; is the initial value for &lt;code&gt;sleep_period&lt;&#x2F;code&gt;. All values are in seconds.&lt;&#x2F;p&gt;
+&lt;p&gt;Use &lt;code&gt;set_sleep_params&lt;&#x2F;code&gt; to set it:&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; sleep_params = SleepParams {
+&lt;&#x2F;span&gt;&lt;span&gt;    sleep_period: Duration::from_secs(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;2&lt;&#x2F;span&gt;&lt;span&gt;),
+&lt;&#x2F;span&gt;&lt;span&gt;    max_sleep_period: Duration::from_secs(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;6&lt;&#x2F;span&gt;&lt;span&gt;),
+&lt;&#x2F;span&gt;&lt;span&gt;    min_sleep_period: Duration::from_secs(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;2&lt;&#x2F;span&gt;&lt;span&gt;),
+&lt;&#x2F;span&gt;&lt;span&gt;    sleep_step: Duration::from_secs(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;),
+&lt;&#x2F;span&gt;&lt;span&gt;};
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Set sleep params with worker pools &lt;code&gt;TypeBuilder&lt;&#x2F;code&gt; in both modules.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;contributing&quot;&gt;Contributing&lt;&#x2F;h2&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;fork&quot;&gt;Fork it!&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;Create your feature branch (&lt;code&gt;git checkout -b my-new-feature&lt;&#x2F;code&gt;)&lt;&#x2F;li&gt;
+&lt;li&gt;Commit your changes (&lt;code&gt;git commit -am &#x27;Add some feature&#x27;&lt;&#x2F;code&gt;)&lt;&#x2F;li&gt;
+&lt;li&gt;Push to the branch (&lt;code&gt;git push origin my-new-feature&lt;&#x2F;code&gt;)&lt;&#x2F;li&gt;
+&lt;li&gt;Create new Pull Request&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;h3 id=&quot;running-tests-locally&quot;&gt;Running tests locally&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Install diesel_cli.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;pre style=&quot;background-color:#2b303b;color:#c0c5ce;&quot;&gt;&lt;code&gt;&lt;span&gt;cargo install diesel_cli
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;Install docker in your machine.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Run a Postgres docker container. (See in Makefile.)&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;pre style=&quot;background-color:#2b303b;color:#c0c5ce;&quot;&gt;&lt;code&gt;&lt;span&gt;make db
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;ul&gt;
+&lt;li&gt;Run the migrations&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;pre style=&quot;background-color:#2b303b;color:#c0c5ce;&quot;&gt;&lt;code&gt;&lt;span&gt;make diesel
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;ul&gt;
+&lt;li&gt;Run tests&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;pre style=&quot;background-color:#2b303b;color:#c0c5ce;&quot;&gt;&lt;code&gt;&lt;span&gt;make tests
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;ul&gt;
+&lt;li&gt;Run dirty&#x2F;&#x2F;long tests, DB must be recreated afterwards.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;pre style=&quot;background-color:#2b303b;color:#c0c5ce;&quot;&gt;&lt;code&gt;&lt;span&gt;make ignored
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;ul&gt;
+&lt;li&gt;Kill docker container&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;pre style=&quot;background-color:#2b303b;color:#c0c5ce;&quot;&gt;&lt;code&gt;&lt;span&gt;make stop
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h2 id=&quot;authors&quot;&gt;Authors&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;Ayrat Badykov (@ayrat555)&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;Pepe Márquez (@pxp9)&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+</content>
+	</entry>
+	<entry xml:lang="en">
+		<title>Ayrat Badykov</title>
+		<published>2021-04-01T08:50:45+00:00</published>
+		<updated>2021-04-01T08:50:45+00:00</updated>
+		<link rel="alternate" href="https://adidoks.netlify.com/authors/ayrat555/" type="text/html"/>
+		<id>https://adidoks.netlify.com/authors/ayrat555/</id>
+		<content type="html">&lt;p&gt;Creator of &lt;strong&gt;Fang&lt;&#x2F;strong&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&quot;&gt;@ayrat555&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
+</content>
+	</entry>
+	<entry xml:lang="en">
+		<title>Pepe Márquez Romero</title>
+		<published>2021-04-01T08:50:45+00:00</published>
+		<updated>2021-04-01T08:50:45+00:00</updated>
+		<link rel="alternate" href="https://adidoks.netlify.com/authors/pxp9/" type="text/html"/>
+		<id>https://adidoks.netlify.com/authors/pxp9/</id>
+		<content type="html">&lt;p&gt;Co-Creator of &lt;strong&gt;Fang&lt;&#x2F;strong&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;pxp9&quot;&gt;@pxp9&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
+</content>
+	</entry>
+</feed>

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="x-ua-compatible" content="ie=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <link rel="preload" as="font" href="https://adidoks.netlify.com/fonts/vendor/jost/jost-v4-latin-regular.woff2" type="font/woff2" crossorigin>
+  <link rel="preload" as="font" href="https://adidoks.netlify.com/fonts/vendor/jost/jost-v4-latin-700.woff2"  type="font/woff2" crossorigin>
+
+
+<link rel="stylesheet" href="https://adidoks.netlify.com/main.css">
+
+
+
+  
+  
+  
+  
+  
+    
+  
+
+  
+  
+    
+    
+  
+  
+  
+    
+  
+  
+  
+  
+    
+  
+  
+  
+
+
+  <meta name="robots" content="index, follow">
+  <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+
+	
+
+
+	
+
+<title>Fang, async background processing for Rust | Fang</title>
+<meta name="description" content="Async background processing for rust with tokio and postgres">
+<link rel="canonical" href="https://adidoks.netlify.com/blog/async-processing/">
+
+
+  <meta name="twitter:card" content="summary_large_image">
+  
+    <meta name="twitter:image" content="https://adidoks.netlify.com/doks.png">
+  
+  <meta name="twitter:title" content="Fang, async background processing for Rust">
+  <meta name="twitter:description" content="Async background processing for rust with tokio and postgres">
+  <meta name="twitter:site" content="@aaranxu">
+  <meta name="twitter:creator" content="@aaranxu">
+  
+  <meta property="og:title" content="Fang, async background processing for Rust">
+  <meta property="og:description" content="Async background processing for rust with tokio and postgres">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://adidoks.netlify.com/blog/async-processing/">
+
+  
+    <meta property="og:image" content="https://adidoks.netlify.com/doks.png">
+  
+
+  <meta property="og:updated_time" content="2021-05-01T08:00:00+00:00">
+  <meta property="og:site_name" content="Fang, async background processing for Rust">
+
+  
+
+  
+
+  
+  <meta property="article:publisher" content="https://www.facebook.com/ichunyun">
+  <meta property="article:author" content="https://www.facebook.com/ichunyun">
+  <meta property="og:locale" content="en_US">
+
+
+
+
+
+  
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "/blog/async-processing/"
+      },
+      "headline": "Fang, async background processing for Rust",
+      "image": ,
+      "datePublished": "2025-05-01T08:00:00+00:00",
+      "dateModified": "2021-05-01T08:00:00+00:00",
+      "author": {
+        "@type": "Organization",
+        "name": "Fang, async background processing for Rust"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Fang, async background processing for Rust",
+        
+        "logo": {
+          "@type": "ImageObject",
+          "url": "/logo-doks.png"
+        }
+        
+      },
+      "description": "Async background processing for rust with tokio and postgres"
+    }
+    </script>
+  
+
+
+
+
+
+<script type="application/ld+json">
+  {
+    "@context": "http://schema.org",
+    "@type": "BreadcrumbList",
+    
+      
+      
+        
+        
+        
+        
+        
+        
+        
+        
+          {
+            "@type": "ListItem",
+            "position":  1 ,
+            "name": "Home",
+            "item": "https://adidoks.netlify.com/"
+          },
+          
+          
+          {
+            "@type": "ListItem",
+            "position":  2 ,
+            "name": "Blog",
+            "item": "https://adidoks.netlify.com/blog/"
+          },
+        
+      
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+          
+          
+          {
+            "@type": "ListItem",
+            "position":  3 ,
+            "name": "Async Processing",
+            "item": "https://adidoks.netlify.com/blog/async-processing/"
+          },
+        
+      
+    
+  }
+</script>
+
+
+
+
+
+
+
+  <meta name="theme-color" content="#fff">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://adidoks.netlify.com/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="https://adidoks.netlify.com/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="https://adidoks.netlify.com/favicon-16x16.png">
+  
+
+
+  
+
+</head>
+
+  
+
+<body class="blog single">
+  
+  
+<div class="header-bar fixed-top"></div>
+<header class="navbar fixed-top navbar-expand-md navbar-light">
+	<div class="container">
+		<input class="menu-btn order-0" type="checkbox" id="menu-btn">
+		<label class="menu-icon d-md-none" for="menu-btn"><span class="navicon"></span></label>
+		<a class="navbar-brand order-1 order-md-0 me-auto" href="https://adidoks.netlify.com">Fang</a>
+		<button id="mode" class="btn btn-link order-2 order-md-4" type="button" aria-label="Toggle mode">
+			<span class="toggle-dark"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-moon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></span>
+			<span class="toggle-light"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-sun"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></span>
+		</button>
+		<ul class="navbar-nav fork-me order-3 order-md-5">
+			
+				
+					<li class="nav-item">
+						<a class="nav-link" href="https://github.com/ayrat555/fang"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-github"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg><span class="ms-2 visually-hidden">GitHub</span></a>
+					</li>
+				
+			
+		</ul>
+		<div class="collapse navbar-collapse order-4 order-md-1">
+			<ul class="navbar-nav main-nav me-auto order-5 order-md-2">
+				
+					
+				
+				
+				
+					
+						<li class="nav-item">
+							<a class="nav-link" href="https://adidoks.netlify.com/docs/readme/readme/">README</a>
+						</li>
+					
+						<li class="nav-item">
+							<a class="nav-link" href="https://adidoks.netlify.com/docs/changelog/changelog/">CHANGELOG</a>
+						</li>
+					
+						<li class="nav-item blog active">
+							<a class="nav-link" href="https://adidoks.netlify.com/blog/">Blog</a>
+						</li>
+					
+				
+			</ul>
+			<div class="break order-6 d-md-none"></div>
+			
+		</div>
+	</div>
+</header>
+
+
+
+  
+<div class="wrap container" role="document">
+  <div class="content">
+    <div class="row justify-content-center">
+      <div class="col-md-12 col-lg-10 col-xxl-8">
+        <article>
+          <div class="blog-header">
+            <h1>Fang, async background processing for Rust</h1>
+            
+<p><small>Posted May  1, 2025 by <a class="stretched-link position-relative" href="https://adidoks.netlify.com/authors/ayrat-badykov/">Ayrat Badykov</a> and <a class="stretched-link position-relative" href="https://adidoks.netlify.com/authors/pepe-marquez/">Pepe Márquez</a>&nbsp;&hyphen;&nbsp;<strong>5&nbsp;min read</strong></small><p>
+
+          </div>
+          <p class="lead">Async background processing for rust with tokio and postgres</p>
+          <p>Even though the first stable version of Rust was released in 2015, there are still some holes in its ecosystem for solving common tasks. One of which is background processing.</p>
+<p>In software engineering background processing is a common approach for solving several problems:</p>
+<ul>
+<li>Carry out periodic tasks. For example, deliver notifications, update cached values.</li>
+<li>Defer expensive work so your application stays responsive while performing calculations in the background</li>
+</ul>
+<p>Most programming languages have go-to background processing frameworks/libraries. For example:</p>
+<ul>
+<li>Ruby - <a href="https://github.com/mperham/sidekiq">sidekiq</a>. It uses Redis as a job queue.</li>
+<li>Python - <a href="https://github.com/Bogdanp/dramatiq">dramatiq</a>. It uses RabbitMQ as a job queue.</li>
+<li>Elixir - <a href="https://github.com/sorentwo/oban">oban</a>. It uses a Postgres DB as a job queue.</li>
+</ul>
+<p>The async programming (async/await) can be used for background processing but it has several major disadvantages if used directly:</p>
+<ul>
+<li>It doesn't give control of the number of tasks that are being executed at any given time. So a lot of spawned tasks can overload a thread/threads that they're started on.</li>
+<li>It doesn't provide any monitoring which can be useful to investigate your system and find bottlenecks</li>
+<li>Tasks are not persistent. So all enqueued tasks are lost on every application restart</li>
+</ul>
+<p>To solve these shortcomings of the async programming we implemented the async processing in <a href="https://github.com/ayrat555/fang">the fang library</a>.</p>
+<h2 id="threaded-fang">Threaded Fang</h2>
+<p>Fang is a background processing library for rust. The first version of Fang was released exactly one year ago. Its key features were:</p>
+<ul>
+<li>Each worker is started in a separate thread</li>
+<li>A Postgres table is used as the task queue</li>
+</ul>
+<p>This implementation was written for a specific use case - <a href="https://github.com/ayrat555/el_monitorro">el monitorro bot</a>. This specific implementation of background processing was proved by time. Each day it processes more and more feeds every minute (the current number is more than 3000). Some users host the bot on their infrastructure.</p>
+<p>You can find out more about the threaded processing in fang in <a href="https://www.badykov.com/rust/fang/">this blog post</a>.</p>
+<h2 id="async-fang">Async Fang</h2>
+<blockquote>
+  <p>
+Async provides significantly reduced CPU and memory overhead, especially for workloads with a large amount of IO-bound tasks, such as servers and databases. All else equal, you can have orders of magnitude more tasks than OS threads, because an async runtime uses a small amount of (expensive) threads to handle a large amount of (cheap) tasks
+  </p>
+  <footer><cite title="Async book">From the Rust's Async book</cite></footer>
+</blockquote>
+<p>For some lightweight background tasks, it's cheaper to run them on the same thread using async instead of starting one thread per worker. That's why we implemented this kind of processing in fang. Its key features:</p>
+<ul>
+<li>Each worker is started as a tokio task</li>
+<li>If any worker fails during task execution, it's restarted</li>
+<li>Tasks are saved to a Postgres database. Instead of diesel, <a href="https://github.com/sfackler/rust-postgres">tokio-postgres</a> is used to interact with a db. The threaded processing uses the <a href="https://github.com/diesel-rs/diesel">diesel</a> ORM which blocks the thread.</li>
+<li>The implementation is based on traits so it's easy to implement additional backends (redis, in-memory) to store tasks.</li>
+</ul>
+<h2 id="usage">Usage</h2>
+<p>The usage is straightforward:</p>
+<ol>
+<li>Define a serializable task by adding <code>serde</code> derives to a task struct.</li>
+<li>Implement <code>AsyncRunnable</code> runnable trait for fang to be able to run it.</li>
+<li>Start workers.</li>
+<li>Enqueue tasks.</li>
+</ol>
+<p>Let's go over each step.</p>
+<h3 id="define-a-job">Define a job</h3>
+<pre data-lang="rust" style="background-color:#2b303b;color:#c0c5ce;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#b48ead;">use </span><span>fang::serde::{Deserialize, Serialize};
+</span><span>
+</span><span>#[</span><span style="color:#bf616a;">derive</span><span>(Serialize, Deserialize)]
+</span><span>#[</span><span style="color:#bf616a;">serde</span><span>(crate = &quot;</span><span style="color:#a3be8c;">fang::serde</span><span>&quot;)]
+</span><span style="color:#b48ead;">pub struct </span><span>MyTask {
+</span><span>    </span><span style="color:#b48ead;">pub </span><span style="color:#bf616a;">number</span><span>: </span><span style="color:#b48ead;">u16</span><span>,
+</span><span>}
+</span><span>
+</span><span style="color:#b48ead;">impl </span><span>MyTask {
+</span><span>    </span><span style="color:#b48ead;">pub fn </span><span style="color:#8fa1b3;">new</span><span>(</span><span style="color:#bf616a;">number</span><span>: </span><span style="color:#b48ead;">u16</span><span>) -&gt; </span><span style="color:#b48ead;">Self </span><span>{
+</span><span>        </span><span style="color:#b48ead;">Self </span><span>{ number }
+</span><span>    }
+</span><span>}
+</span></code></pre>
+<p>Fang re-exports <code>serde</code> so it's not required to add it to the <code>Cargo.toml</code> file</p>
+<h3 id="implement-the-asyncrunnable-trait">Implement the AsyncRunnable trait</h3>
+<pre data-lang="rust" style="background-color:#2b303b;color:#c0c5ce;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#b48ead;">use </span><span>fang::async_trait;
+</span><span style="color:#b48ead;">use </span><span>fang::typetag;
+</span><span style="color:#b48ead;">use </span><span>fang::AsyncRunnable;
+</span><span style="color:#b48ead;">use </span><span>std::time::Duration;
+</span><span>
+</span><span>#[</span><span style="color:#bf616a;">async_trait</span><span>]
+</span><span>#[</span><span style="color:#bf616a;">typetag</span><span>::</span><span style="color:#bf616a;">serde</span><span>]
+</span><span style="color:#b48ead;">impl </span><span>AsyncRunnable </span><span style="color:#b48ead;">for </span><span>MyTask {
+</span><span>    async </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">run</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>, </span><span style="color:#bf616a;">queue</span><span>: &amp;</span><span style="color:#b48ead;">mut</span><span> dyn AsyncQueueable) -&gt; Result&lt;(), Error&gt; {
+</span><span>        </span><span style="color:#b48ead;">let</span><span> new_task = MyTask::new(</span><span style="color:#bf616a;">self</span><span>.number + </span><span style="color:#d08770;">1</span><span>);
+</span><span>        queue
+</span><span>            .</span><span style="color:#96b5b4;">insert_task</span><span>(&amp;new_task as &amp;dyn AsyncRunnable)
+</span><span>            .await
+</span><span>            .</span><span style="color:#96b5b4;">unwrap</span><span>();
+</span><span>
+</span><span>        log::info!(&quot;</span><span style="color:#a3be8c;">the current number is {}</span><span>&quot;, </span><span style="color:#bf616a;">self</span><span>.number);
+</span><span>        tokio::time::sleep(Duration::from_secs(</span><span style="color:#d08770;">3</span><span>)).await;
+</span><span>
+</span><span>        Ok(())
+</span><span>    }
+</span><span>}
+</span><span>
+</span></code></pre>
+<ul>
+<li>Fang uses the <a href="https://github.com/dtolnay/typetag">typetag library</a> to serialize trait objects and save them to the queue.</li>
+<li>The <a href="https://github.com/dtolnay/async-trait">async-trait</a> is used for implementing async traits</li>
+</ul>
+<h3 id="init-queue">Init queue</h3>
+<pre data-lang="rust" style="background-color:#2b303b;color:#c0c5ce;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#b48ead;">use </span><span>fang::asynk::async_queue::AsyncQueue;
+</span><span>
+</span><span style="color:#b48ead;">let</span><span> max_pool_size: </span><span style="color:#b48ead;">u32 </span><span>= </span><span style="color:#d08770;">2</span><span>;
+</span><span style="color:#b48ead;">let mut</span><span> queue = AsyncQueue::builder()
+</span><span>    .</span><span style="color:#96b5b4;">uri</span><span>(&quot;</span><span style="color:#a3be8c;">postgres://postgres:postgres@localhost/fang</span><span>&quot;)
+</span><span>    .</span><span style="color:#96b5b4;">max_pool_size</span><span>(max_pool_size)
+</span><span>    .</span><span style="color:#96b5b4;">duplicated_tasks</span><span>(</span><span style="color:#d08770;">true</span><span>)
+</span><span>    .</span><span style="color:#96b5b4;">build</span><span>();
+</span></code></pre>
+<h3 id="start-workers">Start workers</h3>
+<pre data-lang="rust" style="background-color:#2b303b;color:#c0c5ce;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#b48ead;">use </span><span>fang::asynk::async_worker_pool::AsyncWorkerPool;
+</span><span style="color:#b48ead;">use </span><span>fang::NoTls;
+</span><span>
+</span><span style="color:#b48ead;">let mut</span><span> pool: AsyncWorkerPool&lt;AsyncQueue&lt;NoTls&gt;&gt; = AsyncWorkerPool::builder()
+</span><span>    .</span><span style="color:#96b5b4;">number_of_workers</span><span>(</span><span style="color:#d08770;">10_</span><span style="color:#b48ead;">u32</span><span>)
+</span><span>    .</span><span style="color:#96b5b4;">queue</span><span>(queue.</span><span style="color:#96b5b4;">clone</span><span>())
+</span><span>    .</span><span style="color:#96b5b4;">build</span><span>();
+</span><span>
+</span><span>pool.</span><span style="color:#96b5b4;">start</span><span>().await;
+</span></code></pre>
+<h3 id="insert-tasks">Insert tasks</h3>
+<pre data-lang="rust" style="background-color:#2b303b;color:#c0c5ce;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#b48ead;">let</span><span> task = MyTask::new(</span><span style="color:#d08770;">0</span><span>);
+</span><span>
+</span><span>queue
+</span><span>    .</span><span style="color:#96b5b4;">insert_task</span><span>(&amp;task1 as &amp;dyn AsyncRunnable)
+</span><span>    .await
+</span><span>    .</span><span style="color:#96b5b4;">unwrap</span><span>();
+</span></code></pre>
+<h2 id="pitfalls">Pitfalls</h2>
+<p>The async processing is suitable for lightweight tasks. But for heavier tasks it's advised to use one of the following approaches:</p>
+<ul>
+<li>start a separate tokio runtime to run fang workers</li>
+<li>use the threaded processing feature implemented in fang instead of the async processing</li>
+</ul>
+<h2 id="future-directions">Future directions</h2>
+<p>There are a couple of features planned for fang:</p>
+<ul>
+<li>Retries with different backoff modes</li>
+<li>Additional backends (in-memory, redis)</li>
+<li>Graceful shutdown for async workers (for the threaded processing this feature is implemented)</li>
+<li>Cron jobs</li>
+</ul>
+<h2 id="conclusion">Conclusion</h2>
+<p>The project is available on <a href="https://github.com/ayrat555/fang">GitHub</a></p>
+<p>The async feature and this post is written in collaboration between <a href="https://www.badykov.com/">Ayrat Badykov</a> (<a href="https://github.com/ayrat555">github</a>) and <a href="https://pxp9.github.io/">Pepe Márquez Romero</a> (<a href="https://github.com/pxp9">github</a>)</p>
+
+        </article>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+  
+    
+<footer class="footer text-muted">
+	<div class="container">
+		<div class="row">
+			<div class="col-lg-8 order-last order-lg-first">
+				<ul class="list-inline">
+					
+						<li class="list-inline-item">Built with ❤️ by <a href="https://github.com/ayrat555">Ayrat Badykov</a> and <a href="https://github.com/pxp9">Pepe Márquez</a></li>
+					
+				</ul>
+			</div>
+			<div class="col-lg-8 order-first order-lg-last text-lg-end">
+				<ul class="list-inline">
+					
+				</ul>
+			</div>
+		</div>
+	</div>
+</footer>
+
+  
+
+  
+<script type="text/javascript" src="https://adidoks.netlify.com/js/main.js" defer></script>
+
+  
+</body>
+</html>
