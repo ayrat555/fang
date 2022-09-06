@@ -59,7 +59,7 @@ theme_color = "#fff"
 
 # More about site's title
 title_separator = "|"  # set as |, -, _, etc
-title_addition = "Modern Documentation Theme"
+title_addition = "Background processing"
 
 
 # Set date format in blog publish metadata
@@ -68,8 +68,8 @@ timezone = "America/New_York"
 
 # Edit page on reposity or not
 edit_page = false
-docs_repo = "https://github.com/aaranxu/adidoks"
-repo_branch = "main"
+docs_repo = "https://github.com/ayrat555/fang"
+repo_branch = "master"
 
 ## Math settings
 # options: true, false. Enable math support globally,
@@ -92,9 +92,9 @@ og_locale = "en_US"
 [extra.schema]
 type = "Organization"
 logo = "logo-doks.png"
-twitter = "https://twitter.com/aaranxu"
+twitter = ""
 linked_in = ""
-github = "https://github.com/aaranxu"
+github = ""
 section = "blog" # see config.extra.main~url
 ## Sitelinks Search Box
 site_links_search_box = false

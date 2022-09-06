@@ -6,7 +6,7 @@ title = "FANG"
 [extra]
 lead = '<b>Fang</b> is a background task processing for Rust. It uses Postgres DB as a task queue.'
 
-url = "/docs/readme/readme"
+url = "/docs/readme"
 
 url_button = "Get started"
 repo_version = "GitHub v0.9.0"
@@ -41,9 +41,13 @@ content = 'Tasks can be scheduled at any time in the future'
 
 [[extra.list]]
 title = "Periodic (CRON) tasks"
-content = 'Tasks can be scheduled with a <a href="https://docs.oracle.com/cd/E12058_01/doc/doc.1014/e12030/cron_expressions.htm">cron expression</a>'
+content = 'Tasks can be scheduled using cron expressions'
 
 [[extra.list]]
 title = "Unique tasks"
 content = 'Tasks are not duplicated in the queue if they are unique'
+
+[[extra.list]]
+title = "Single-purpose workers"
+content = 'Tasks are stored in a single table but workers can execute only tasks of the specific type'
 +++
