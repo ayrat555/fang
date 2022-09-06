@@ -8,7 +8,7 @@ build() {
 
   cp -R docs ../docs_backup
   rm -r *
-  cp ../docs_backup ./docs
+  cp -R ../docs_backup ./docs
   cd docs
 
   sudo snap install --edge zola
