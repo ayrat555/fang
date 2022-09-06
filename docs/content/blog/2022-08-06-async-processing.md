@@ -1,8 +1,8 @@
 +++
 title = "Fang, async background processing for Rust"
 description = "Async background processing for rust with tokio and postgres"
-date = 2025-05-01T08:00:00+00:00
-updated = 2021-05-01T08:00:00+00:00
+date = 2022-08-06T08:00:00+00:00
+updated = 2022-08-06T08:00:00+00:00
 template = "blog/page.html"
 sort_by = "weight"
 weight = 1
