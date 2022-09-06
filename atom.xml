@@ -2,17 +2,17 @@
 <feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
 	<title>Fang</title>
 	<subtitle>Fang is a background task processing for Rust. It uses Postgres DB as a task queue.</subtitle>
-	<link href="https://adidoks.netlify.com/atom.xml" rel="self" type="application/atom+xml"/>
-  <link href="https://adidoks.netlify.com"/>
+	<link href="https://fang.badykov.com/atom.xml" rel="self" type="application/atom+xml"/>
+  <link href="https://fang.badykov.com"/>
 	<generator uri="https://www.getzola.org/">Zola</generator>
 	<updated>2025-05-01T08:00:00+00:00</updated>
-	<id>https://adidoks.netlify.com/atom.xml</id>
+	<id>https://fang.badykov.com/atom.xml</id>
 	<entry xml:lang="en">
 		<title>Fang, async background processing for Rust</title>
 		<published>2025-05-01T08:00:00+00:00</published>
 		<updated>2021-05-01T08:00:00+00:00</updated>
-		<link rel="alternate" href="https://adidoks.netlify.com/blog/async-processing/" type="text/html"/>
-		<id>https://adidoks.netlify.com/blog/async-processing/</id>
+		<link rel="alternate" href="https://fang.badykov.com/blog/async-processing/" type="text/html"/>
+		<id>https://fang.badykov.com/blog/async-processing/</id>
 		<content type="html">&lt;p&gt;Even though the first stable version of Rust was released in 2015, there are still some holes in its ecosystem for solving common tasks. One of which is background processing.&lt;&#x2F;p&gt;
 &lt;p&gt;In software engineering background processing is a common approach for solving several problems:&lt;&#x2F;p&gt;
 &lt;ul&gt;
@@ -159,8 +159,8 @@ Async provides significantly reduced CPU and memory overhead, especially for wor
 		<title>CHANGELOG</title>
 		<published>2021-05-01T18:10:00+00:00</published>
 		<updated>2021-05-01T18:10:00+00:00</updated>
-		<link rel="alternate" href="https://adidoks.netlify.com/docs/changelog/changelog/" type="text/html"/>
-		<id>https://adidoks.netlify.com/docs/changelog/changelog/</id>
+		<link rel="alternate" href="https://fang.badykov.com/docs/changelog/changelog/" type="text/html"/>
+		<id>https://fang.badykov.com/docs/changelog/changelog/</id>
 		<content type="html">&lt;h1 id=&quot;changelog&quot;&gt;Changelog&lt;&#x2F;h1&gt;
 &lt;h2 id=&quot;0-9-0-2022-09-2&quot;&gt;0.9.0 (2022-09-2)&lt;&#x2F;h2&gt;
 &lt;h3 id=&quot;69&quot;&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;69&quot;&gt;#69&lt;&#x2F;a&gt;&lt;&#x2F;h3&gt;
@@ -245,8 +245,8 @@ Async provides significantly reduced CPU and memory overhead, especially for wor
 		<title>README</title>
 		<published>2021-05-01T18:10:00+00:00</published>
 		<updated>2021-05-01T18:10:00+00:00</updated>
-		<link rel="alternate" href="https://adidoks.netlify.com/docs/readme/readme/" type="text/html"/>
-		<id>https://adidoks.netlify.com/docs/readme/readme/</id>
+		<link rel="alternate" href="https://fang.badykov.com/docs/readme/readme/" type="text/html"/>
+		<id>https://fang.badykov.com/docs/readme/readme/</id>
 		<content type="html">&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;raw.githubusercontent.com&#x2F;ayrat555&#x2F;fang&#x2F;master&#x2F;logo.png&quot; alt=&quot;fang&quot; height=&quot;300px&quot;&gt;&lt;&#x2F;p&gt;
 &lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;crates.io&#x2F;crates&#x2F;fang&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;img.shields.io&#x2F;crates&#x2F;v&#x2F;fang.svg&quot; alt=&quot;Crates.io&quot; &#x2F;&gt;&lt;&#x2F;a&gt; &lt;a href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;fang&#x2F;&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;img.shields.io&#x2F;badge&#x2F;docs-website-blue.svg&quot; alt=&quot;docs page&quot; &#x2F;&gt;&lt;&#x2F;a&gt; &lt;img src=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;actions&#x2F;workflows&#x2F;rust.yml&#x2F;badge.svg&quot; alt=&quot;test&quot; &#x2F;&gt; &lt;img src=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;actions&#x2F;workflows&#x2F;style.yml&#x2F;badge.svg&quot; alt=&quot;style&quot; &#x2F;&gt;&lt;&#x2F;p&gt;
 &lt;h1 id=&quot;fang&quot;&gt;Fang&lt;&#x2F;h1&gt;
@@ -560,8 +560,8 @@ Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&g
 		<title>Ayrat Badykov</title>
 		<published>2021-04-01T08:50:45+00:00</published>
 		<updated>2021-04-01T08:50:45+00:00</updated>
-		<link rel="alternate" href="https://adidoks.netlify.com/authors/ayrat555/" type="text/html"/>
-		<id>https://adidoks.netlify.com/authors/ayrat555/</id>
+		<link rel="alternate" href="https://fang.badykov.com/authors/ayrat555/" type="text/html"/>
+		<id>https://fang.badykov.com/authors/ayrat555/</id>
 		<content type="html">&lt;p&gt;Creator of &lt;strong&gt;Fang&lt;&#x2F;strong&gt;.&lt;&#x2F;p&gt;
 &lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&quot;&gt;@ayrat555&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
 </content>
@@ -570,8 +570,8 @@ Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&g
 		<title>Pepe Márquez Romero</title>
 		<published>2021-04-01T08:50:45+00:00</published>
 		<updated>2021-04-01T08:50:45+00:00</updated>
-		<link rel="alternate" href="https://adidoks.netlify.com/authors/pxp9/" type="text/html"/>
-		<id>https://adidoks.netlify.com/authors/pxp9/</id>
+		<link rel="alternate" href="https://fang.badykov.com/authors/pxp9/" type="text/html"/>
+		<id>https://fang.badykov.com/authors/pxp9/</id>
 		<content type="html">&lt;p&gt;Co-Creator of &lt;strong&gt;Fang&lt;&#x2F;strong&gt;.&lt;&#x2F;p&gt;
 &lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;pxp9&quot;&gt;@pxp9&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
 </content>
