@@ -18,10 +18,6 @@ current_time() {
 
 build() {
   echo "Starting building..."
-  
-  rm docs/content/docs/CHANGELOG.md
-
-  rm docs/content/docs/README.md
 
   TIME=$(current_time)
 
@@ -50,7 +46,7 @@ deploy() {
   git config --global url."https://".insteadOf git://
   git config --global url."https://github.com/".insteadOf git@github.com:
 
-  git checkout ${BRANCH}
+  git checkout -f ${BRANCH}
   cp -vr /tmp/public/* .
   git config user.name "GitHub Actions"
   git config user.email "github-actions-bot@users.noreply.github.com"
