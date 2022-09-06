@@ -1,5 +1,5 @@
 # The URL the site will be built for
-base_url = "https://adidoks.netlify.com"
+base_url = "https://fang.badykov.com"
 title = "Fang"
 description = "Fang is a background task processing for Rust. It uses Postgres DB as a task queue."
 
