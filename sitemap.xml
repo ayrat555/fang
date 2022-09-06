@@ -1,9 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-        <loc>https://adidoks.netlify.com/</loc>
+        <loc>https://fang.badykov.com/</loc>
     </url>
     <url>
-        <loc>https://adidoks.netlify.com/authors/</loc>
+        <loc>https://fang.badykov.com/authors/</loc>
+    </url>
+    <url>
+        <loc>https://fang.badykov.com/authors/ayrat-badykov/</loc>
+        <lastmod>2021-04-01T08:50:45+00:00</lastmod>
+    </url>
+    <url>
+        <loc>https://fang.badykov.com/authors/pepe-marquez/</loc>
+        <lastmod>2021-04-01T08:50:45+00:00</lastmod>
+    </url>
+    <url>
+        <loc>https://fang.badykov.com/blog/</loc>
+    </url>
+    <url>
+        <loc>https://fang.badykov.com/blog/async-processing/</loc>
+        <lastmod>2022-08-06T08:00:00+00:00</lastmod>
+    </url>
+    <url>
+        <loc>https://fang.badykov.com/blog/page/1/</loc>
+    </url>
+    <url>
+        <loc>https://fang.badykov.com/docs/</loc>
+    </url>
+    <url>
+        <loc>https://fang.badykov.com/docs/changelog/</loc>
+        <lastmod>2022-09-06T18:44:23+00:00</lastmod>
+    </url>
+    <url>
+        <loc>https://fang.badykov.com/docs/readme/</loc>
+        <lastmod>2022-09-06T18:44:23+00:00</lastmod>
     </url>
 </urlset>

@@ -18,15 +18,15 @@
     
   
 
-
   
+  
+  
+    
     
   
   
   
     
-  
-  
   
   
   
@@ -42,31 +42,31 @@
 
 	
 
-<title>Fang | Background processing</title>
-<meta name="description" content="Fang is a background task processing for Rust. It uses Postgres DB as a task queue.">
-<link rel="canonical" href="https://fang.badykov.com/">
+<title>Docs | Fang</title>
+<meta name="description" content="The documentation of Fang library.">
+<link rel="canonical" href="https://fang.badykov.com/docs/">
 
 
   <meta name="twitter:card" content="summary_large_image">
   
     <meta name="twitter:image" content="https://fang.badykov.com/doks.png">
   
-  <meta name="twitter:title" content="Fang">
-  <meta name="twitter:description" content="Fang is a background task processing for Rust. It uses Postgres DB as a task queue.">
+  <meta name="twitter:title" content="Docs">
+  <meta name="twitter:description" content="The documentation of Fang library.">
   <meta name="twitter:site" content="@aaranxu">
   <meta name="twitter:creator" content="@aaranxu">
   
-  <meta property="og:title" content="Fang">
-  <meta property="og:description" content="Fang is a background task processing for Rust. It uses Postgres DB as a task queue.">
+  <meta property="og:title" content="Docs">
+  <meta property="og:description" content="The documentation of Fang library.">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://fang.badykov.com/">
+  <meta property="og:url" content="https://fang.badykov.com/docs/">
 
   
     <meta property="og:image" content="https://fang.badykov.com/doks.png">
   
 
   <meta property="og:updated_time" content="2021-05-01T08:08:08+08:00">
-  <meta property="og:site_name" content="Fang">
+  <meta property="og:site_name" content="Docs">
 
   
 
@@ -79,25 +79,6 @@
 
 
 
-  
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "url": "/",
-      "name": "Fang",
-      "logo": "/logo-doks.png",
-      "sameAs": [
-        
-        
-        
-      ]
-    }
-    </script>
-  
-  
-  
-
 
 
 
@@ -109,12 +90,32 @@
     "@context": "http://schema.org",
     "@type": "BreadcrumbList",
     
-    {
-      "@type": "ListItem",
-      "position":  1 ,
-      "name": "Home",
-      "item": "https://fang.badykov.com/"
-    },
+      
+      
+        
+        
+        
+        
+        
+        
+        
+        
+          {
+            "@type": "ListItem",
+            "position":  1 ,
+            "name": "Home",
+            "item": "https://fang.badykov.com/"
+          },
+          
+          
+          {
+            "@type": "ListItem",
+            "position":  2 ,
+            "name": "Docs",
+            "item": "https://fang.badykov.com/docs/"
+          },
+        
+      
     
   }
 </script>
@@ -135,9 +136,13 @@
 
 </head>
 
-<body class="home">
   
-    
+
+<body class="docs list">
+  
+  
+  
+  
 <div class="header-bar fixed-top"></div>
 <header class="navbar fixed-top navbar-expand-md navbar-light">
 	<div class="container">
@@ -165,11 +170,11 @@
 				
 				
 					
-						<li class="nav-item">
+						<li class="nav-item docs active">
 							<a class="nav-link" href="https://fang.badykov.com/docs/readme/">README</a>
 						</li>
 					
-						<li class="nav-item">
+						<li class="nav-item docs active">
 							<a class="nav-link" href="https://fang.badykov.com/docs/changelog/">CHANGELOG</a>
 						</li>
 					
@@ -185,66 +190,39 @@
 	</div>
 </header>
 
-  
+
 
   
 <div class="wrap container" role="document">
   <div class="content">
-    <section class="section container-fluid mt-n3 pb-3">
-      <div class="row justify-content-center">
-        <div class="col-lg-12 text-center">
-          <h1 class="mt-0">FANG</h1>
-        </div>
-        <div class="col-lg-9 col-xl-8 text-center">
-          <p class="lead"><b>Fang</b> is a background task processing for Rust. It uses Postgres DB as a task queue.</p>
-          <a class="btn btn-primary btn-lg px-4 mb-2" href="https://fang.badykov.com/docs/readme" role="button">Get started</a>
-          <p class="meta">Open-source MIT License. <a href="https://github.com/ayrat555/fang">GitHub v0.9.0</a></p>
-        </div>
+    <div class="row justify-content-center">
+      <div class="col-md-12 col-lg-10 col-xxl-8">
+        <article>
+          <h1 class="text-center">Docs</h1>
+          <div class="text-center"></div>
+          <div class="card-list">
+            
+            
+            
+              <div class="card my-3">
+                <div class="card-body">
+                  <a class="stretched-link" href="https:&#x2F;&#x2F;fang.badykov.com&#x2F;docs&#x2F;changelog&#x2F;">CHANGELOG &rarr;</a>
+                </div>
+              </div>
+            
+              <div class="card my-3">
+                <div class="card-body">
+                  <a class="stretched-link" href="https:&#x2F;&#x2F;fang.badykov.com&#x2F;docs&#x2F;readme&#x2F;">README &rarr;</a>
+                </div>
+              </div>
+            
+            
+          </div>
+        </article>
       </div>
-    </section>
-  </div>
-</div>
-
-<section class="section section-sm">
-  <div class="container">
-    <div class="row justify-content-center text-center">
-      
-        
-        <div class="col-lg-5">
-          <h2 class="h4">Async and threaded workers</h2>
-          <p>Workers can be started in threads (threaded workers) or tokio tasks (async workers)</p>
-        </div>
-        
-        <div class="col-lg-5">
-          <h2 class="h4">Scheduled tasks</h2>
-          <p>Tasks can be scheduled at any time in the future</p>
-        </div>
-        
-        <div class="col-lg-5">
-          <h2 class="h4">Periodic (CRON) tasks</h2>
-          <p>Tasks can be scheduled using cron expressions</p>
-        </div>
-        
-        <div class="col-lg-5">
-          <h2 class="h4">Unique tasks</h2>
-          <p>Tasks are not duplicated in the queue if they are unique</p>
-        </div>
-        
-        <div class="col-lg-5">
-          <h2 class="h4">Single-purpose workers</h2>
-          <p>Tasks are stored in a single table but workers can execute only tasks of the specific type</p>
-        </div>
-        
-      
     </div>
   </div>
-</section>
-
-<section class="section section-sm container-fluid">
-  <div class="row justify-content-center text-center">
-    <div class="col-lg-9"></div>
-  </div>
-</section>
+</div>
 
 
   
