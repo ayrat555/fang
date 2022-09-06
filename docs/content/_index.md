@@ -17,13 +17,13 @@ repo_url = "https://github.com/ayrat555/fang"
 [[extra.menu.main]]
 name = "README"
 section = "docs"
-url = "/docs/readme/readme"
+url = "/docs/readme"
 weight = 10
 
 [[extra.menu.main]]
 name = "CHANGELOG"
 section = "docs"
-url = "/docs/changelog/changelog"
+url = "/docs/changelog"
 
 [[extra.menu.main]]
 name = "Blog"
@@ -47,4 +47,3 @@ content = 'Tasks can be scheduled with a <a href="https://docs.oracle.com/cd/E12
 title = "Unique tasks"
 content = 'Tasks are not duplicated in the queue if they are unique'
 +++
-
