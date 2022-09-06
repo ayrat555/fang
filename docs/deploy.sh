@@ -19,6 +19,10 @@ current_time() {
 build() {
   echo "Starting building..."
   
+  rm docs/content/docs/CHANGELOG.md
+
+  rm docs/content/docs/README.md
+
   TIME=$(current_time)
 
   printf "+++\ntitle = \"CHANGELOG\"\ndescription = \"Fang CHANGELOG\"\ndate = $TIME\nupdated = $TIME\ndraft = false\nweight = 410\nsort_by = \"weight\"\ntemplate = \"docs/page.html\"\n\n[extra]\nlead = \"Fang Changelog\"\ntoc = true\ntop = false\n+++\n\n" > docs/content/docs/CHANGELOG.md
