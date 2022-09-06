@@ -1,3 +1,5 @@
 **/target
 Cargo.lock
 src/schema.rs
+docs/content/docs/CHANGELOG.md
+docs/content/docs/README.md
