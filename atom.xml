@@ -5,160 +5,12 @@
 	<link href="https://fang.badykov.com/atom.xml" rel="self" type="application/atom+xml"/>
   <link href="https://fang.badykov.com"/>
 	<generator uri="https://www.getzola.org/">Zola</generator>
-	<updated>2025-05-01T08:00:00+00:00</updated>
+	<updated>2022-09-06T08:00:00+00:00</updated>
 	<id>https://fang.badykov.com/atom.xml</id>
 	<entry xml:lang="en">
-		<title>Fang, async background processing for Rust</title>
-		<published>2025-05-01T08:00:00+00:00</published>
-		<updated>2021-05-01T08:00:00+00:00</updated>
-		<link rel="alternate" href="https://fang.badykov.com/blog/async-processing/" type="text/html"/>
-		<id>https://fang.badykov.com/blog/async-processing/</id>
-		<content type="html">&lt;p&gt;Even though the first stable version of Rust was released in 2015, there are still some holes in its ecosystem for solving common tasks. One of which is background processing.&lt;&#x2F;p&gt;
-&lt;p&gt;In software engineering background processing is a common approach for solving several problems:&lt;&#x2F;p&gt;
-&lt;ul&gt;
-&lt;li&gt;Carry out periodic tasks. For example, deliver notifications, update cached values.&lt;&#x2F;li&gt;
-&lt;li&gt;Defer expensive work so your application stays responsive while performing calculations in the background&lt;&#x2F;li&gt;
-&lt;&#x2F;ul&gt;
-&lt;p&gt;Most programming languages have go-to background processing frameworks&#x2F;libraries. For example:&lt;&#x2F;p&gt;
-&lt;ul&gt;
-&lt;li&gt;Ruby - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;mperham&#x2F;sidekiq&quot;&gt;sidekiq&lt;&#x2F;a&gt;. It uses Redis as a job queue.&lt;&#x2F;li&gt;
-&lt;li&gt;Python - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;Bogdanp&#x2F;dramatiq&quot;&gt;dramatiq&lt;&#x2F;a&gt;. It uses RabbitMQ as a job queue.&lt;&#x2F;li&gt;
-&lt;li&gt;Elixir - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;sorentwo&#x2F;oban&quot;&gt;oban&lt;&#x2F;a&gt;. It uses a Postgres DB as a job queue.&lt;&#x2F;li&gt;
-&lt;&#x2F;ul&gt;
-&lt;p&gt;The async programming (async&#x2F;await) can be used for background processing but it has several major disadvantages if used directly:&lt;&#x2F;p&gt;
-&lt;ul&gt;
-&lt;li&gt;It doesn&#x27;t give control of the number of tasks that are being executed at any given time. So a lot of spawned tasks can overload a thread&#x2F;threads that they&#x27;re started on.&lt;&#x2F;li&gt;
-&lt;li&gt;It doesn&#x27;t provide any monitoring which can be useful to investigate your system and find bottlenecks&lt;&#x2F;li&gt;
-&lt;li&gt;Tasks are not persistent. So all enqueued tasks are lost on every application restart&lt;&#x2F;li&gt;
-&lt;&#x2F;ul&gt;
-&lt;p&gt;To solve these shortcomings of the async programming we implemented the async processing in &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&quot;&gt;the fang library&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
-&lt;h2 id=&quot;threaded-fang&quot;&gt;Threaded Fang&lt;&#x2F;h2&gt;
-&lt;p&gt;Fang is a background processing library for rust. The first version of Fang was released exactly one year ago. Its key features were:&lt;&#x2F;p&gt;
-&lt;ul&gt;
-&lt;li&gt;Each worker is started in a separate thread&lt;&#x2F;li&gt;
-&lt;li&gt;A Postgres table is used as the task queue&lt;&#x2F;li&gt;
-&lt;&#x2F;ul&gt;
-&lt;p&gt;This implementation was written for a specific use case - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;el_monitorro&quot;&gt;el monitorro bot&lt;&#x2F;a&gt;. This specific implementation of background processing was proved by time. Each day it processes more and more feeds every minute (the current number is more than 3000). Some users host the bot on their infrastructure.&lt;&#x2F;p&gt;
-&lt;p&gt;You can find out more about the threaded processing in fang in &lt;a href=&quot;https:&#x2F;&#x2F;www.badykov.com&#x2F;rust&#x2F;fang&#x2F;&quot;&gt;this blog post&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
-&lt;h2 id=&quot;async-fang&quot;&gt;Async Fang&lt;&#x2F;h2&gt;
-&lt;blockquote&gt;
-  &lt;p&gt;
-Async provides significantly reduced CPU and memory overhead, especially for workloads with a large amount of IO-bound tasks, such as servers and databases. All else equal, you can have orders of magnitude more tasks than OS threads, because an async runtime uses a small amount of (expensive) threads to handle a large amount of (cheap) tasks
-  &lt;&#x2F;p&gt;
-  &lt;footer&gt;&lt;cite title=&quot;Async book&quot;&gt;From the Rust&#x27;s Async book&lt;&#x2F;cite&gt;&lt;&#x2F;footer&gt;
-&lt;&#x2F;blockquote&gt;
-&lt;p&gt;For some lightweight background tasks, it&#x27;s cheaper to run them on the same thread using async instead of starting one thread per worker. That&#x27;s why we implemented this kind of processing in fang. Its key features:&lt;&#x2F;p&gt;
-&lt;ul&gt;
-&lt;li&gt;Each worker is started as a tokio task&lt;&#x2F;li&gt;
-&lt;li&gt;If any worker fails during task execution, it&#x27;s restarted&lt;&#x2F;li&gt;
-&lt;li&gt;Tasks are saved to a Postgres database. Instead of diesel, &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;sfackler&#x2F;rust-postgres&quot;&gt;tokio-postgres&lt;&#x2F;a&gt; is used to interact with a db. The threaded processing uses the &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;diesel-rs&#x2F;diesel&quot;&gt;diesel&lt;&#x2F;a&gt; ORM which blocks the thread.&lt;&#x2F;li&gt;
-&lt;li&gt;The implementation is based on traits so it&#x27;s easy to implement additional backends (redis, in-memory) to store tasks.&lt;&#x2F;li&gt;
-&lt;&#x2F;ul&gt;
-&lt;h2 id=&quot;usage&quot;&gt;Usage&lt;&#x2F;h2&gt;
-&lt;p&gt;The usage is straightforward:&lt;&#x2F;p&gt;
-&lt;ol&gt;
-&lt;li&gt;Define a serializable task by adding &lt;code&gt;serde&lt;&#x2F;code&gt; derives to a task struct.&lt;&#x2F;li&gt;
-&lt;li&gt;Implement &lt;code&gt;AsyncRunnable&lt;&#x2F;code&gt; runnable trait for fang to be able to run it.&lt;&#x2F;li&gt;
-&lt;li&gt;Start workers.&lt;&#x2F;li&gt;
-&lt;li&gt;Enqueue tasks.&lt;&#x2F;li&gt;
-&lt;&#x2F;ol&gt;
-&lt;p&gt;Let&#x27;s go over each step.&lt;&#x2F;p&gt;
-&lt;h3 id=&quot;define-a-job&quot;&gt;Define a job&lt;&#x2F;h3&gt;
-&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::serde::{Deserialize, Serialize};
-&lt;&#x2F;span&gt;&lt;span&gt;
-&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;derive&lt;&#x2F;span&gt;&lt;span&gt;(Serialize, Deserialize)]
-&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;serde&lt;&#x2F;span&gt;&lt;span&gt;(crate = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;fang::serde&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;)]
-&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub struct &lt;&#x2F;span&gt;&lt;span&gt;MyTask {
-&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;number&lt;&#x2F;span&gt;&lt;span&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u16&lt;&#x2F;span&gt;&lt;span&gt;,
-&lt;&#x2F;span&gt;&lt;span&gt;}
-&lt;&#x2F;span&gt;&lt;span&gt;
-&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;impl &lt;&#x2F;span&gt;&lt;span&gt;MyTask {
-&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;new&lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;number&lt;&#x2F;span&gt;&lt;span&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u16&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;Self &lt;&#x2F;span&gt;&lt;span&gt;{
-&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;Self &lt;&#x2F;span&gt;&lt;span&gt;{ number }
-&lt;&#x2F;span&gt;&lt;span&gt;    }
-&lt;&#x2F;span&gt;&lt;span&gt;}
-&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
-&lt;p&gt;Fang re-exports &lt;code&gt;serde&lt;&#x2F;code&gt; so it&#x27;s not required to add it to the &lt;code&gt;Cargo.toml&lt;&#x2F;code&gt; file&lt;&#x2F;p&gt;
-&lt;h3 id=&quot;implement-the-asyncrunnable-trait&quot;&gt;Implement the AsyncRunnable trait&lt;&#x2F;h3&gt;
-&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::async_trait;
-&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::typetag;
-&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::AsyncRunnable;
-&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;std::time::Duration;
-&lt;&#x2F;span&gt;&lt;span&gt;
-&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;async_trait&lt;&#x2F;span&gt;&lt;span&gt;]
-&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;typetag&lt;&#x2F;span&gt;&lt;span&gt;::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;serde&lt;&#x2F;span&gt;&lt;span&gt;]
-&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;impl &lt;&#x2F;span&gt;&lt;span&gt;AsyncRunnable &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;for &lt;&#x2F;span&gt;&lt;span&gt;MyTask {
-&lt;&#x2F;span&gt;&lt;span&gt;    async &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;run&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;queue&lt;&#x2F;span&gt;&lt;span&gt;: &amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut&lt;&#x2F;span&gt;&lt;span&gt; dyn AsyncQueueable) -&amp;gt; Result&amp;lt;(), Error&amp;gt; {
-&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; new_task = MyTask::new(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;.number + &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;);
-&lt;&#x2F;span&gt;&lt;span&gt;        queue
-&lt;&#x2F;span&gt;&lt;span&gt;            .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;insert_task&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;new_task as &amp;amp;dyn AsyncRunnable)
-&lt;&#x2F;span&gt;&lt;span&gt;            .await
-&lt;&#x2F;span&gt;&lt;span&gt;            .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span&gt;();
-&lt;&#x2F;span&gt;&lt;span&gt;
-&lt;&#x2F;span&gt;&lt;span&gt;        log::info!(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;the current number is {}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;.number);
-&lt;&#x2F;span&gt;&lt;span&gt;        tokio::time::sleep(Duration::from_secs(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;3&lt;&#x2F;span&gt;&lt;span&gt;)).await;
-&lt;&#x2F;span&gt;&lt;span&gt;
-&lt;&#x2F;span&gt;&lt;span&gt;        Ok(())
-&lt;&#x2F;span&gt;&lt;span&gt;    }
-&lt;&#x2F;span&gt;&lt;span&gt;}
-&lt;&#x2F;span&gt;&lt;span&gt;
-&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
-&lt;ul&gt;
-&lt;li&gt;Fang uses the &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;dtolnay&#x2F;typetag&quot;&gt;typetag library&lt;&#x2F;a&gt; to serialize trait objects and save them to the queue.&lt;&#x2F;li&gt;
-&lt;li&gt;The &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;dtolnay&#x2F;async-trait&quot;&gt;async-trait&lt;&#x2F;a&gt; is used for implementing async traits&lt;&#x2F;li&gt;
-&lt;&#x2F;ul&gt;
-&lt;h3 id=&quot;init-queue&quot;&gt;Init queue&lt;&#x2F;h3&gt;
-&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::asynk::async_queue::AsyncQueue;
-&lt;&#x2F;span&gt;&lt;span&gt;
-&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; max_pool_size: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32 &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;2&lt;&#x2F;span&gt;&lt;span&gt;;
-&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let mut&lt;&#x2F;span&gt;&lt;span&gt; queue = AsyncQueue::builder()
-&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;uri&lt;&#x2F;span&gt;&lt;span&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;postgres:&#x2F;&#x2F;postgres:postgres@localhost&#x2F;fang&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;)
-&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;max_pool_size&lt;&#x2F;span&gt;&lt;span&gt;(max_pool_size)
-&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;duplicated_tasks&lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;)
-&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;build&lt;&#x2F;span&gt;&lt;span&gt;();
-&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
-&lt;h3 id=&quot;start-workers&quot;&gt;Start workers&lt;&#x2F;h3&gt;
-&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::asynk::async_worker_pool::AsyncWorkerPool;
-&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::NoTls;
-&lt;&#x2F;span&gt;&lt;span&gt;
-&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let mut&lt;&#x2F;span&gt;&lt;span&gt; pool: AsyncWorkerPool&amp;lt;AsyncQueue&amp;lt;NoTls&amp;gt;&amp;gt; = AsyncWorkerPool::builder()
-&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;number_of_workers&lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;10_&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32&lt;&#x2F;span&gt;&lt;span&gt;)
-&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;queue&lt;&#x2F;span&gt;&lt;span&gt;(queue.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;clone&lt;&#x2F;span&gt;&lt;span&gt;())
-&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;build&lt;&#x2F;span&gt;&lt;span&gt;();
-&lt;&#x2F;span&gt;&lt;span&gt;
-&lt;&#x2F;span&gt;&lt;span&gt;pool.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;start&lt;&#x2F;span&gt;&lt;span&gt;().await;
-&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
-&lt;h3 id=&quot;insert-tasks&quot;&gt;Insert tasks&lt;&#x2F;h3&gt;
-&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; task = MyTask::new(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;);
-&lt;&#x2F;span&gt;&lt;span&gt;
-&lt;&#x2F;span&gt;&lt;span&gt;queue
-&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;insert_task&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;task1 as &amp;amp;dyn AsyncRunnable)
-&lt;&#x2F;span&gt;&lt;span&gt;    .await
-&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span&gt;();
-&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
-&lt;h2 id=&quot;pitfalls&quot;&gt;Pitfalls&lt;&#x2F;h2&gt;
-&lt;p&gt;The async processing is suitable for lightweight tasks. But for heavier tasks it&#x27;s advised to use one of the following approaches:&lt;&#x2F;p&gt;
-&lt;ul&gt;
-&lt;li&gt;start a separate tokio runtime to run fang workers&lt;&#x2F;li&gt;
-&lt;li&gt;use the threaded processing feature implemented in fang instead of the async processing&lt;&#x2F;li&gt;
-&lt;&#x2F;ul&gt;
-&lt;h2 id=&quot;future-directions&quot;&gt;Future directions&lt;&#x2F;h2&gt;
-&lt;p&gt;There are a couple of features planned for fang:&lt;&#x2F;p&gt;
-&lt;ul&gt;
-&lt;li&gt;Retries with different backoff modes&lt;&#x2F;li&gt;
-&lt;li&gt;Additional backends (in-memory, redis)&lt;&#x2F;li&gt;
-&lt;li&gt;Graceful shutdown for async workers (for the threaded processing this feature is implemented)&lt;&#x2F;li&gt;
-&lt;li&gt;Cron jobs&lt;&#x2F;li&gt;
-&lt;&#x2F;ul&gt;
-&lt;h2 id=&quot;conclusion&quot;&gt;Conclusion&lt;&#x2F;h2&gt;
-&lt;p&gt;The project is available on &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&quot;&gt;GitHub&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
-&lt;p&gt;The async feature and this post is written in collaboration between &lt;a href=&quot;https:&#x2F;&#x2F;www.badykov.com&#x2F;&quot;&gt;Ayrat Badykov&lt;&#x2F;a&gt; (&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&quot;&gt;github&lt;&#x2F;a&gt;) and &lt;a href=&quot;https:&#x2F;&#x2F;pxp9.github.io&#x2F;&quot;&gt;Pepe Márquez Romero&lt;&#x2F;a&gt; (&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;pxp9&quot;&gt;github&lt;&#x2F;a&gt;)&lt;&#x2F;p&gt;
-</content>
-	</entry>
-	<entry xml:lang="en">
 		<title>CHANGELOG</title>
-		<published>2021-05-01T18:10:00+00:00</published>
-		<updated>2021-05-01T18:10:00+00:00</updated>
+		<published>2022-09-06T08:00:00+00:00</published>
+		<updated>2022-09-06T08:00:00+00:00</updated>
 		<link rel="alternate" href="https://fang.badykov.com/docs/changelog/changelog/" type="text/html"/>
 		<id>https://fang.badykov.com/docs/changelog/changelog/</id>
 		<content type="html">&lt;h1 id=&quot;changelog&quot;&gt;Changelog&lt;&#x2F;h1&gt;
@@ -243,8 +95,8 @@ Async provides significantly reduced CPU and memory overhead, especially for wor
 	</entry>
 	<entry xml:lang="en">
 		<title>README</title>
-		<published>2021-05-01T18:10:00+00:00</published>
-		<updated>2021-05-01T18:10:00+00:00</updated>
+		<published>2022-09-06T08:00:00+00:00</published>
+		<updated>2022-09-06T08:00:00+00:00</updated>
 		<link rel="alternate" href="https://fang.badykov.com/docs/readme/readme/" type="text/html"/>
 		<id>https://fang.badykov.com/docs/readme/readme/</id>
 		<content type="html">&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;raw.githubusercontent.com&#x2F;ayrat555&#x2F;fang&#x2F;master&#x2F;logo.png&quot; alt=&quot;fang&quot; height=&quot;300px&quot;&gt;&lt;&#x2F;p&gt;
@@ -554,6 +406,154 @@ Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&g
 &lt;p&gt;Pepe Márquez (@pxp9)&lt;&#x2F;p&gt;
 &lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
+</content>
+	</entry>
+	<entry xml:lang="en">
+		<title>Fang, async background processing for Rust</title>
+		<published>2022-08-06T08:00:00+00:00</published>
+		<updated>2022-08-06T08:00:00+00:00</updated>
+		<link rel="alternate" href="https://fang.badykov.com/blog/async-processing/" type="text/html"/>
+		<id>https://fang.badykov.com/blog/async-processing/</id>
+		<content type="html">&lt;p&gt;Even though the first stable version of Rust was released in 2015, there are still some holes in its ecosystem for solving common tasks. One of which is background processing.&lt;&#x2F;p&gt;
+&lt;p&gt;In software engineering background processing is a common approach for solving several problems:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Carry out periodic tasks. For example, deliver notifications, update cached values.&lt;&#x2F;li&gt;
+&lt;li&gt;Defer expensive work so your application stays responsive while performing calculations in the background&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;Most programming languages have go-to background processing frameworks&#x2F;libraries. For example:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Ruby - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;mperham&#x2F;sidekiq&quot;&gt;sidekiq&lt;&#x2F;a&gt;. It uses Redis as a job queue.&lt;&#x2F;li&gt;
+&lt;li&gt;Python - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;Bogdanp&#x2F;dramatiq&quot;&gt;dramatiq&lt;&#x2F;a&gt;. It uses RabbitMQ as a job queue.&lt;&#x2F;li&gt;
+&lt;li&gt;Elixir - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;sorentwo&#x2F;oban&quot;&gt;oban&lt;&#x2F;a&gt;. It uses a Postgres DB as a job queue.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;The async programming (async&#x2F;await) can be used for background processing but it has several major disadvantages if used directly:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;It doesn&#x27;t give control of the number of tasks that are being executed at any given time. So a lot of spawned tasks can overload a thread&#x2F;threads that they&#x27;re started on.&lt;&#x2F;li&gt;
+&lt;li&gt;It doesn&#x27;t provide any monitoring which can be useful to investigate your system and find bottlenecks&lt;&#x2F;li&gt;
+&lt;li&gt;Tasks are not persistent. So all enqueued tasks are lost on every application restart&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;To solve these shortcomings of the async programming we implemented the async processing in &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&quot;&gt;the fang library&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;threaded-fang&quot;&gt;Threaded Fang&lt;&#x2F;h2&gt;
+&lt;p&gt;Fang is a background processing library for rust. The first version of Fang was released exactly one year ago. Its key features were:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Each worker is started in a separate thread&lt;&#x2F;li&gt;
+&lt;li&gt;A Postgres table is used as the task queue&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;This implementation was written for a specific use case - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;el_monitorro&quot;&gt;el monitorro bot&lt;&#x2F;a&gt;. This specific implementation of background processing was proved by time. Each day it processes more and more feeds every minute (the current number is more than 3000). Some users host the bot on their infrastructure.&lt;&#x2F;p&gt;
+&lt;p&gt;You can find out more about the threaded processing in fang in &lt;a href=&quot;https:&#x2F;&#x2F;www.badykov.com&#x2F;rust&#x2F;fang&#x2F;&quot;&gt;this blog post&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;async-fang&quot;&gt;Async Fang&lt;&#x2F;h2&gt;
+&lt;blockquote&gt;
+  &lt;p&gt;
+Async provides significantly reduced CPU and memory overhead, especially for workloads with a large amount of IO-bound tasks, such as servers and databases. All else equal, you can have orders of magnitude more tasks than OS threads, because an async runtime uses a small amount of (expensive) threads to handle a large amount of (cheap) tasks
+  &lt;&#x2F;p&gt;
+  &lt;footer&gt;&lt;cite title=&quot;Async book&quot;&gt;From the Rust&#x27;s Async book&lt;&#x2F;cite&gt;&lt;&#x2F;footer&gt;
+&lt;&#x2F;blockquote&gt;
+&lt;p&gt;For some lightweight background tasks, it&#x27;s cheaper to run them on the same thread using async instead of starting one thread per worker. That&#x27;s why we implemented this kind of processing in fang. Its key features:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Each worker is started as a tokio task&lt;&#x2F;li&gt;
+&lt;li&gt;If any worker fails during task execution, it&#x27;s restarted&lt;&#x2F;li&gt;
+&lt;li&gt;Tasks are saved to a Postgres database. Instead of diesel, &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;sfackler&#x2F;rust-postgres&quot;&gt;tokio-postgres&lt;&#x2F;a&gt; is used to interact with a db. The threaded processing uses the &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;diesel-rs&#x2F;diesel&quot;&gt;diesel&lt;&#x2F;a&gt; ORM which blocks the thread.&lt;&#x2F;li&gt;
+&lt;li&gt;The implementation is based on traits so it&#x27;s easy to implement additional backends (redis, in-memory) to store tasks.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;usage&quot;&gt;Usage&lt;&#x2F;h2&gt;
+&lt;p&gt;The usage is straightforward:&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;Define a serializable task by adding &lt;code&gt;serde&lt;&#x2F;code&gt; derives to a task struct.&lt;&#x2F;li&gt;
+&lt;li&gt;Implement &lt;code&gt;AsyncRunnable&lt;&#x2F;code&gt; runnable trait for fang to be able to run it.&lt;&#x2F;li&gt;
+&lt;li&gt;Start workers.&lt;&#x2F;li&gt;
+&lt;li&gt;Enqueue tasks.&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;p&gt;Let&#x27;s go over each step.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;define-a-job&quot;&gt;Define a job&lt;&#x2F;h3&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::serde::{Deserialize, Serialize};
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;derive&lt;&#x2F;span&gt;&lt;span&gt;(Serialize, Deserialize)]
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;serde&lt;&#x2F;span&gt;&lt;span&gt;(crate = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;fang::serde&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;)]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub struct &lt;&#x2F;span&gt;&lt;span&gt;MyTask {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;number&lt;&#x2F;span&gt;&lt;span&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u16&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;impl &lt;&#x2F;span&gt;&lt;span&gt;MyTask {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;new&lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;number&lt;&#x2F;span&gt;&lt;span&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u16&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;Self &lt;&#x2F;span&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;Self &lt;&#x2F;span&gt;&lt;span&gt;{ number }
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Fang re-exports &lt;code&gt;serde&lt;&#x2F;code&gt; so it&#x27;s not required to add it to the &lt;code&gt;Cargo.toml&lt;&#x2F;code&gt; file&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;implement-the-asyncrunnable-trait&quot;&gt;Implement the AsyncRunnable trait&lt;&#x2F;h3&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::async_trait;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::typetag;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::AsyncRunnable;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;std::time::Duration;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;async_trait&lt;&#x2F;span&gt;&lt;span&gt;]
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;typetag&lt;&#x2F;span&gt;&lt;span&gt;::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;serde&lt;&#x2F;span&gt;&lt;span&gt;]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;impl &lt;&#x2F;span&gt;&lt;span&gt;AsyncRunnable &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;for &lt;&#x2F;span&gt;&lt;span&gt;MyTask {
+&lt;&#x2F;span&gt;&lt;span&gt;    async &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;run&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;queue&lt;&#x2F;span&gt;&lt;span&gt;: &amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut&lt;&#x2F;span&gt;&lt;span&gt; dyn AsyncQueueable) -&amp;gt; Result&amp;lt;(), Error&amp;gt; {
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; new_task = MyTask::new(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;.number + &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;);
+&lt;&#x2F;span&gt;&lt;span&gt;        queue
+&lt;&#x2F;span&gt;&lt;span&gt;            .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;insert_task&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;new_task as &amp;amp;dyn AsyncRunnable)
+&lt;&#x2F;span&gt;&lt;span&gt;            .await
+&lt;&#x2F;span&gt;&lt;span&gt;            .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;        log::info!(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;the current number is {}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;.number);
+&lt;&#x2F;span&gt;&lt;span&gt;        tokio::time::sleep(Duration::from_secs(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;3&lt;&#x2F;span&gt;&lt;span&gt;)).await;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;        Ok(())
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;ul&gt;
+&lt;li&gt;Fang uses the &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;dtolnay&#x2F;typetag&quot;&gt;typetag library&lt;&#x2F;a&gt; to serialize trait objects and save them to the queue.&lt;&#x2F;li&gt;
+&lt;li&gt;The &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;dtolnay&#x2F;async-trait&quot;&gt;async-trait&lt;&#x2F;a&gt; is used for implementing async traits&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h3 id=&quot;init-queue&quot;&gt;Init queue&lt;&#x2F;h3&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::asynk::async_queue::AsyncQueue;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; max_pool_size: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32 &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;2&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let mut&lt;&#x2F;span&gt;&lt;span&gt; queue = AsyncQueue::builder()
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;uri&lt;&#x2F;span&gt;&lt;span&gt;(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;postgres:&#x2F;&#x2F;postgres:postgres@localhost&#x2F;fang&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;)
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;max_pool_size&lt;&#x2F;span&gt;&lt;span&gt;(max_pool_size)
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;duplicated_tasks&lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;)
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;build&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h3 id=&quot;start-workers&quot;&gt;Start workers&lt;&#x2F;h3&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::asynk::async_worker_pool::AsyncWorkerPool;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::NoTls;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let mut&lt;&#x2F;span&gt;&lt;span&gt; pool: AsyncWorkerPool&amp;lt;AsyncQueue&amp;lt;NoTls&amp;gt;&amp;gt; = AsyncWorkerPool::builder()
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;number_of_workers&lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;10_&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32&lt;&#x2F;span&gt;&lt;span&gt;)
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;queue&lt;&#x2F;span&gt;&lt;span&gt;(queue.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;clone&lt;&#x2F;span&gt;&lt;span&gt;())
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;build&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;pool.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;start&lt;&#x2F;span&gt;&lt;span&gt;().await;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h3 id=&quot;insert-tasks&quot;&gt;Insert tasks&lt;&#x2F;h3&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; task = MyTask::new(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;);
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;queue
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;insert_task&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;task1 as &amp;amp;dyn AsyncRunnable)
+&lt;&#x2F;span&gt;&lt;span&gt;    .await
+&lt;&#x2F;span&gt;&lt;span&gt;    .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span&gt;();
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h2 id=&quot;pitfalls&quot;&gt;Pitfalls&lt;&#x2F;h2&gt;
+&lt;p&gt;The async processing is suitable for lightweight tasks. But for heavier tasks it&#x27;s advised to use one of the following approaches:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;start a separate tokio runtime to run fang workers&lt;&#x2F;li&gt;
+&lt;li&gt;use the threaded processing feature implemented in fang instead of the async processing&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;future-directions&quot;&gt;Future directions&lt;&#x2F;h2&gt;
+&lt;p&gt;There are a couple of features planned for fang:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Retries with different backoff modes&lt;&#x2F;li&gt;
+&lt;li&gt;Additional backends (in-memory, redis)&lt;&#x2F;li&gt;
+&lt;li&gt;Graceful shutdown for async workers (for the threaded processing this feature is implemented)&lt;&#x2F;li&gt;
+&lt;li&gt;Cron jobs&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;conclusion&quot;&gt;Conclusion&lt;&#x2F;h2&gt;
+&lt;p&gt;The project is available on &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&quot;&gt;GitHub&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;The async feature and this post is written in collaboration between &lt;a href=&quot;https:&#x2F;&#x2F;www.badykov.com&#x2F;&quot;&gt;Ayrat Badykov&lt;&#x2F;a&gt; (&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&quot;&gt;github&lt;&#x2F;a&gt;) and &lt;a href=&quot;https:&#x2F;&#x2F;pxp9.github.io&#x2F;&quot;&gt;Pepe Márquez Romero&lt;&#x2F;a&gt; (&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;pxp9&quot;&gt;github&lt;&#x2F;a&gt;)&lt;&#x2F;p&gt;
 </content>
 	</entry>
 	<entry xml:lang="en">
