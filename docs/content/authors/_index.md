@@ -8,8 +8,8 @@ draft = false
 # Authors
 
 [extra.author_pages]
-"ayrat555" = "authors/ayrat555.md"
-"pxp9" = "authors/pxp9.md"
+"ayrat-badykov" = "authors/ayrat-badykov.md"
+"pepe-marquez" = "authors/pepe-marquez.md"
 +++
 
 The authors of the blog articles.
