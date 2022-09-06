@@ -6,6 +6,9 @@ BRANCH="gh-pages"
 build() {
   echo "Starting building..."
 
+  cp -R docs ../docs_backup
+  rm -r *
+  cp ../docs_backup ./docs
   cd docs
 
   sudo snap install --edge zola
@@ -23,6 +26,7 @@ deploy() {
   cp -vr /tmp/public/* .
   git config user.name "GitHub Actions"
   git config user.email "github-actions-bot@users.noreply.github.com"
+
   git add .
   git commit -m "Deploy new version docs"
   git push --force "https://${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ${BRANCH}
