@@ -23,7 +23,6 @@ deploy() {
   cp -vr /tmp/public/* .
   git config user.name "GitHub Actions"
   git config user.email "github-actions-bot@users.noreply.github.com"
-  rm -rf docs
   git add .
   git commit -m "Deploy new version docs"
   git push --force "https://${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ${BRANCH}
