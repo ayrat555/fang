@@ -45,7 +45,7 @@ highlight_code = true
 
 [extra]
 # Put all your custom variables here
-author = "Airat Badykov, Pepe Márquez"
+author = "Ayrat Badykov, Pepe Márquez"
 github = "https://github.com/ayrat555/fang"
 
 # If running on netlify.app site, set to true
@@ -81,20 +81,20 @@ library = "katex"  # options: "katex", "mathjax". default is "katex".
 [extra.open]
 enable = true
 # this image will be used as fallback if a page has no image of its own
-image = "doks.png"
-twitter_site = "aaranxu"
-twitter_creator = "aaranxu"
-facebook_author = "ichunyun"
-facebook_publisher = "ichunyun"
+image = "logo.png"
+twitter_site = ""
+twitter_creator = ""
+facebook_author = ""
+facebook_publisher = ""
 og_locale = "en_US"
 
 ## JSON-LD
 [extra.schema]
-type = "Organization"
-logo = "logo-doks.png"
+type = "FANG"
+logo = "logo.png"
 twitter = ""
 linked_in = ""
-github = ""
+github = "https://github.com/ayrat555/fang"
 section = "blog" # see config.extra.main~url
 ## Sitelinks Search Box
 site_links_search_box = false
