@@ -42,7 +42,7 @@
 
 	
 
-<title>Fang | Modern Documentation Theme</title>
+<title>Fang | Background processing</title>
 <meta name="description" content="Fang is a background task processing for Rust. It uses Postgres DB as a task queue.">
 <link rel="canonical" href="https://fang.badykov.com/">
 
@@ -88,9 +88,9 @@
       "name": "Fang",
       "logo": "/logo-doks.png",
       "sameAs": [
-        "https://twitter.com/aaranxu",
         
-        "https://github.com/aaranxu"
+        
+        
       ]
     }
     </script>
@@ -197,7 +197,7 @@
         </div>
         <div class="col-lg-9 col-xl-8 text-center">
           <p class="lead"><b>Fang</b> is a background task processing for Rust. It uses Postgres DB as a task queue.</p>
-          <a class="btn btn-primary btn-lg px-4 mb-2" href="https://fang.badykov.com/docs/readme/readme" role="button">Get started</a>
+          <a class="btn btn-primary btn-lg px-4 mb-2" href="https://fang.badykov.com/docs/readme" role="button">Get started</a>
           <p class="meta">Open-source MIT License. <a href="https://github.com/ayrat555/fang">GitHub v0.9.0</a></p>
         </div>
       </div>
@@ -222,12 +222,17 @@
         
         <div class="col-lg-5">
           <h2 class="h4">Periodic (CRON) tasks</h2>
-          <p>Tasks can be scheduled with a <a href="https://docs.oracle.com/cd/E12058_01/doc/doc.1014/e12030/cron_expressions.htm">cron expression</a></p>
+          <p>Tasks can be scheduled using cron expressions</p>
         </div>
         
         <div class="col-lg-5">
           <h2 class="h4">Unique tasks</h2>
           <p>Tasks are not duplicated in the queue if they are unique</p>
+        </div>
+        
+        <div class="col-lg-5">
+          <h2 class="h4">Single-purpose workers</h2>
+          <p>Tasks are stored in a single table but workers can execute only tasks of the specific type</p>
         </div>
         
       
