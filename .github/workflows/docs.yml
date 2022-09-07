@@ -10,14 +10,14 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        ref: 'ayrat555/docs-site'
+        ref: 'master'
         submodules: 'recursive'
     - run: |
         git fetch --no-tags --prune --depth=1 origin +refs/heads/*:refs/remotes/origin/*
     - run: |
           git config --global user.email "ayratin555@gmail.com"
           git config --global user.name "Ayrat Badykov"
-          git add . && git commit -m "Commit copied files"
+
     - name: Deploy docs
       run: |
         source ./docs/deploy.sh && build && deploy

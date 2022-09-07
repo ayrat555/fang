@@ -1,5 +1,5 @@
 # The URL the site will be built for
-base_url = "https://adidoks.netlify.com"
+base_url = "https://fang.badykov.com"
 title = "Fang"
 description = "Fang is a background task processing for Rust. It uses Postgres DB as a task queue."
 
@@ -45,7 +45,7 @@ highlight_code = true
 
 [extra]
 # Put all your custom variables here
-author = "Airat Badykov, Pepe Márquez"
+author = "Ayrat Badykov, Pepe Márquez"
 github = "https://github.com/ayrat555/fang"
 
 # If running on netlify.app site, set to true
@@ -59,7 +59,7 @@ theme_color = "#fff"
 
 # More about site's title
 title_separator = "|"  # set as |, -, _, etc
-title_addition = "Modern Documentation Theme"
+title_addition = "Background processing"
 
 
 # Set date format in blog publish metadata
@@ -68,8 +68,8 @@ timezone = "America/New_York"
 
 # Edit page on reposity or not
 edit_page = false
-docs_repo = "https://github.com/aaranxu/adidoks"
-repo_branch = "main"
+docs_repo = "https://github.com/ayrat555/fang"
+repo_branch = "master"
 
 ## Math settings
 # options: true, false. Enable math support globally,
@@ -81,20 +81,20 @@ library = "katex"  # options: "katex", "mathjax". default is "katex".
 [extra.open]
 enable = true
 # this image will be used as fallback if a page has no image of its own
-image = "doks.png"
-twitter_site = "aaranxu"
-twitter_creator = "aaranxu"
-facebook_author = "ichunyun"
-facebook_publisher = "ichunyun"
+image = "logo.png"
+twitter_site = ""
+twitter_creator = ""
+facebook_author = ""
+facebook_publisher = ""
 og_locale = "en_US"
 
 ## JSON-LD
 [extra.schema]
-type = "Organization"
-logo = "logo-doks.png"
-twitter = "https://twitter.com/aaranxu"
+type = "FANG"
+logo = "logo.png"
+twitter = ""
 linked_in = ""
-github = "https://github.com/aaranxu"
+github = "https://github.com/ayrat555/fang"
 section = "blog" # see config.extra.main~url
 ## Sitelinks Search Box
 site_links_search_box = false
