@@ -12,7 +12,7 @@ draft = false
 authors = ["Ayrat Badykov", "Pepe Márquez"]
 
 [extra]
-lead = 'What's new with the release of fang 0.9'
+lead = "What's new with the release of fang 0.9"
 images = []
 +++
 
@@ -48,29 +48,57 @@ CREATE TABLE fang_tasks (
 This is the way to schedule tasks with new Fang 0.9
 
 You will only need to define a new function in the trait that implements the task.
-`Runnable` for blocking and `AsyncRunnable` for async.
+`Runnable` for blocking and `AsyncRunnable` for asynk.
+
+Take a look this example for `AsyncRunnable`.
 
 ```rust
-// you must use fang::Scheduled enum.
-fn cron(&self) -> Option<Scheduled> {
-        // cron expression to execute a task every 20 seconds.
-        let expression = "0/20 * * * * * *";
-        Some(Scheduled::CronPattern(expression.to_string()))
+impl AsyncRunnable for MyCronTask {
+  async fn run(&self, _queue: &mut dyn AsyncQueueable) -> Result<(), Error> {
+    log::info!("CRON!!!!!!!!!!!!!!!",);
+
+    Ok(())
+  }
+
+  // you must use fang::Scheduled enum.
+  fn cron(&self) -> Option<Scheduled> {
+    // cron expression to execute a task every 20 seconds.
+    let expression = "0/20 * * * * * *";
+    Some(Scheduled::CronPattern(expression.to_string()))
+  }
+
+  fn uniq(&self) -> bool {
+    true
+  }
 }
 ```
 
 Also it is possible to schedule the task only once.
 
 ```rust
-// you must use fang::Scheduled enum.
-fn cron(&self) -> Option<Scheduled> {
-        // You must use DateTime<Utc> to specify 
-        // when in the future you would like schedule the task.
+impl AsyncRunnable for MyCronTask {
+  async fn run(&self, _queue: &mut dyn AsyncQueueable) -> Result<(), Error> {
+    log::info!("CRON!!!!!!!!!!!!!!!",);
 
-        // This will schedule the task for within 7 seconds.
-        Some(Scheduled::ScheduleOnce(Utc::now() + Duration::seconds(7i64)))
+    Ok(())
+  }
+
+  // you must use fang::Scheduled enum.
+  fn cron(&self) -> Option<Scheduled> {
+    // You must use DateTime<Utc> to specify 
+    // when in the future you would like schedule the task.
+  
+    // This will schedule the task for within 7 seconds.
+    Some(Scheduled::ScheduleOnce(Utc::now() + Duration::seconds(7i64)))
+  }
+
+  fn uniq(&self) -> bool {
+    true
+  }
 }
 ```
+
+You can check more [fang examples](https://github.com/ayrat555/fang/tree/master/fang_examples)
 
 It is no longer needed to start the schedule process, 
 because the scheduled tasks are going to be executed a `WorkerPool` or `AsyncWorkerPool` start.
