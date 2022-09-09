@@ -1,5 +1,5 @@
 +++
-title = "Fang 0.9 release."
+title = "Fang 0.9"
 description = "What's new with the release of fang 0.9"
 date = 2022-09-08T16:45:22+00:00
 updated = 2022-09-08T16:45:22+00:00
@@ -9,7 +9,7 @@ weight = 1
 draft = false
 
 [taxonomies]
-authors = ["Ayrat Badykov", "Pepe Márquez"]
+authors = ["Pepe Márquez", "Ayrat Badykov"]
 
 [extra]
 lead = "What's new with the release of fang 0.9"
@@ -18,17 +18,22 @@ images = []
 
 ## Major changes
 
-- Simplify schema.
-- Improve the way that tasks are scheduled.
-- Added Cron tasks support to both modules (asynk and blocking)
-- Diesel crate 2.0 update (only blocking module).
-- Major refactoring of the blocking module.
+- Simplify the database schema
+- Improve the way tasks are scheduled
+- Add CRON tasks support to both modules (asynk and blocking)
+- Update the diesel crate to 2.0 (used only by blocking module)
+- Major refactoring of the blocking module
 
-### Simplify schema
+### Simplify the DB schema
 
-We have completely eliminated the table of periodic tasks from the schema.
+We got rid of the periodic tasks table. Now periodic, scheduled and one-time tasks are stored in the same table (`fang_tasks`).
 
-So schema only has one table.
+We added two new fields to the `fang_tasks` table
+
+- `scheduled_at` - based on this table tasks are scheduled. Workers fetch tasks with `scheduled_at` <= `current_time`
+- `uniq_hash` - hash calculated from the JSON metadata of the task. Based on this field tasks are deduplicated.
+
+So changed schema is looking like this:
 
 ```sql
 CREATE TABLE fang_tasks (
@@ -46,12 +51,11 @@ CREATE TABLE fang_tasks (
 
 ### Schedule tasks
 
-This is the way to schedule tasks with new Fang 0.9
+Let's examine how periodic tasks can be created with fang 0.9.
 
-You will only need to define a new function called `cron` in the trait that implements the task.
-`Runnable` for blocking and `AsyncRunnable` for asynk.
+The only method that should be defined is the `cron` method in the `Runnable`(blocking)/`AsyncRunnable`(asynk) trait implementation.
 
-Take a look this example for `AsyncRunnable`.
+Let's take a look at an example:
 
 ```rust
 impl AsyncRunnable for MyCronTask {
@@ -74,7 +78,7 @@ impl AsyncRunnable for MyCronTask {
 }
 ```
 
-Also it is possible to schedule the task only once.
+Also, it is possible to schedule a task only once.
 
 ```rust
 impl AsyncRunnable for MyCronTask {
@@ -86,9 +90,9 @@ impl AsyncRunnable for MyCronTask {
 
   // you must use fang::Scheduled enum.
   fn cron(&self) -> Option<Scheduled> {
-    // You must use DateTime<Utc> to specify 
+    // You must use DateTime<Utc> to specify
     // when in the future you would like schedule the task.
-  
+
     // This will schedule the task for within 7 seconds.
     Some(Scheduled::ScheduleOnce(Utc::now() + Duration::seconds(7i64)))
   }
@@ -99,25 +103,21 @@ impl AsyncRunnable for MyCronTask {
 }
 ```
 
-You can check more [fang examples](https://github.com/ayrat555/fang/tree/master/fang_examples)
+More examples are available at [fang examples](https://github.com/ayrat555/fang/tree/master/fang_examples)
 
-It is no longer needed to start the schedule process, 
-because the scheduled tasks are going to be executed a `WorkerPool` or `AsyncWorkerPool` start.
+It is no longer needed to start the scheduler process, the scheduled tasks will be executed by `WorkerPool` or `AsyncWorkerPool`. If a task is periodic, it will be re-scheduled before its next execution.
 
 ### Blocking refactor
 
-We have deleted graceful shutdown for blocking module but will be reimplemented at the same time that asynk graceful shutdown.
+- We deleted the graceful shutdown feature of the blocking module. But we're planning to re-implement it in the future.
 
-We have completely changed most of the blocking module API.
+- We completely changed most of the blocking module's API.
 
-The reason for this change is because we want to unify the APIs of blocking and asynk so, 
-if you would like to change the fang behaviour(change asynk module by blocking module or vice versa) 
-in your software will be easier to change between modules.
+The reason for this change is to unify the APIs of the blocking and the asynk modules. So users can easily switch between blocking and async workers.
 
-Another reason is we want to do a trait to define a queue in blocking module. 
-So this way we open the possibility to implement new backends in blocking module.
+Another reason is we wanted to do a trait for the task queue in the blocking module. It opens a  possibility to implement new backends for the blocking module.
 
-This will be the new API for blocking queue.
+A new API of the blocking queues looks like this:
 
 ```rust
 pub trait Queueable {
@@ -143,24 +143,21 @@ pub trait Queueable {
 }
 ```
 
+- Another change we want to highlight is that we updated Diesel to 2.0 (used only in the blocking module to interact with the DB)
 
-Another change to highlight is that we updated to Diesel 2.0 so that affect directly to blocking module.
+Pre 0.9 release was tested in real projects:
 
-Before Fang 0.9 release we also have done many unit tests to prove that Fang works with Diesel 2.0.
-
-Pre 0.9 release has been tested in real proyects called [el_monitorro](https://github.com/ayrat555/el_monitorro/) and [weather_bot_rust](https://github.com/pxp9/weather_bot_rust/).
+- [el_monitorro](https://github.com/ayrat555/el_monitorro/)
+- [weather_bot_rust](https://github.com/pxp9/weather_bot_rust/).
 
 ## Future directions
 
-There are a couple of features planned for fang:
-
 - Retries with different backoff modes
 - Additional backends (in-memory, redis)
-- Graceful shutdown for both modules.
+- Graceful shutdown for both modules
 
 ## Conclusion
 
 The project is available on [GitHub](https://github.com/ayrat555/fang)
 
-The new release and this post is written in collaboration between [Ayrat Badykov](https://www.badykov.com/) ([github](https://github.com/ayrat555)) and [Pepe Márquez Romero](https://pxp9.github.io/) ([github](https://github.com/pxp9))
-
+The new release and this post is written in collaboration between  [Pepe Márquez Romero](https://pxp9.github.io/) ([github](https://github.com/pxp9)) and [Ayrat Badykov](https://www.badykov.com/) ([github](https://github.com/ayrat555)).
