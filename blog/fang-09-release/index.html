@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="x-ua-compatible" content="ie=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+  <link rel="preload" as="font" href="https://fang.badykov.com/fonts/vendor/jost/jost-v4-latin-regular.woff2" type="font/woff2" crossorigin>
+  <link rel="preload" as="font" href="https://fang.badykov.com/fonts/vendor/jost/jost-v4-latin-700.woff2"  type="font/woff2" crossorigin>
+
+
+<link rel="stylesheet" href="https://fang.badykov.com/main.css">
+
+
+
+  
+  
+  
+  
+  
+    
+  
+
+  
+  
+    
+    
+  
+  
+  
+    
+  
+  
+  
+  
+    
+  
+  
+  
+
+
+  <meta name="robots" content="index, follow">
+  <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+
+	
+
+
+	
+
+<title>Fang 0.9 | Fang</title>
+<meta name="description" content="What&#x27;s new with the release of fang 0.9">
+<link rel="canonical" href="https://fang.badykov.com/blog/fang-09-release/">
+
+
+  <meta name="twitter:card" content="summary_large_image">
+  
+    <meta name="twitter:image" content="https://fang.badykov.com/logo.png">
+  
+  <meta name="twitter:title" content="Fang 0.9">
+  <meta name="twitter:description" content="What&#x27;s new with the release of fang 0.9">
+  <meta name="twitter:site" content="@">
+  <meta name="twitter:creator" content="@">
+  
+  <meta property="og:title" content="Fang 0.9">
+  <meta property="og:description" content="What&#x27;s new with the release of fang 0.9">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://fang.badykov.com/blog/fang-09-release/">
+
+  
+    <meta property="og:image" content="https://fang.badykov.com/logo.png">
+  
+
+  <meta property="og:updated_time" content="2022-09-09T16:45:22+00:00">
+  <meta property="og:site_name" content="Fang 0.9">
+
+  
+
+  
+
+  
+  <meta property="article:publisher" content="https://www.facebook.com/">
+  <meta property="article:author" content="https://www.facebook.com/">
+  <meta property="og:locale" content="en_US">
+
+
+
+
+
+  
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "/blog/fang-09-release/"
+      },
+      "headline": "Fang 0.9",
+      "image": ,
+      "datePublished": "2022-09-09T16:45:22+00:00",
+      "dateModified": "2022-09-09T16:45:22+00:00",
+      "author": {
+        "@type": "FANG",
+        "name": "Fang 0.9"
+      },
+      "publisher": {
+        "@type": "FANG",
+        "name": "Fang 0.9",
+        
+      },
+      "description": "What&#x27;s new with the release of fang 0.9"
+    }
+    </script>
+  
+
+
+
+
+
+<script type="application/ld+json">
+  {
+    "@context": "http://schema.org",
+    "@type": "BreadcrumbList",
+    
+      
+      
+        
+        
+        
+        
+        
+        
+        
+        
+          {
+            "@type": "ListItem",
+            "position":  1 ,
+            "name": "Home",
+            "item": "https://fang.badykov.com/"
+          },
+          
+          
+          {
+            "@type": "ListItem",
+            "position":  2 ,
+            "name": "Blog",
+            "item": "https://fang.badykov.com/blog/"
+          },
+        
+      
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+          
+          
+          {
+            "@type": "ListItem",
+            "position":  3 ,
+            "name": "Fang 09 Release",
+            "item": "https://fang.badykov.com/blog/fang-09-release/"
+          },
+        
+      
+    
+  }
+</script>
+
+
+
+
+
+
+
+  <meta name="theme-color" content="#fff">
+  <link rel="apple-touch-icon" sizes="180x180" href="https://fang.badykov.com/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="https://fang.badykov.com/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="https://fang.badykov.com/favicon-16x16.png">
+  
+
+
+  
+
+</head>
+
+  
+
+<body class="blog single">
+  
+  
+<div class="header-bar fixed-top"></div>
+<header class="navbar fixed-top navbar-expand-md navbar-light">
+	<div class="container">
+		<input class="menu-btn order-0" type="checkbox" id="menu-btn">
+		<label class="menu-icon d-md-none" for="menu-btn"><span class="navicon"></span></label>
+		<a class="navbar-brand order-1 order-md-0 me-auto" href="https://fang.badykov.com">Fang</a>
+		<button id="mode" class="btn btn-link order-2 order-md-4" type="button" aria-label="Toggle mode">
+			<span class="toggle-dark"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-moon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></span>
+			<span class="toggle-light"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-sun"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></span>
+		</button>
+		<ul class="navbar-nav fork-me order-3 order-md-5">
+			
+				
+					<li class="nav-item">
+						<a class="nav-link" href="https://github.com/ayrat555/fang"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-github"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg><span class="ms-2 visually-hidden">GitHub</span></a>
+					</li>
+				
+			
+		</ul>
+		<div class="collapse navbar-collapse order-4 order-md-1">
+			<ul class="navbar-nav main-nav me-auto order-5 order-md-2">
+				
+					
+				
+				
+				
+					
+						<li class="nav-item">
+							<a class="nav-link" href="https://fang.badykov.com/docs/readme/">README</a>
+						</li>
+					
+						<li class="nav-item">
+							<a class="nav-link" href="https://fang.badykov.com/docs/changelog/">CHANGELOG</a>
+						</li>
+					
+						<li class="nav-item blog active">
+							<a class="nav-link" href="https://fang.badykov.com/blog/">Blog</a>
+						</li>
+					
+				
+			</ul>
+			<div class="break order-6 d-md-none"></div>
+			
+		</div>
+	</div>
+</header>
+
+
+
+  
+<div class="wrap container" role="document">
+  <div class="content">
+    <div class="row justify-content-center">
+      <div class="col-md-12 col-lg-10 col-xxl-8">
+        <article>
+          <div class="blog-header">
+            <h1>Fang 0.9</h1>
+            
+<p><small>Posted September  9, 2022 by <a class="stretched-link position-relative" href="https://fang.badykov.com/authors/pepe-marquez/">Pepe Márquez</a> and <a class="stretched-link position-relative" href="https://fang.badykov.com/authors/ayrat-badykov/">Ayrat Badykov</a>&nbsp;&hyphen;&nbsp;<strong>4&nbsp;min read</strong></small><p>
+
+          </div>
+          <p class="lead">What's new with the release of fang 0.9</p>
+          <h2 id="major-changes">Major changes</h2>
+<ul>
+<li>Simplify the database schema</li>
+<li>Improve the way tasks are scheduled</li>
+<li>Add CRON tasks support to both modules (asynk and blocking)</li>
+<li>Update the diesel crate to 2.0 (used only by blocking module)</li>
+<li>Major refactoring of the blocking module</li>
+</ul>
+<h3 id="simplify-the-db-schema">Simplify the DB schema</h3>
+<p>We got rid of the periodic tasks table. Now periodic, scheduled and one-time tasks are stored in the same table (<code>fang_tasks</code>).</p>
+<p>We added two new fields to the <code>fang_tasks</code> table</p>
+<ul>
+<li><code>scheduled_at</code> - based on this table tasks are scheduled. Workers fetch tasks with <code>scheduled_at</code> &lt;= <code>current_time</code></li>
+<li><code>uniq_hash</code> - hash calculated from the JSON metadata of the task. Based on this field tasks are deduplicated.</li>
+</ul>
+<p>So changed schema is looking like this:</p>
+<pre data-lang="sql" style="background-color:#2b303b;color:#c0c5ce;" class="language-sql "><code class="language-sql" data-lang="sql"><span style="color:#b48ead;">CREATE TABLE </span><span style="color:#8fa1b3;">fang_tasks</span><span> (
+</span><span>     id uuid </span><span style="color:#b48ead;">PRIMARY KEY DEFAULT</span><span> uuid_generate_v4(),
+</span><span>     metadata jsonb NOT </span><span style="color:#d08770;">NULL</span><span>,
+</span><span>     error_message </span><span style="color:#b48ead;">TEXT</span><span>,
+</span><span>     state fang_task_state </span><span style="color:#b48ead;">DEFAULT </span><span>&#39;</span><span style="color:#a3be8c;">new</span><span>&#39; NOT </span><span style="color:#d08770;">NULL</span><span>,
+</span><span>     task_type </span><span style="color:#b48ead;">VARCHAR DEFAULT </span><span>&#39;</span><span style="color:#a3be8c;">common</span><span>&#39; NOT </span><span style="color:#d08770;">NULL</span><span>,
+</span><span>     uniq_hash </span><span style="color:#b48ead;">CHAR</span><span>(</span><span style="color:#d08770;">64</span><span>),
+</span><span>     scheduled_at </span><span style="color:#b48ead;">TIMESTAMP WITH TIME ZONE </span><span>NOT </span><span style="color:#d08770;">NULL </span><span style="color:#b48ead;">DEFAULT</span><span> NOW(),
+</span><span>     created_at </span><span style="color:#b48ead;">TIMESTAMP WITH TIME ZONE </span><span>NOT </span><span style="color:#d08770;">NULL </span><span style="color:#b48ead;">DEFAULT</span><span> NOW(),
+</span><span>     updated_at </span><span style="color:#b48ead;">TIMESTAMP WITH TIME ZONE </span><span>NOT </span><span style="color:#d08770;">NULL </span><span style="color:#b48ead;">DEFAULT</span><span> NOW()
+</span><span>);
+</span></code></pre>
+<h3 id="schedule-tasks">Schedule tasks</h3>
+<p>Let's examine how periodic tasks can be created with fang 0.9.</p>
+<p>The only method that should be defined is the <code>cron</code> method in the <code>Runnable</code>(blocking)/<code>AsyncRunnable</code>(asynk) trait implementation.</p>
+<p>Let's take a look at an example:</p>
+<pre data-lang="rust" style="background-color:#2b303b;color:#c0c5ce;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#b48ead;">impl </span><span>AsyncRunnable </span><span style="color:#b48ead;">for </span><span>MyCronTask {
+</span><span>  async </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">run</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>, </span><span style="color:#bf616a;">_queue</span><span>: &amp;</span><span style="color:#b48ead;">mut</span><span> dyn AsyncQueueable) -&gt; Result&lt;(), Error&gt; {
+</span><span>    log::info!(&quot;</span><span style="color:#a3be8c;">CRON!!!!!!!!!!!!!!!</span><span>&quot;,);
+</span><span>
+</span><span>    Ok(())
+</span><span>  }
+</span><span>
+</span><span>  </span><span style="color:#65737e;">// you must use fang::Scheduled enum.
+</span><span>  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">cron</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>) -&gt; Option&lt;Scheduled&gt; {
+</span><span>    </span><span style="color:#65737e;">// cron expression to execute a task every 20 seconds.
+</span><span>    </span><span style="color:#b48ead;">let</span><span> expression = &quot;</span><span style="color:#a3be8c;">0/20 * * * * * *</span><span>&quot;;
+</span><span>    Some(Scheduled::CronPattern(expression.</span><span style="color:#96b5b4;">to_string</span><span>()))
+</span><span>  }
+</span><span>
+</span><span>  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">uniq</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>) -&gt; </span><span style="color:#b48ead;">bool </span><span>{
+</span><span>    </span><span style="color:#d08770;">true
+</span><span>  }
+</span><span>}
+</span></code></pre>
+<p>Also, it is possible to schedule a task only once.</p>
+<pre data-lang="rust" style="background-color:#2b303b;color:#c0c5ce;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#b48ead;">impl </span><span>AsyncRunnable </span><span style="color:#b48ead;">for </span><span>MyCronTask {
+</span><span>  async </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">run</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>, </span><span style="color:#bf616a;">_queue</span><span>: &amp;</span><span style="color:#b48ead;">mut</span><span> dyn AsyncQueueable) -&gt; Result&lt;(), Error&gt; {
+</span><span>    log::info!(&quot;</span><span style="color:#a3be8c;">CRON!!!!!!!!!!!!!!!</span><span>&quot;,);
+</span><span>
+</span><span>    Ok(())
+</span><span>  }
+</span><span>
+</span><span>  </span><span style="color:#65737e;">// you must use fang::Scheduled enum.
+</span><span>  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">cron</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>) -&gt; Option&lt;Scheduled&gt; {
+</span><span>    </span><span style="color:#65737e;">// You must use DateTime&lt;Utc&gt; to specify
+</span><span>    </span><span style="color:#65737e;">// when in the future you would like schedule the task.
+</span><span>
+</span><span>    </span><span style="color:#65737e;">// This will schedule the task for within 7 seconds.
+</span><span>    Some(Scheduled::ScheduleOnce(Utc::now() + Duration::seconds(</span><span style="color:#d08770;">7</span><span style="color:#b48ead;">i64</span><span>)))
+</span><span>  }
+</span><span>
+</span><span>  </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">uniq</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>) -&gt; </span><span style="color:#b48ead;">bool </span><span>{
+</span><span>    </span><span style="color:#d08770;">true
+</span><span>  }
+</span><span>}
+</span></code></pre>
+<p>More examples are available at <a href="https://github.com/ayrat555/fang/tree/master/fang_examples">fang examples</a></p>
+<p>It is no longer needed to start the scheduler process, the scheduled tasks will be executed by <code>WorkerPool</code> or <code>AsyncWorkerPool</code>. If a task is periodic, it will be re-scheduled before its next execution.</p>
+<h3 id="blocking-refactor">Blocking refactor</h3>
+<ul>
+<li>
+<p>We deleted the graceful shutdown feature of the blocking module. But we're planning to re-implement it in the future.</p>
+</li>
+<li>
+<p>We completely changed most of the blocking module's API.</p>
+</li>
+</ul>
+<p>The reason for this change is to unify the APIs of the blocking and the asynk modules. So users can easily switch between blocking and async workers.</p>
+<p>Another reason is we wanted to do a trait for the task queue in the blocking module. It opens a  possibility to implement new backends for the blocking module.</p>
+<p>A new API of the blocking queues looks like this:</p>
+<pre data-lang="rust" style="background-color:#2b303b;color:#c0c5ce;" class="language-rust "><code class="language-rust" data-lang="rust"><span style="color:#b48ead;">pub trait </span><span>Queueable {
+</span><span>    </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">fetch_and_touch_task</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>, </span><span style="color:#bf616a;">task_type</span><span>: String) -&gt; Result&lt;Option&lt;Task&gt;, QueueError&gt;;
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">insert_task</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>, </span><span style="color:#bf616a;">params</span><span>: &amp;dyn Runnable) -&gt; Result&lt;Task, QueueError&gt;;
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">remove_all_tasks</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>) -&gt; Result&lt;</span><span style="color:#b48ead;">usize</span><span>, QueueError&gt;;
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">remove_all_scheduled_tasks</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>) -&gt; Result&lt;</span><span style="color:#b48ead;">usize</span><span>, QueueError&gt;;
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">remove_tasks_of_type</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>, </span><span style="color:#bf616a;">task_type</span><span>: &amp;</span><span style="color:#b48ead;">str</span><span>) -&gt; Result&lt;</span><span style="color:#b48ead;">usize</span><span>, QueueError&gt;;
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">remove_task</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>, </span><span style="color:#bf616a;">id</span><span>: Uuid) -&gt; Result&lt;</span><span style="color:#b48ead;">usize</span><span>, QueueError&gt;;
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">find_task_by_id</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>, </span><span style="color:#bf616a;">id</span><span>: Uuid) -&gt; Option&lt;Task&gt;;
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">update_task_state</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>, </span><span style="color:#bf616a;">task</span><span>: &amp;Task, </span><span style="color:#bf616a;">state</span><span>: FangTaskState) -&gt; Result&lt;Task, QueueError&gt;;
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">fail_task</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>, </span><span style="color:#bf616a;">task</span><span>: &amp;Task, </span><span style="color:#bf616a;">error</span><span>: String) -&gt; Result&lt;Task, QueueError&gt;;
+</span><span>
+</span><span>    </span><span style="color:#b48ead;">fn </span><span style="color:#8fa1b3;">schedule_task</span><span>(&amp;</span><span style="color:#bf616a;">self</span><span>, </span><span style="color:#bf616a;">task</span><span>: &amp;dyn Runnable) -&gt; Result&lt;Task, QueueError&gt;;
+</span><span>}
+</span></code></pre>
+<ul>
+<li>Another change we want to highlight is that we updated Diesel to 2.0 (used only in the blocking module to interact with the DB)</li>
+</ul>
+<p>Pre 0.9 release was tested in real projects:</p>
+<ul>
+<li><a href="https://github.com/ayrat555/el_monitorro/">el_monitorro</a></li>
+<li><a href="https://github.com/pxp9/weather_bot_rust/">weather_bot_rust</a>.</li>
+</ul>
+<h2 id="future-directions">Future directions</h2>
+<ul>
+<li>Retries with different backoff modes</li>
+<li>Additional backends (in-memory, redis)</li>
+<li>Graceful shutdown for both modules</li>
+</ul>
+<h2 id="conclusion">Conclusion</h2>
+<p>The project is available on <a href="https://github.com/ayrat555/fang">GitHub</a></p>
+<p>The new release and this post is written in collaboration between  <a href="https://pxp9.github.io/">Pepe Márquez Romero</a> (<a href="https://github.com/pxp9">github</a>) and <a href="https://www.badykov.com/">Ayrat Badykov</a> (<a href="https://github.com/ayrat555">github</a>).</p>
+
+        </article>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+  
+    
+<footer class="footer text-muted">
+	<div class="container">
+		<div class="row">
+			<div class="col-lg-8 order-last order-lg-first">
+				<ul class="list-inline">
+					
+						<li class="list-inline-item">Built with ❤️ by <a href="https://github.com/ayrat555">Ayrat Badykov</a> and <a href="https://github.com/pxp9">Pepe Márquez</a></li>
+					
+				</ul>
+			</div>
+			<div class="col-lg-8 order-first order-lg-last text-lg-end">
+				<ul class="list-inline">
+					
+				</ul>
+			</div>
+		</div>
+	</div>
+</footer>
+
+  
+
+  
+<script type="text/javascript" src="https://fang.badykov.com/js/main.js" defer></script>
+
+  
+</body>
+</html>
