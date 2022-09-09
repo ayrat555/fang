@@ -1,8 +1,8 @@
 +++
 title = "Fang 0.9"
 description = "What's new with the release of fang 0.9"
-date = 2022-09-08T16:45:22+00:00
-updated = 2022-09-08T16:45:22+00:00
+date = 2022-09-09T16:45:22+00:00
+updated = 2022-09-09T16:45:22+00:00
 template = "blog/page.html"
 sort_by = "weight"
 weight = 1
