@@ -71,6 +71,8 @@ pub enum QueueError {
     PoolError(#[from] PoolError),
     #[error(transparent)]
     CronError(#[from] CronError),
+    #[error("Can not perform this operation if task is not uniq, please check its definition in impl Runnable")]
+    TaskNotUniqError,
 }
 
 impl From<cron::error::Error> for QueueError {
@@ -92,6 +94,8 @@ pub trait Queueable {
 
     fn remove_task(&self, id: Uuid) -> Result<usize, QueueError>;
 
+    /// To use this function task has to be uniq. uniq() has to return true.
+    /// If task is not uniq this function will not do anything.
     fn remove_task_by_uniq_hash(&self, task: &dyn Runnable) -> Result<usize, QueueError>;
 
     fn find_task_by_id(&self, id: Uuid) -> Option<Task>;
@@ -151,10 +155,16 @@ impl Queueable for Queue {
         Self::remove_task_query(&mut connection, id)
     }
 
+    /// To use this function task has to be uniq. uniq() has to return true.
+    /// If task is not uniq this function will not do anything.
     fn remove_task_by_uniq_hash(&self, task: &dyn Runnable) -> Result<usize, QueueError> {
-        let mut connection = self.get_connection()?;
+        if task.uniq() {
+            let mut connection = self.get_connection()?;
 
-        Self::remove_task_by_uniq_hash_query(&mut connection, task)
+            Self::remove_task_by_uniq_hash_query(&mut connection, task)
+        } else {
+            Err(QueueError::TaskNotUniqError)
+        }
     }
 
     fn update_task_state(&self, task: &Task, state: FangTaskState) -> Result<Task, QueueError> {

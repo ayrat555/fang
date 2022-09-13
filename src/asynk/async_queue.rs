@@ -97,6 +97,8 @@ pub enum AsyncQueueError {
     NotConnectedError,
     #[error("Can not convert `std::time::Duration` to `chrono::Duration`")]
     TimeError,
+    #[error("Can not perform this operation if task is not uniq, please check its definition in impl AsyncRunnable")]
+    TaskNotUniqError,
 }
 
 impl From<cron::error::Error> for AsyncQueueError {
@@ -275,9 +277,13 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         &mut self,
         task: &dyn AsyncRunnable,
     ) -> Result<u64, AsyncQueueError> {
-        let transaction = &mut self.transaction;
+        if task.uniq() {
+            let transaction = &mut self.transaction;
 
-        AsyncQueue::<NoTls>::remove_task_by_uniq_hash_query(transaction, task).await
+            AsyncQueue::<NoTls>::remove_task_by_uniq_hash_query(transaction, task).await
+        } else {
+            Err(AsyncQueueError::TaskNotUniqError)
+        }
     }
 
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
@@ -719,15 +725,19 @@ where
         &mut self,
         task: &dyn AsyncRunnable,
     ) -> Result<u64, AsyncQueueError> {
-        self.check_if_connection()?;
-        let mut connection = self.pool.as_ref().unwrap().get().await?;
-        let mut transaction = connection.transaction().await?;
+        if task.uniq() {
+            self.check_if_connection()?;
+            let mut connection = self.pool.as_ref().unwrap().get().await?;
+            let mut transaction = connection.transaction().await?;
 
-        let result = Self::remove_task_by_uniq_hash_query(&mut transaction, task).await?;
+            let result = Self::remove_task_by_uniq_hash_query(&mut transaction, task).await?;
 
-        transaction.commit().await?;
+            transaction.commit().await?;
 
-        Ok(result)
+            Ok(result)
+        } else {
+            Err(AsyncQueueError::TaskNotUniqError)
+        }
     }
 
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
