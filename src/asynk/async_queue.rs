@@ -119,6 +119,11 @@ pub trait AsyncQueueable: Send {
 
     async fn remove_task(&mut self, id: Uuid) -> Result<u64, AsyncQueueError>;
 
+    async fn remove_task_by_uniq_hash(
+        &mut self,
+        task: &dyn AsyncRunnable,
+    ) -> Result<u64, AsyncQueueError>;
+
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError>;
 
     async fn find_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError>;

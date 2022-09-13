@@ -92,6 +92,8 @@ pub trait Queueable {
 
     fn remove_task(&self, id: Uuid) -> Result<usize, QueueError>;
 
+    fn remove_task_by_uniq_hash(&mut self, task: &dyn Runnable) -> Result<usize, QueueError>;
+
     fn find_task_by_id(&self, id: Uuid) -> Option<Task>;
 
     fn update_task_state(&self, task: &Task, state: FangTaskState) -> Result<Task, QueueError>;
