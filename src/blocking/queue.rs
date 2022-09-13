@@ -92,7 +92,7 @@ pub trait Queueable {
 
     fn remove_task(&self, id: Uuid) -> Result<usize, QueueError>;
 
-    fn remove_task_by_uniq_hash(&mut self, task: &dyn Runnable) -> Result<usize, QueueError>;
+    fn remove_task_by_uniq_hash(&self, task: &dyn Runnable) -> Result<usize, QueueError>;
 
     fn find_task_by_id(&self, id: Uuid) -> Option<Task>;
 
@@ -149,6 +149,12 @@ impl Queueable for Queue {
         let mut connection = self.get_connection()?;
 
         Self::remove_task_query(&mut connection, id)
+    }
+
+    fn remove_task_by_uniq_hash(&self, task: &dyn Runnable) -> Result<usize, QueueError> {
+        let mut connection = self.get_connection()?;
+
+        Self::remove_task_by_uniq_hash_query(&mut connection, task)
     }
 
     fn update_task_state(&self, task: &Task, state: FangTaskState) -> Result<Task, QueueError> {
@@ -302,6 +308,19 @@ impl Queue {
         task_type: &str,
     ) -> Result<usize, QueueError> {
         let query = fang_tasks::table.filter(fang_tasks::task_type.eq(task_type));
+
+        Ok(diesel::delete(query).execute(connection)?)
+    }
+
+    pub fn remove_task_by_uniq_hash_query(
+        connection: &mut PgConnection,
+        task: &dyn Runnable,
+    ) -> Result<usize, QueueError> {
+        let metadata = serde_json::to_value(task).unwrap();
+
+        let uniq_hash = Self::calculate_hash(metadata.to_string());
+
+        let query = fang_tasks::table.filter(fang_tasks::uniq_hash.eq(uniq_hash));
 
         Ok(diesel::delete(query).execute(connection)?)
     }
