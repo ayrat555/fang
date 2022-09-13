@@ -30,6 +30,7 @@ const REMOVE_ALL_TASK_QUERY: &str = include_str!("queries/remove_all_tasks.sql")
 const REMOVE_ALL_SCHEDULED_TASK_QUERY: &str =
     include_str!("queries/remove_all_scheduled_tasks.sql");
 const REMOVE_TASK_QUERY: &str = include_str!("queries/remove_task.sql");
+const REMOVE_TASK_BY_UNIQ_HASH_QUERY: &str = include_str!("queries/remove_task_by_uniq_hash.sql");
 const REMOVE_TASKS_TYPE_QUERY: &str = include_str!("queries/remove_tasks_type.sql");
 const FETCH_TASK_TYPE_QUERY: &str = include_str!("queries/fetch_task_type.sql");
 const FIND_TASK_BY_UNIQ_HASH_QUERY: &str = include_str!("queries/find_task_by_uniq_hash.sql");
@@ -270,6 +271,15 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         AsyncQueue::<NoTls>::remove_task_query(transaction, id).await
     }
 
+    async fn remove_task_by_uniq_hash(
+        &mut self,
+        task: &dyn AsyncRunnable,
+    ) -> Result<u64, AsyncQueueError> {
+        let transaction = &mut self.transaction;
+
+        AsyncQueue::<NoTls>::remove_task_by_uniq_hash_query(transaction, task).await
+    }
+
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
@@ -346,6 +356,23 @@ where
         id: Uuid,
     ) -> Result<u64, AsyncQueueError> {
         Self::execute_query(transaction, REMOVE_TASK_QUERY, &[&id], Some(1)).await
+    }
+
+    async fn remove_task_by_uniq_hash_query(
+        transaction: &mut Transaction<'_>,
+        task: &dyn AsyncRunnable,
+    ) -> Result<u64, AsyncQueueError> {
+        let metadata = serde_json::to_value(task)?;
+
+        let uniq_hash = Self::calculate_hash(metadata.to_string());
+
+        Self::execute_query(
+            transaction,
+            REMOVE_TASK_BY_UNIQ_HASH_QUERY,
+            &[&uniq_hash],
+            Some(1),
+        )
+        .await
     }
 
     async fn remove_tasks_type_query(
@@ -682,6 +709,21 @@ where
         let mut transaction = connection.transaction().await?;
 
         let result = Self::remove_task_query(&mut transaction, id).await?;
+
+        transaction.commit().await?;
+
+        Ok(result)
+    }
+
+    async fn remove_task_by_uniq_hash(
+        &mut self,
+        task: &dyn AsyncRunnable,
+    ) -> Result<u64, AsyncQueueError> {
+        self.check_if_connection()?;
+        let mut connection = self.pool.as_ref().unwrap().get().await?;
+        let mut transaction = connection.transaction().await?;
+
+        let result = Self::remove_task_by_uniq_hash_query(&mut transaction, task).await?;
 
         transaction.commit().await?;
 
