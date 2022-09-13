@@ -30,7 +30,7 @@ const REMOVE_ALL_TASK_QUERY: &str = include_str!("queries/remove_all_tasks.sql")
 const REMOVE_ALL_SCHEDULED_TASK_QUERY: &str =
     include_str!("queries/remove_all_scheduled_tasks.sql");
 const REMOVE_TASK_QUERY: &str = include_str!("queries/remove_task.sql");
-const REMOVE_TASK_BY_UNIQ_HASH_QUERY: &str = include_str!("queries/remove_task_by_uniq_hash.sql");
+const REMOVE_TASK_BY_METADATA_QUERY: &str = include_str!("queries/remove_task_by_metadata.sql");
 const REMOVE_TASKS_TYPE_QUERY: &str = include_str!("queries/remove_tasks_type.sql");
 const FETCH_TASK_TYPE_QUERY: &str = include_str!("queries/fetch_task_type.sql");
 const FIND_TASK_BY_UNIQ_HASH_QUERY: &str = include_str!("queries/find_task_by_uniq_hash.sql");
@@ -122,7 +122,7 @@ pub trait AsyncQueueable: Send {
 
     async fn remove_task(&mut self, id: Uuid) -> Result<u64, AsyncQueueError>;
 
-    async fn remove_task_by_uniq_hash(
+    async fn remove_task_by_metadata(
         &mut self,
         task: &dyn AsyncRunnable,
     ) -> Result<u64, AsyncQueueError>;
@@ -273,14 +273,14 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         AsyncQueue::<NoTls>::remove_task_query(transaction, id).await
     }
 
-    async fn remove_task_by_uniq_hash(
+    async fn remove_task_by_metadata(
         &mut self,
         task: &dyn AsyncRunnable,
     ) -> Result<u64, AsyncQueueError> {
         if task.uniq() {
             let transaction = &mut self.transaction;
 
-            AsyncQueue::<NoTls>::remove_task_by_uniq_hash_query(transaction, task).await
+            AsyncQueue::<NoTls>::remove_task_by_metadata_query(transaction, task).await
         } else {
             Err(AsyncQueueError::TaskNotUniqError)
         }
@@ -364,7 +364,7 @@ where
         Self::execute_query(transaction, REMOVE_TASK_QUERY, &[&id], Some(1)).await
     }
 
-    async fn remove_task_by_uniq_hash_query(
+    async fn remove_task_by_metadata_query(
         transaction: &mut Transaction<'_>,
         task: &dyn AsyncRunnable,
     ) -> Result<u64, AsyncQueueError> {
@@ -374,7 +374,7 @@ where
 
         Self::execute_query(
             transaction,
-            REMOVE_TASK_BY_UNIQ_HASH_QUERY,
+            REMOVE_TASK_BY_METADATA_QUERY,
             &[&uniq_hash],
             Some(1),
         )
@@ -721,7 +721,7 @@ where
         Ok(result)
     }
 
-    async fn remove_task_by_uniq_hash(
+    async fn remove_task_by_metadata(
         &mut self,
         task: &dyn AsyncRunnable,
     ) -> Result<u64, AsyncQueueError> {
@@ -730,7 +730,7 @@ where
             let mut connection = self.pool.as_ref().unwrap().get().await?;
             let mut transaction = connection.transaction().await?;
 
-            let result = Self::remove_task_by_uniq_hash_query(&mut transaction, task).await?;
+            let result = Self::remove_task_by_metadata_query(&mut transaction, task).await?;
 
             transaction.commit().await?;
 

@@ -96,7 +96,7 @@ pub trait Queueable {
 
     /// To use this function task has to be uniq. uniq() has to return true.
     /// If task is not uniq this function will not do anything.
-    fn remove_task_by_uniq_hash(&self, task: &dyn Runnable) -> Result<usize, QueueError>;
+    fn remove_task_by_metadata(&self, task: &dyn Runnable) -> Result<usize, QueueError>;
 
     fn find_task_by_id(&self, id: Uuid) -> Option<Task>;
 
@@ -157,11 +157,11 @@ impl Queueable for Queue {
 
     /// To use this function task has to be uniq. uniq() has to return true.
     /// If task is not uniq this function will not do anything.
-    fn remove_task_by_uniq_hash(&self, task: &dyn Runnable) -> Result<usize, QueueError> {
+    fn remove_task_by_metadata(&self, task: &dyn Runnable) -> Result<usize, QueueError> {
         if task.uniq() {
             let mut connection = self.get_connection()?;
 
-            Self::remove_task_by_uniq_hash_query(&mut connection, task)
+            Self::remove_task_by_metadata_query(&mut connection, task)
         } else {
             Err(QueueError::TaskNotUniqError)
         }
@@ -322,7 +322,7 @@ impl Queue {
         Ok(diesel::delete(query).execute(connection)?)
     }
 
-    pub fn remove_task_by_uniq_hash_query(
+    pub fn remove_task_by_metadata_query(
         connection: &mut PgConnection,
         task: &dyn Runnable,
     ) -> Result<usize, QueueError> {
