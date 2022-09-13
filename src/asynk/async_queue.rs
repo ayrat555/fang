@@ -376,7 +376,7 @@ where
             transaction,
             REMOVE_TASK_BY_METADATA_QUERY,
             &[&uniq_hash],
-            Some(1),
+            None,
         )
         .await
     }
@@ -816,6 +816,23 @@ mod async_queue_tests {
     }
 
     #[derive(Serialize, Deserialize)]
+    struct AsyncUniqTask {
+        pub number: u16,
+    }
+
+    #[typetag::serde]
+    #[async_trait]
+    impl AsyncRunnable for AsyncUniqTask {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+            Ok(())
+        }
+
+        fn uniq(&self) -> bool {
+            true
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
     struct AsyncTaskSchedule {
         pub number: u16,
         pub datetime: String,
@@ -1072,6 +1089,47 @@ mod async_queue_tests {
 
         let result = test.remove_tasks_type("common").await.unwrap();
         assert_eq!(2, result);
+
+        test.transaction.rollback().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn remove_tasks_by_metadata() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
+
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+
+        let task = insert_task(&mut test, &AsyncUniqTask { number: 1 }).await;
+
+        let metadata = task.metadata.as_object().unwrap();
+        let number = metadata["number"].as_u64();
+        let type_task = metadata["type"].as_str();
+
+        assert_eq!(Some(1), number);
+        assert_eq!(Some("AsyncUniqTask"), type_task);
+
+        let task = insert_task(&mut test, &AsyncUniqTask { number: 2 }).await;
+
+        let metadata = task.metadata.as_object().unwrap();
+        let number = metadata["number"].as_u64();
+        let type_task = metadata["type"].as_str();
+
+        assert_eq!(Some(2), number);
+        assert_eq!(Some("AsyncUniqTask"), type_task);
+
+        let result = test
+            .remove_task_by_metadata(&AsyncUniqTask { number: 0 })
+            .await
+            .unwrap();
+        assert_eq!(0, result);
+
+        let result = test
+            .remove_task_by_metadata(&AsyncUniqTask { number: 1 })
+            .await
+            .unwrap();
+        assert_eq!(1, result);
 
         test.transaction.rollback().await.unwrap();
     }

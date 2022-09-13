@@ -806,4 +806,35 @@ mod queue_tests {
             Ok(())
         });
     }
+
+    #[test]
+    fn remove_task_by_metadata() {
+        let m_task1 = PepeTask { number: 10 };
+        let m_task2 = PepeTask { number: 11 };
+        let m_task3 = AyratTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let mut queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|conn| {
+            let task1 = Queue::insert_query(conn, &m_task1, Utc::now()).unwrap();
+            let task2 = Queue::insert_query(conn, &m_task2, Utc::now()).unwrap();
+            let task3 = Queue::insert_query(conn, &m_task3, Utc::now()).unwrap();
+
+            assert!(Queue::find_task_by_id_query(conn, task1.id).is_some());
+            assert!(Queue::find_task_by_id_query(conn, task2.id).is_some());
+            assert!(Queue::find_task_by_id_query(conn, task3.id).is_some());
+
+            Queue::remove_task_by_metadata_query(conn, &m_task1).unwrap();
+
+            assert!(Queue::find_task_by_id_query(conn, task1.id).is_none());
+            assert!(Queue::find_task_by_id_query(conn, task2.id).is_some());
+            assert!(Queue::find_task_by_id_query(conn, task3.id).is_some());
+
+            Ok(())
+        });
+    }
 }
