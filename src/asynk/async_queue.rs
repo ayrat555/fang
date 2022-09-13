@@ -117,7 +117,7 @@ pub trait AsyncQueueable: Send {
 
     async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError>;
 
-    async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError>;
+    async fn remove_task(&mut self, id: Uuid) -> Result<u64, AsyncQueueError>;
 
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError>;
 
@@ -259,10 +259,10 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         AsyncQueue::<NoTls>::remove_all_scheduled_tasks_query(transaction).await
     }
 
-    async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError> {
+    async fn remove_task(&mut self, id: Uuid) -> Result<u64, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
-        AsyncQueue::<NoTls>::remove_task_query(transaction, task).await
+        AsyncQueue::<NoTls>::remove_task_query(transaction, id).await
     }
 
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
@@ -338,9 +338,9 @@ where
 
     async fn remove_task_query(
         transaction: &mut Transaction<'_>,
-        task: Task,
+        id: Uuid,
     ) -> Result<u64, AsyncQueueError> {
-        Self::execute_query(transaction, REMOVE_TASK_QUERY, &[&task.id], Some(1)).await
+        Self::execute_query(transaction, REMOVE_TASK_QUERY, &[&id], Some(1)).await
     }
 
     async fn remove_tasks_type_query(
@@ -671,12 +671,12 @@ where
         Ok(result)
     }
 
-    async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError> {
+    async fn remove_task(&mut self, id: Uuid) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
         let mut connection = self.pool.as_ref().unwrap().get().await?;
         let mut transaction = connection.transaction().await?;
 
-        let result = Self::remove_task_query(&mut transaction, task).await?;
+        let result = Self::remove_task_query(&mut transaction, id).await?;
 
         transaction.commit().await?;
 
