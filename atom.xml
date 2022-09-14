@@ -5,18 +5,23 @@
 	<link href="https://fang.badykov.com/atom.xml" rel="self" type="application/atom+xml"/>
   <link href="https://fang.badykov.com"/>
 	<generator uri="https://www.getzola.org/">Zola</generator>
-	<updated>2022-09-09T18:34:16+00:00</updated>
+	<updated>2022-09-14T11:47:07+00:00</updated>
 	<id>https://fang.badykov.com/atom.xml</id>
 	<entry xml:lang="en">
 		<title>CHANGELOG</title>
-		<published>2022-09-09T18:34:16+00:00</published>
-		<updated>2022-09-09T18:34:16+00:00</updated>
+		<published>2022-09-14T11:47:07+00:00</published>
+		<updated>2022-09-14T11:47:07+00:00</updated>
 		<link rel="alternate" href="https://fang.badykov.com/docs/changelog/" type="text/html"/>
 		<id>https://fang.badykov.com/docs/changelog/</id>
 		<content type="html">&lt;h1 id=&quot;changelog&quot;&gt;Changelog&lt;&#x2F;h1&gt;
-&lt;h2 id=&quot;0-9-0-2022-09-2&quot;&gt;0.9.0 (2022-09-2)&lt;&#x2F;h2&gt;
-&lt;h3 id=&quot;69&quot;&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;69&quot;&gt;#69&lt;&#x2F;a&gt;&lt;&#x2F;h3&gt;
+&lt;h2 id=&quot;0-9-1-2022-09-14&quot;&gt;0.9.1 (2022-09-14)&lt;&#x2F;h2&gt;
 &lt;h3 id=&quot;added&quot;&gt;Added&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Add methods to remove a task by uniq hash or id - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;90&quot;&gt;#90&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-9-0-2022-09-02&quot;&gt;0.9.0 (2022-09-02)&lt;&#x2F;h2&gt;
+&lt;h3 id=&quot;69&quot;&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;69&quot;&gt;#69&lt;&#x2F;a&gt;&lt;&#x2F;h3&gt;
+&lt;h3 id=&quot;added-1&quot;&gt;Added&lt;&#x2F;h3&gt;
 &lt;ul&gt;
 &lt;li&gt;Added cron support for scheduled tasks.&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
@@ -95,8 +100,8 @@
 	</entry>
 	<entry xml:lang="en">
 		<title>README</title>
-		<published>2022-09-09T18:34:16+00:00</published>
-		<updated>2022-09-09T18:34:16+00:00</updated>
+		<published>2022-09-14T11:47:07+00:00</published>
+		<updated>2022-09-14T11:47:07+00:00</updated>
 		<link rel="alternate" href="https://fang.badykov.com/docs/readme/" type="text/html"/>
 		<id>https://fang.badykov.com/docs/readme/</id>
 		<content type="html">&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;raw.githubusercontent.com&#x2F;ayrat555&#x2F;fang&#x2F;master&#x2F;logo.png&quot; alt=&quot;fang&quot; height=&quot;300px&quot;&gt;&lt;&#x2F;p&gt;
