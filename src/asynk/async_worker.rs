@@ -68,17 +68,17 @@ where
             },
             RetentionMode::RemoveAll => match result {
                 Ok(task) => {
-                    self.queue.remove_task(task).await?;
+                    self.queue.remove_task(task.id).await?;
                     Ok(())
                 }
                 Err((task, _error)) => {
-                    self.queue.remove_task(task).await?;
+                    self.queue.remove_task(task.id).await?;
                     Ok(())
                 }
             },
             RetentionMode::RemoveFinished => match result {
                 Ok(task) => {
-                    self.queue.remove_task(task).await?;
+                    self.queue.remove_task(task.id).await?;
                     Ok(())
                 }
                 Err((task, error)) => {
@@ -185,17 +185,17 @@ impl<'a> AsyncWorkerTest<'a> {
             },
             RetentionMode::RemoveAll => match result {
                 Ok(task) => {
-                    self.queue.remove_task(task).await?;
+                    self.queue.remove_task(task.id).await?;
                     Ok(())
                 }
                 Err((task, _error)) => {
-                    self.queue.remove_task(task).await?;
+                    self.queue.remove_task(task.id).await?;
                     Ok(())
                 }
             },
             RetentionMode::RemoveFinished => match result {
                 Ok(task) => {
-                    self.queue.remove_task(task).await?;
+                    self.queue.remove_task(task.id).await?;
                     Ok(())
                 }
                 Err((task, error)) => {

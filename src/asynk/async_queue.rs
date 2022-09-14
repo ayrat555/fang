@@ -30,6 +30,7 @@ const REMOVE_ALL_TASK_QUERY: &str = include_str!("queries/remove_all_tasks.sql")
 const REMOVE_ALL_SCHEDULED_TASK_QUERY: &str =
     include_str!("queries/remove_all_scheduled_tasks.sql");
 const REMOVE_TASK_QUERY: &str = include_str!("queries/remove_task.sql");
+const REMOVE_TASK_BY_METADATA_QUERY: &str = include_str!("queries/remove_task_by_metadata.sql");
 const REMOVE_TASKS_TYPE_QUERY: &str = include_str!("queries/remove_tasks_type.sql");
 const FETCH_TASK_TYPE_QUERY: &str = include_str!("queries/fetch_task_type.sql");
 const FIND_TASK_BY_UNIQ_HASH_QUERY: &str = include_str!("queries/find_task_by_uniq_hash.sql");
@@ -96,6 +97,8 @@ pub enum AsyncQueueError {
     NotConnectedError,
     #[error("Can not convert `std::time::Duration` to `chrono::Duration`")]
     TimeError,
+    #[error("Can not perform this operation if task is not uniq, please check its definition in impl AsyncRunnable")]
+    TaskNotUniqError,
 }
 
 impl From<cron::error::Error> for AsyncQueueError {
@@ -117,7 +120,12 @@ pub trait AsyncQueueable: Send {
 
     async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError>;
 
-    async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError>;
+    async fn remove_task(&mut self, id: Uuid) -> Result<u64, AsyncQueueError>;
+
+    async fn remove_task_by_metadata(
+        &mut self,
+        task: &dyn AsyncRunnable,
+    ) -> Result<u64, AsyncQueueError>;
 
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError>;
 
@@ -259,10 +267,23 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
         AsyncQueue::<NoTls>::remove_all_scheduled_tasks_query(transaction).await
     }
 
-    async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError> {
+    async fn remove_task(&mut self, id: Uuid) -> Result<u64, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
-        AsyncQueue::<NoTls>::remove_task_query(transaction, task).await
+        AsyncQueue::<NoTls>::remove_task_query(transaction, id).await
+    }
+
+    async fn remove_task_by_metadata(
+        &mut self,
+        task: &dyn AsyncRunnable,
+    ) -> Result<u64, AsyncQueueError> {
+        if task.uniq() {
+            let transaction = &mut self.transaction;
+
+            AsyncQueue::<NoTls>::remove_task_by_metadata_query(transaction, task).await
+        } else {
+            Err(AsyncQueueError::TaskNotUniqError)
+        }
     }
 
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
@@ -338,9 +359,26 @@ where
 
     async fn remove_task_query(
         transaction: &mut Transaction<'_>,
-        task: Task,
+        id: Uuid,
     ) -> Result<u64, AsyncQueueError> {
-        Self::execute_query(transaction, REMOVE_TASK_QUERY, &[&task.id], Some(1)).await
+        Self::execute_query(transaction, REMOVE_TASK_QUERY, &[&id], Some(1)).await
+    }
+
+    async fn remove_task_by_metadata_query(
+        transaction: &mut Transaction<'_>,
+        task: &dyn AsyncRunnable,
+    ) -> Result<u64, AsyncQueueError> {
+        let metadata = serde_json::to_value(task)?;
+
+        let uniq_hash = Self::calculate_hash(metadata.to_string());
+
+        Self::execute_query(
+            transaction,
+            REMOVE_TASK_BY_METADATA_QUERY,
+            &[&uniq_hash],
+            None,
+        )
+        .await
     }
 
     async fn remove_tasks_type_query(
@@ -671,16 +709,35 @@ where
         Ok(result)
     }
 
-    async fn remove_task(&mut self, task: Task) -> Result<u64, AsyncQueueError> {
+    async fn remove_task(&mut self, id: Uuid) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
         let mut connection = self.pool.as_ref().unwrap().get().await?;
         let mut transaction = connection.transaction().await?;
 
-        let result = Self::remove_task_query(&mut transaction, task).await?;
+        let result = Self::remove_task_query(&mut transaction, id).await?;
 
         transaction.commit().await?;
 
         Ok(result)
+    }
+
+    async fn remove_task_by_metadata(
+        &mut self,
+        task: &dyn AsyncRunnable,
+    ) -> Result<u64, AsyncQueueError> {
+        if task.uniq() {
+            self.check_if_connection()?;
+            let mut connection = self.pool.as_ref().unwrap().get().await?;
+            let mut transaction = connection.transaction().await?;
+
+            let result = Self::remove_task_by_metadata_query(&mut transaction, task).await?;
+
+            transaction.commit().await?;
+
+            Ok(result)
+        } else {
+            Err(AsyncQueueError::TaskNotUniqError)
+        }
     }
 
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
@@ -755,6 +812,23 @@ mod async_queue_tests {
     impl AsyncRunnable for AsyncTask {
         async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
             Ok(())
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct AsyncUniqTask {
+        pub number: u16,
+    }
+
+    #[typetag::serde]
+    #[async_trait]
+    impl AsyncRunnable for AsyncUniqTask {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+            Ok(())
+        }
+
+        fn uniq(&self) -> bool {
+            true
         }
     }
 
@@ -1015,6 +1089,47 @@ mod async_queue_tests {
 
         let result = test.remove_tasks_type("common").await.unwrap();
         assert_eq!(2, result);
+
+        test.transaction.rollback().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn remove_tasks_by_metadata() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
+
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+
+        let task = insert_task(&mut test, &AsyncUniqTask { number: 1 }).await;
+
+        let metadata = task.metadata.as_object().unwrap();
+        let number = metadata["number"].as_u64();
+        let type_task = metadata["type"].as_str();
+
+        assert_eq!(Some(1), number);
+        assert_eq!(Some("AsyncUniqTask"), type_task);
+
+        let task = insert_task(&mut test, &AsyncUniqTask { number: 2 }).await;
+
+        let metadata = task.metadata.as_object().unwrap();
+        let number = metadata["number"].as_u64();
+        let type_task = metadata["type"].as_str();
+
+        assert_eq!(Some(2), number);
+        assert_eq!(Some("AsyncUniqTask"), type_task);
+
+        let result = test
+            .remove_task_by_metadata(&AsyncUniqTask { number: 0 })
+            .await
+            .unwrap();
+        assert_eq!(0, result);
+
+        let result = test
+            .remove_task_by_metadata(&AsyncUniqTask { number: 1 })
+            .await
+            .unwrap();
+        assert_eq!(1, result);
 
         test.transaction.rollback().await.unwrap();
     }

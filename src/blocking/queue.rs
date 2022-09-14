@@ -71,6 +71,8 @@ pub enum QueueError {
     PoolError(#[from] PoolError),
     #[error(transparent)]
     CronError(#[from] CronError),
+    #[error("Can not perform this operation if task is not uniq, please check its definition in impl Runnable")]
+    TaskNotUniqError,
 }
 
 impl From<cron::error::Error> for QueueError {
@@ -91,6 +93,10 @@ pub trait Queueable {
     fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, QueueError>;
 
     fn remove_task(&self, id: Uuid) -> Result<usize, QueueError>;
+
+    /// To use this function task has to be uniq. uniq() has to return true.
+    /// If task is not uniq this function will not do anything.
+    fn remove_task_by_metadata(&self, task: &dyn Runnable) -> Result<usize, QueueError>;
 
     fn find_task_by_id(&self, id: Uuid) -> Option<Task>;
 
@@ -147,6 +153,18 @@ impl Queueable for Queue {
         let mut connection = self.get_connection()?;
 
         Self::remove_task_query(&mut connection, id)
+    }
+
+    /// To use this function task has to be uniq. uniq() has to return true.
+    /// If task is not uniq this function will not do anything.
+    fn remove_task_by_metadata(&self, task: &dyn Runnable) -> Result<usize, QueueError> {
+        if task.uniq() {
+            let mut connection = self.get_connection()?;
+
+            Self::remove_task_by_metadata_query(&mut connection, task)
+        } else {
+            Err(QueueError::TaskNotUniqError)
+        }
     }
 
     fn update_task_state(&self, task: &Task, state: FangTaskState) -> Result<Task, QueueError> {
@@ -300,6 +318,19 @@ impl Queue {
         task_type: &str,
     ) -> Result<usize, QueueError> {
         let query = fang_tasks::table.filter(fang_tasks::task_type.eq(task_type));
+
+        Ok(diesel::delete(query).execute(connection)?)
+    }
+
+    pub fn remove_task_by_metadata_query(
+        connection: &mut PgConnection,
+        task: &dyn Runnable,
+    ) -> Result<usize, QueueError> {
+        let metadata = serde_json::to_value(task).unwrap();
+
+        let uniq_hash = Self::calculate_hash(metadata.to_string());
+
+        let query = fang_tasks::table.filter(fang_tasks::uniq_hash.eq(uniq_hash));
 
         Ok(diesel::delete(query).execute(connection)?)
     }
@@ -771,6 +802,37 @@ mod queue_tests {
 
             assert!(Queue::find_task_by_id_query(conn, task1.id).is_some());
             assert!(Queue::find_task_by_id_query(conn, task2.id).is_none());
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn remove_task_by_metadata() {
+        let m_task1 = PepeTask { number: 10 };
+        let m_task2 = PepeTask { number: 11 };
+        let m_task3 = AyratTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let mut queue_pooled_connection = queue.connection_pool.get().unwrap();
+
+        queue_pooled_connection.test_transaction::<(), Error, _>(|conn| {
+            let task1 = Queue::insert_query(conn, &m_task1, Utc::now()).unwrap();
+            let task2 = Queue::insert_query(conn, &m_task2, Utc::now()).unwrap();
+            let task3 = Queue::insert_query(conn, &m_task3, Utc::now()).unwrap();
+
+            assert!(Queue::find_task_by_id_query(conn, task1.id).is_some());
+            assert!(Queue::find_task_by_id_query(conn, task2.id).is_some());
+            assert!(Queue::find_task_by_id_query(conn, task3.id).is_some());
+
+            Queue::remove_task_by_metadata_query(conn, &m_task1).unwrap();
+
+            assert!(Queue::find_task_by_id_query(conn, task1.id).is_none());
+            assert!(Queue::find_task_by_id_query(conn, task2.id).is_some());
+            assert!(Queue::find_task_by_id_query(conn, task3.id).is_some());
 
             Ok(())
         });
