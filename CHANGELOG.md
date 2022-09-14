@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.9.0 (2022-09-2)
+## 0.9.1 (2022-09-14)
+
+### Added
+
+- Add methods to remove a task by uniq hash or id - [#90](https://github.com/ayrat555/fang/pull/90)
+
+## 0.9.0 (2022-09-02)
 
 ###  [#69](https://github.com/ayrat555/fang/pull/69)
 
