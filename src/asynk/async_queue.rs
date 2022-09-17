@@ -10,6 +10,7 @@ use bb8_postgres::tokio_postgres::Socket;
 use bb8_postgres::tokio_postgres::Transaction;
 use bb8_postgres::PostgresConnectionManager;
 use chrono::DateTime;
+use chrono::Duration;
 use chrono::Utc;
 use cron::Schedule;
 use postgres_types::{FromSql, ToSql};
@@ -35,6 +36,7 @@ const REMOVE_TASKS_TYPE_QUERY: &str = include_str!("queries/remove_tasks_type.sq
 const FETCH_TASK_TYPE_QUERY: &str = include_str!("queries/fetch_task_type.sql");
 const FIND_TASK_BY_UNIQ_HASH_QUERY: &str = include_str!("queries/find_task_by_uniq_hash.sql");
 const FIND_TASK_BY_ID_QUERY: &str = include_str!("queries/find_task_by_id.sql");
+const RETRY_TASK_QUERY: &str = include_str!("queries/retry_task.sql");
 
 pub const DEFAULT_TASK_TYPE: &str = "common";
 
@@ -50,7 +52,7 @@ pub enum FangTaskState {
     #[postgres(name = "finished")]
     Finished,
     #[postgres(name = "retried")]
-    Retries,
+    Retried,
 }
 
 impl Default for FangTaskState {
@@ -73,6 +75,8 @@ pub struct Task {
     pub task_type: String,
     #[builder(setter(into))]
     pub uniq_hash: Option<String>,
+    #[builder(setter(into))]
+    pub retries: i32,
     #[builder(setter(into))]
     pub scheduled_at: DateTime<Utc>,
     #[builder(setter(into))]
@@ -143,6 +147,13 @@ pub trait AsyncQueueable: Send {
         -> Result<Task, AsyncQueueError>;
 
     async fn schedule_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
+
+    async fn schedule_retry(
+        &mut self,
+        task: &Task,
+        backoff_seconds: u32,
+        error: &str,
+    ) -> Result<Task, AsyncQueueError>;
 }
 
 #[derive(TypedBuilder, Debug, Clone)]
@@ -313,6 +324,17 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
 
         AsyncQueue::<NoTls>::fail_task_query(transaction, task, error_message).await
     }
+
+    async fn schedule_retry(
+        &mut self,
+        task: &Task,
+        backoff_seconds: u32,
+        error: &str,
+    ) -> Result<Task, AsyncQueueError> {
+        let transaction = &mut self.transaction;
+
+        AsyncQueue::<NoTls>::schedule_retry_query(transaction, task, backoff_seconds, error).await
+    }
 }
 
 impl<Tls> AsyncQueue<Tls>
@@ -416,6 +438,26 @@ where
                     &updated_at,
                     &task.id,
                 ],
+            )
+            .await?;
+        let failed_task = Self::row_to_task(row);
+        Ok(failed_task)
+    }
+
+    async fn schedule_retry_query(
+        transaction: &mut Transaction<'_>,
+        task: &Task,
+        backoff_seconds: u32,
+        error: &str,
+    ) -> Result<Task, AsyncQueueError> {
+        let now = Utc::now();
+        let scheduled_at = now + Duration::seconds(backoff_seconds as i64);
+        let retries = task.retries + 1;
+
+        let row: Row = transaction
+            .query_one(
+                RETRY_TASK_QUERY,
+                &[&error, &retries, &scheduled_at, &now, &task.id],
             )
             .await?;
         let failed_task = Self::row_to_task(row);
@@ -570,6 +612,7 @@ where
         let uniq_hash: Option<String> = row.try_get("uniq_hash").ok();
         let state: FangTaskState = row.get("state");
         let task_type: String = row.get("task_type");
+        let retries: i32 = row.get("retries");
         let created_at: DateTime<Utc> = row.get("created_at");
         let updated_at: DateTime<Utc> = row.get("updated_at");
         let scheduled_at: DateTime<Utc> = row.get("scheduled_at");
@@ -581,6 +624,7 @@ where
             .state(state)
             .uniq_hash(uniq_hash)
             .task_type(task_type)
+            .retries(retries)
             .created_at(created_at)
             .updated_at(updated_at)
             .scheduled_at(scheduled_at)
@@ -779,6 +823,23 @@ where
         let mut transaction = connection.transaction().await?;
 
         let task = Self::fail_task_query(&mut transaction, task, error_message).await?;
+        transaction.commit().await?;
+
+        Ok(task)
+    }
+
+    async fn schedule_retry(
+        &mut self,
+        task: &Task,
+        backoff_seconds: u32,
+        error: &str,
+    ) -> Result<Task, AsyncQueueError> {
+        self.check_if_connection()?;
+        let mut connection = self.pool.as_ref().unwrap().get().await?;
+        let mut transaction = connection.transaction().await?;
+
+        let task =
+            Self::schedule_retry_query(&mut transaction, task, backoff_seconds, error).await?;
         transaction.commit().await?;
 
         Ok(task)
