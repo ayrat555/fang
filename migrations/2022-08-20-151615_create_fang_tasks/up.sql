@@ -9,6 +9,8 @@ CREATE TABLE fang_tasks (
      state fang_task_state DEFAULT 'new' NOT NULL,
      task_type VARCHAR DEFAULT 'common' NOT NULL,
      uniq_hash CHAR(64),
+     retries INTEGER DEFAULT 0 NOT NULL,
+     errors jsonb,
      scheduled_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()

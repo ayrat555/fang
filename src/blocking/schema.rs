@@ -1,27 +1,14 @@
+// @generated automatically by Diesel CLI.
+
 pub mod sql_types {
     #[derive(diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "fang_task_state"))]
     pub struct FangTaskState;
 }
 
-#[derive(diesel_derive_enum::DbEnum, Debug, Eq, PartialEq, Clone)]
-#[DieselTypePath = "crate::blocking::schema::sql_types::FangTaskState"]
-pub enum FangTaskState {
-    New,
-    InProgress,
-    Failed,
-    Finished,
-}
-
-table! {
+diesel::table! {
+    use diesel::sql_types::*;
     use super::sql_types::FangTaskState;
-    use diesel::sql_types::Jsonb;
-    use diesel::sql_types::Nullable;
-    use diesel::sql_types::Text;
-    use diesel::sql_types::Timestamptz;
-    use diesel::sql_types::Uuid;
-    use diesel::sql_types::Varchar;
-    use diesel::pg::sql_types::Bpchar;
 
     fang_tasks (id) {
         id -> Uuid,
@@ -30,6 +17,8 @@ table! {
         state -> FangTaskState,
         task_type -> Varchar,
         uniq_hash -> Nullable<Bpchar>,
+        retries -> Int4,
+        errors -> Nullable<Jsonb>,
         scheduled_at -> Timestamptz,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,

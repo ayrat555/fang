@@ -1,6 +1,6 @@
+use crate::fang_task_state::FangTaskState;
 use crate::runnable::Runnable;
 use crate::schema::fang_tasks;
-use crate::schema::FangTaskState;
 use crate::CronError;
 use crate::Scheduled::*;
 use chrono::DateTime;
@@ -42,6 +42,10 @@ pub struct Task {
     pub task_type: String,
     #[builder(setter(into))]
     pub uniq_hash: Option<String>,
+    #[builder(setter(into))]
+    pub retries: i32,
+    #[builder(setter(into))]
+    pub errors: Option<serde_json::Value>,
     #[builder(setter(into))]
     pub scheduled_at: DateTime<Utc>,
     #[builder(setter(into))]
@@ -417,9 +421,9 @@ mod queue_tests {
     use super::Queue;
     use super::Queueable;
     use crate::chrono::SubsecRound;
+    use crate::fang_task_state::FangTaskState;
     use crate::runnable::Runnable;
     use crate::runnable::COMMON_TYPE;
-    use crate::schema::FangTaskState;
     use crate::typetag;
     use crate::FangError;
     use crate::Scheduled;

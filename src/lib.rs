@@ -68,7 +68,6 @@ pub struct FangError {
     pub description: String,
 }
 
-#[macro_use]
 #[cfg(feature = "blocking")]
 extern crate diesel;
 

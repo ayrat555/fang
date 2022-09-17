@@ -1,8 +1,8 @@
+use crate::fang_task_state::FangTaskState;
 use crate::queue::Queueable;
 use crate::queue::Task;
 use crate::runnable::Runnable;
 use crate::runnable::COMMON_TYPE;
-use crate::schema::FangTaskState;
 use crate::FangError;
 use crate::Scheduled::*;
 use crate::{RetentionMode, SleepParams};
@@ -146,9 +146,9 @@ mod worker_tests {
     use super::RetentionMode;
     use super::Runnable;
     use super::Worker;
+    use crate::fang_task_state::FangTaskState;
     use crate::queue::Queue;
     use crate::queue::Queueable;
-    use crate::schema::FangTaskState;
     use crate::typetag;
     use crate::FangError;
     use chrono::Utc;
