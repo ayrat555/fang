@@ -18,7 +18,6 @@ diesel::table! {
         task_type -> Varchar,
         uniq_hash -> Nullable<Bpchar>,
         retries -> Int4,
-        errors -> Nullable<Jsonb>,
         scheduled_at -> Timestamptz,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,

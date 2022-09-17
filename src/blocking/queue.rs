@@ -46,8 +46,6 @@ pub struct Task {
     #[builder(setter(into))]
     pub retries: i32,
     #[builder(setter(into))]
-    pub errors: Option<serde_json::Value>,
-    #[builder(setter(into))]
     pub scheduled_at: DateTime<Utc>,
     #[builder(setter(into))]
     pub created_at: DateTime<Utc>,
