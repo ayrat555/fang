@@ -1,8 +1,11 @@
+#![allow(clippy::borrowed_box)]
+#![allow(clippy::unnecessary_unwrap)]
+
+use crate::fang_task_state::FangTaskState;
 use crate::queue::Queueable;
 use crate::queue::Task;
 use crate::runnable::Runnable;
 use crate::runnable::COMMON_TYPE;
-use crate::schema::FangTaskState;
 use crate::FangError;
 use crate::Scheduled::*;
 use crate::{RetentionMode, SleepParams};
@@ -30,8 +33,23 @@ where
     BQueue: Queueable + Clone + Sync + Send + 'static,
 {
     pub fn run(&self, task: Task) {
-        let result = self.execute_task(task);
-        self.finalize_task(result)
+        let runnable: Box<dyn Runnable> = serde_json::from_value(task.metadata.clone()).unwrap();
+        let result = runnable.run(&self.queue);
+
+        match result {
+            Ok(_) => self.finalize_task(task, &result),
+            Err(ref error) => {
+                if task.retries < runnable.max_retries() {
+                    let backoff_seconds = runnable.backoff(task.retries as u32);
+
+                    self.queue
+                        .schedule_retry(&task, backoff_seconds, &error.description)
+                        .expect("Failed to retry");
+                } else {
+                    self.finalize_task(task, &result);
+                }
+            }
+        }
     }
 
     pub fn run_tasks(&mut self) -> Result<(), FangError> {
@@ -102,39 +120,31 @@ where
         thread::sleep(self.sleep_params.sleep_period);
     }
 
-    fn execute_task(&self, task: Task) -> Result<Task, (Task, String)> {
-        let actual_task: Box<dyn Runnable> = serde_json::from_value(task.metadata.clone()).unwrap();
-        let task_result = actual_task.run(&self.queue);
-
-        match task_result {
-            Ok(()) => Ok(task),
-            Err(error) => Err((task, error.description)),
-        }
-    }
-
-    fn finalize_task(&self, result: Result<Task, (Task, String)>) {
+    fn finalize_task(&self, task: Task, result: &Result<(), FangError>) {
         match self.retention_mode {
             RetentionMode::KeepAll => {
                 match result {
-                    Ok(task) => self
+                    Ok(_) => self
                         .queue
                         .update_task_state(&task, FangTaskState::Finished)
                         .unwrap(),
-                    Err((task, error)) => self.queue.fail_task(&task, error).unwrap(),
+                    Err(error) => self.queue.fail_task(&task, &error.description).unwrap(),
                 };
             }
+
             RetentionMode::RemoveAll => {
                 match result {
-                    Ok(task) => self.queue.remove_task(task.id).unwrap(),
-                    Err((task, _error)) => self.queue.remove_task(task.id).unwrap(),
+                    Ok(_) => self.queue.remove_task(task.id).unwrap(),
+                    Err(_error) => self.queue.remove_task(task.id).unwrap(),
                 };
             }
+
             RetentionMode::RemoveFinished => match result {
-                Ok(task) => {
+                Ok(_) => {
                     self.queue.remove_task(task.id).unwrap();
                 }
-                Err((task, error)) => {
-                    self.queue.fail_task(&task, error).unwrap();
+                Err(error) => {
+                    self.queue.fail_task(&task, &error.description).unwrap();
                 }
             },
         }
@@ -146,9 +156,9 @@ mod worker_tests {
     use super::RetentionMode;
     use super::Runnable;
     use super::Worker;
+    use crate::fang_task_state::FangTaskState;
     use crate::queue::Queue;
     use crate::queue::Queueable;
-    use crate::schema::FangTaskState;
     use crate::typetag;
     use crate::FangError;
     use chrono::Utc;
@@ -187,8 +197,36 @@ mod worker_tests {
             })
         }
 
+        fn max_retries(&self) -> i32 {
+            0
+        }
+
         fn task_type(&self) -> String {
             "F_task".to_string()
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct RetryTask {
+        pub number: u16,
+    }
+
+    #[typetag::serde]
+    impl Runnable for RetryTask {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
+            let message = format!("Saving Pepe. Attempt {}", self.number);
+
+            Err(FangError {
+                description: message,
+            })
+        }
+
+        fn max_retries(&self) -> i32 {
+            2
+        }
+
+        fn task_type(&self) -> String {
+            "Retry_task".to_string()
         }
     }
 
@@ -321,5 +359,54 @@ mod worker_tests {
         );
 
         Queue::remove_tasks_of_type_query(&mut pooled_connection, "F_task").unwrap();
+    }
+
+    #[test]
+    #[ignore]
+    fn retries_task() {
+        let task = RetryTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let mut worker = Worker::<Queue>::builder()
+            .queue(queue)
+            .retention_mode(RetentionMode::KeepAll)
+            .task_type(task.task_type())
+            .build();
+
+        let mut pooled_connection = worker.queue.connection_pool.get().unwrap();
+
+        let task = Queue::insert_query(&mut pooled_connection, &task, Utc::now()).unwrap();
+
+        assert_eq!(FangTaskState::New, task.state);
+
+        worker.run(task.clone());
+
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+
+        let found_task = Queue::find_task_by_id_query(&mut pooled_connection, task.id).unwrap();
+
+        assert_eq!(FangTaskState::Retried, found_task.state);
+        assert_eq!(1, found_task.retries);
+
+        worker.run_tasks_until_none().unwrap();
+
+        std::thread::sleep(std::time::Duration::from_millis(14000));
+
+        worker.run_tasks_until_none().unwrap();
+
+        let found_task = Queue::find_task_by_id_query(&mut pooled_connection, task.id).unwrap();
+
+        assert_eq!(FangTaskState::Failed, found_task.state);
+        assert_eq!(2, found_task.retries);
+
+        assert_eq!(
+            "Saving Pepe. Attempt 10".to_string(),
+            found_task.error_message.unwrap()
+        );
+
+        Queue::remove_tasks_of_type_query(&mut pooled_connection, "Retry_task").unwrap();
     }
 }

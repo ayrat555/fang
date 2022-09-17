@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-CREATE TYPE fang_task_state AS ENUM ('new', 'in_progress', 'failed', 'finished');
+CREATE TYPE fang_task_state AS ENUM ('new', 'in_progress', 'failed', 'finished', 'retried');
 
 CREATE TABLE fang_tasks (
      id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -9,6 +9,7 @@ CREATE TABLE fang_tasks (
      state fang_task_state DEFAULT 'new' NOT NULL,
      task_type VARCHAR DEFAULT 'common' NOT NULL,
      uniq_hash CHAR(64),
+     retries INTEGER DEFAULT 0 NOT NULL,
      scheduled_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()

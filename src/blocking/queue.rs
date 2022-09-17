@@ -1,9 +1,10 @@
+use crate::fang_task_state::FangTaskState;
 use crate::runnable::Runnable;
 use crate::schema::fang_tasks;
-use crate::schema::FangTaskState;
 use crate::CronError;
 use crate::Scheduled::*;
 use chrono::DateTime;
+use chrono::Duration;
 use chrono::Utc;
 use cron::Schedule;
 use diesel::pg::PgConnection;
@@ -42,6 +43,8 @@ pub struct Task {
     pub task_type: String,
     #[builder(setter(into))]
     pub uniq_hash: Option<String>,
+    #[builder(setter(into))]
+    pub retries: i32,
     #[builder(setter(into))]
     pub scheduled_at: DateTime<Utc>,
     #[builder(setter(into))]
@@ -102,9 +105,16 @@ pub trait Queueable {
 
     fn update_task_state(&self, task: &Task, state: FangTaskState) -> Result<Task, QueueError>;
 
-    fn fail_task(&self, task: &Task, error: String) -> Result<Task, QueueError>;
+    fn fail_task(&self, task: &Task, error: &str) -> Result<Task, QueueError>;
 
     fn schedule_task(&self, task: &dyn Runnable) -> Result<Task, QueueError>;
+
+    fn schedule_retry(
+        &self,
+        task: &Task,
+        backoff_in_seconds: u32,
+        error: &str,
+    ) -> Result<Task, QueueError>;
 }
 
 #[derive(Clone, TypedBuilder)]
@@ -173,7 +183,7 @@ impl Queueable for Queue {
         Self::update_task_state_query(&mut connection, task, state)
     }
 
-    fn fail_task(&self, task: &Task, error: String) -> Result<Task, QueueError> {
+    fn fail_task(&self, task: &Task, error: &str) -> Result<Task, QueueError> {
         let mut connection = self.get_connection()?;
 
         Self::fail_task_query(&mut connection, task, error)
@@ -183,6 +193,17 @@ impl Queueable for Queue {
         let mut connection = self.get_connection().unwrap();
 
         Self::find_task_by_id_query(&mut connection, id)
+    }
+
+    fn schedule_retry(
+        &self,
+        task: &Task,
+        backoff_seconds: u32,
+        error: &str,
+    ) -> Result<Task, QueueError> {
+        let mut connection = self.get_connection()?;
+
+        Self::schedule_retry_query(&mut connection, task, backoff_seconds, error)
     }
 }
 
@@ -357,7 +378,7 @@ impl Queue {
     pub fn fail_task_query(
         connection: &mut PgConnection,
         task: &Task,
-        error: String,
+        error: &str,
     ) -> Result<Task, QueueError> {
         Ok(diesel::update(task)
             .set((
@@ -392,7 +413,7 @@ impl Queue {
             .order(fang_tasks::scheduled_at.asc())
             .limit(1)
             .filter(fang_tasks::scheduled_at.le(Utc::now()))
-            .filter(fang_tasks::state.eq(FangTaskState::New))
+            .filter(fang_tasks::state.eq_any(vec![FangTaskState::New, FangTaskState::Retried]))
             .filter(fang_tasks::task_type.eq(task_type))
             .for_update()
             .skip_locked()
@@ -406,9 +427,31 @@ impl Queue {
     ) -> Option<Task> {
         fang_tasks::table
             .filter(fang_tasks::uniq_hash.eq(uniq_hash))
-            .filter(fang_tasks::state.eq(FangTaskState::New))
+            .filter(fang_tasks::state.eq_any(vec![FangTaskState::New, FangTaskState::Retried]))
             .first::<Task>(connection)
             .ok()
+    }
+
+    pub fn schedule_retry_query(
+        connection: &mut PgConnection,
+        task: &Task,
+        backoff_seconds: u32,
+        error: &str,
+    ) -> Result<Task, QueueError> {
+        let now = Self::current_time();
+        let scheduled_at = now + Duration::seconds(backoff_seconds as i64);
+
+        let task = diesel::update(task)
+            .set((
+                fang_tasks::state.eq(FangTaskState::Retried),
+                fang_tasks::error_message.eq(error),
+                fang_tasks::retries.eq(task.retries + 1),
+                fang_tasks::scheduled_at.eq(scheduled_at),
+                fang_tasks::updated_at.eq(now),
+            ))
+            .get_result::<Task>(connection)?;
+
+        Ok(task)
     }
 }
 
@@ -417,9 +460,9 @@ mod queue_tests {
     use super::Queue;
     use super::Queueable;
     use crate::chrono::SubsecRound;
+    use crate::fang_task_state::FangTaskState;
     use crate::runnable::Runnable;
     use crate::runnable::COMMON_TYPE;
-    use crate::schema::FangTaskState;
     use crate::typetag;
     use crate::FangError;
     use crate::Scheduled;
@@ -586,7 +629,7 @@ mod queue_tests {
 
             let error = "Failed".to_string();
 
-            let found_task = Queue::fail_task_query(conn, &task, error.clone()).unwrap();
+            let found_task = Queue::fail_task_query(conn, &task, &error).unwrap();
 
             let metadata = found_task.metadata.as_object().unwrap();
             let number = metadata["number"].as_u64();
