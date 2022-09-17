@@ -105,7 +105,7 @@ pub trait Queueable {
 
     fn update_task_state(&self, task: &Task, state: FangTaskState) -> Result<Task, QueueError>;
 
-    fn fail_task(&self, task: &Task, error: String) -> Result<Task, QueueError>;
+    fn fail_task(&self, task: &Task, error: &str) -> Result<Task, QueueError>;
 
     fn schedule_task(&self, task: &dyn Runnable) -> Result<Task, QueueError>;
 
@@ -113,7 +113,7 @@ pub trait Queueable {
         &self,
         task: &Task,
         backoff_in_seconds: u32,
-        error: String,
+        error: &str,
     ) -> Result<Task, QueueError>;
 }
 
@@ -183,7 +183,7 @@ impl Queueable for Queue {
         Self::update_task_state_query(&mut connection, task, state)
     }
 
-    fn fail_task(&self, task: &Task, error: String) -> Result<Task, QueueError> {
+    fn fail_task(&self, task: &Task, error: &str) -> Result<Task, QueueError> {
         let mut connection = self.get_connection()?;
 
         Self::fail_task_query(&mut connection, task, error)
@@ -199,7 +199,7 @@ impl Queueable for Queue {
         &self,
         task: &Task,
         backoff_seconds: u32,
-        error: String,
+        error: &str,
     ) -> Result<Task, QueueError> {
         let mut connection = self.get_connection()?;
 
@@ -378,7 +378,7 @@ impl Queue {
     pub fn fail_task_query(
         connection: &mut PgConnection,
         task: &Task,
-        error: String,
+        error: &str,
     ) -> Result<Task, QueueError> {
         Ok(diesel::update(task)
             .set((
@@ -436,7 +436,7 @@ impl Queue {
         connection: &mut PgConnection,
         task: &Task,
         backoff_seconds: u32,
-        error: String,
+        error: &str,
     ) -> Result<Task, QueueError> {
         let now = Self::current_time();
         let scheduled_at = now + Duration::seconds(backoff_seconds as i64);
@@ -629,7 +629,7 @@ mod queue_tests {
 
             let error = "Failed".to_string();
 
-            let found_task = Queue::fail_task_query(conn, &task, error.clone()).unwrap();
+            let found_task = Queue::fail_task_query(conn, &task, &error).unwrap();
 
             let metadata = found_task.metadata.as_object().unwrap();
             let number = metadata["number"].as_u64();
