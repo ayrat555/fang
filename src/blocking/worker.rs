@@ -1,3 +1,6 @@
+#![allow(clippy::borrowed_box)]
+#![allow(clippy::unnecessary_unwrap)]
+
 use crate::fang_task_state::FangTaskState;
 use crate::queue::Queueable;
 use crate::queue::Task;
@@ -33,7 +36,7 @@ where
         let runnable: Box<dyn Runnable> = serde_json::from_value(task.metadata.clone()).unwrap();
         let result = self.execute_task(&runnable);
 
-        if result.is_err() && task.retries < runnable.retries() {
+        if result.is_err() && task.retries < runnable.max_retries() {
             let backoff_seconds = runnable.backoff(task.retries as u32);
 
             self.queue

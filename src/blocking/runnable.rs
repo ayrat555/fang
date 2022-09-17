@@ -21,7 +21,7 @@ pub trait Runnable {
         None
     }
 
-    fn retries(&self) -> i32 {
+    fn max_retries(&self) -> i32 {
         RETRIES_NUMBER
     }
 
