@@ -8,6 +8,7 @@ use bb8_postgres::tokio_postgres::Error as TokioPostgresError;
 use serde_json::Error as SerdeError;
 
 const COMMON_TYPE: &str = "common";
+pub const RETRIES_NUMBER: i32 = 20;
 
 impl From<AsyncQueueError> for FangError {
     fn from(error: AsyncQueueError) -> Self {
@@ -51,5 +52,13 @@ pub trait AsyncRunnable: Send + Sync {
 
     fn cron(&self) -> Option<Scheduled> {
         None
+    }
+
+    fn max_retries(&self) -> i32 {
+        RETRIES_NUMBER
+    }
+
+    fn backoff(&self, attempt: u32) -> u32 {
+        u32::pow(2, attempt)
     }
 }

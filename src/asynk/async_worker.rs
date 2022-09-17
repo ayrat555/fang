@@ -31,62 +31,64 @@ where
     pub async fn run(
         &mut self,
         task: Task,
-        actual_task: Box<dyn AsyncRunnable>,
+        runnable: Box<dyn AsyncRunnable>,
     ) -> Result<(), FangError> {
-        let result = self.execute_task(task, actual_task).await;
-        self.finalize_task(result).await
-    }
+        let result = runnable.run(&mut self.queue).await;
 
-    async fn execute_task(
-        &mut self,
-        task: Task,
-        actual_task: Box<dyn AsyncRunnable>,
-    ) -> Result<Task, (Task, String)> {
-        let task_result = actual_task.run(&mut self.queue).await;
-        match task_result {
-            Ok(()) => Ok(task),
-            Err(error) => Err((task, error.description)),
+        match result {
+            Ok(_) => self.finalize_task(task, &result).await?,
+
+            Err(ref error) => {
+                if task.retries < runnable.max_retries() {
+                    let backoff_seconds = runnable.backoff(task.retries as u32);
+
+                    self.queue
+                        .schedule_retry(&task, backoff_seconds, &error.description)
+                        .await?;
+                } else {
+                    self.finalize_task(task, &result).await?;
+                }
+            }
         }
+
+        Ok(())
     }
 
     async fn finalize_task(
         &mut self,
-        result: Result<Task, (Task, String)>,
+        task: Task,
+        result: &Result<(), FangError>,
     ) -> Result<(), FangError> {
         match self.retention_mode {
             RetentionMode::KeepAll => match result {
-                Ok(task) => {
+                Ok(_) => {
                     self.queue
                         .update_task_state(task, FangTaskState::Finished)
                         .await?;
-                    Ok(())
                 }
-                Err((task, error)) => {
-                    self.queue.fail_task(task, &error).await?;
-                    Ok(())
+                Err(error) => {
+                    self.queue.fail_task(task, &error.description).await?;
                 }
             },
             RetentionMode::RemoveAll => match result {
-                Ok(task) => {
+                Ok(_) => {
                     self.queue.remove_task(task.id).await?;
-                    Ok(())
                 }
-                Err((task, _error)) => {
+                Err(_error) => {
                     self.queue.remove_task(task.id).await?;
-                    Ok(())
                 }
             },
             RetentionMode::RemoveFinished => match result {
-                Ok(task) => {
+                Ok(_) => {
                     self.queue.remove_task(task.id).await?;
-                    Ok(())
                 }
-                Err((task, error)) => {
-                    self.queue.fail_task(task, &error).await?;
-                    Ok(())
+                Err(error) => {
+                    self.queue.fail_task(task, &error.description).await?;
                 }
             },
-        }
+        };
+
+        Ok(())
     }
 
     pub async fn sleep(&mut self) {
@@ -148,62 +150,64 @@ impl<'a> AsyncWorkerTest<'a> {
     pub async fn run(
         &mut self,
         task: Task,
-        actual_task: Box<dyn AsyncRunnable>,
+        runnable: Box<dyn AsyncRunnable>,
     ) -> Result<(), FangError> {
-        let result = self.execute_task(task, actual_task).await;
-        self.finalize_task(result).await
-    }
+        let result = runnable.run(self.queue).await;
 
-    async fn execute_task(
-        &mut self,
-        task: Task,
-        actual_task: Box<dyn AsyncRunnable>,
-    ) -> Result<Task, (Task, String)> {
-        let task_result = actual_task.run(self.queue).await;
-        match task_result {
-            Ok(()) => Ok(task),
-            Err(error) => Err((task, error.description)),
+        match result {
+            Ok(_) => self.finalize_task(task, &result).await?,
+
+            Err(ref error) => {
+                if task.retries < runnable.max_retries() {
+                    let backoff_seconds = runnable.backoff(task.retries as u32);
+
+                    self.queue
+                        .schedule_retry(&task, backoff_seconds, &error.description)
+                        .await?;
+                } else {
+                    self.finalize_task(task, &result).await?;
+                }
+            }
         }
+
+        Ok(())
     }
 
     async fn finalize_task(
         &mut self,
-        result: Result<Task, (Task, String)>,
+        task: Task,
+        result: &Result<(), FangError>,
     ) -> Result<(), FangError> {
         match self.retention_mode {
             RetentionMode::KeepAll => match result {
-                Ok(task) => {
+                Ok(_) => {
                     self.queue
                         .update_task_state(task, FangTaskState::Finished)
                         .await?;
-                    Ok(())
                 }
-                Err((task, error)) => {
-                    self.queue.fail_task(task, &error).await?;
-                    Ok(())
+                Err(error) => {
+                    self.queue.fail_task(task, &error.description).await?;
                 }
             },
             RetentionMode::RemoveAll => match result {
-                Ok(task) => {
+                Ok(_) => {
                     self.queue.remove_task(task.id).await?;
-                    Ok(())
                 }
-                Err((task, _error)) => {
+                Err(_error) => {
                     self.queue.remove_task(task.id).await?;
-                    Ok(())
                 }
             },
             RetentionMode::RemoveFinished => match result {
-                Ok(task) => {
+                Ok(_) => {
                     self.queue.remove_task(task.id).await?;
-                    Ok(())
                 }
-                Err((task, error)) => {
-                    self.queue.fail_task(task, &error).await?;
-                    Ok(())
+                Err(error) => {
+                    self.queue.fail_task(task, &error.description).await?;
                 }
             },
-        }
+        };
+
+        Ok(())
     }
 
     pub async fn sleep(&mut self) {
@@ -307,6 +311,10 @@ mod async_worker_tests {
             Err(FangError {
                 description: message,
             })
+        }
+
+        fn max_retries(&self) -> i32 {
+            0
         }
     }
 
