@@ -199,6 +199,10 @@ mod worker_tests {
             })
         }
 
+        fn max_retries(&self) -> i32 {
+            0
+        }
+
         fn task_type(&self) -> String {
             "F_task".to_string()
         }
