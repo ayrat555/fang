@@ -30,8 +30,18 @@ where
     BQueue: Queueable + Clone + Sync + Send + 'static,
 {
     pub fn run(&self, task: Task) {
-        let result = self.execute_task(task);
-        self.finalize_task(result)
+        let runnable: Box<dyn Runnable> = serde_json::from_value(task.metadata.clone()).unwrap();
+        let result = self.execute_task(&runnable);
+
+        if result.is_err() && task.retries < runnable.retries() {
+            let backoff_seconds = runnable.backoff(task.retries as u32);
+
+            self.queue
+                .schedule_retry(&task, backoff_seconds, result.unwrap_err())
+                .expect("Failed to retry");
+        } else {
+            self.finalize_task(task, result);
+        }
     }
 
     pub fn run_tasks(&mut self) -> Result<(), FangError> {
@@ -102,38 +112,37 @@ where
         thread::sleep(self.sleep_params.sleep_period);
     }
 
-    fn execute_task(&self, task: Task) -> Result<Task, (Task, String)> {
-        let actual_task: Box<dyn Runnable> = serde_json::from_value(task.metadata.clone()).unwrap();
-        let task_result = actual_task.run(&self.queue);
+    fn execute_task(&self, runnable: &Box<dyn Runnable>) -> Result<(), String> {
+        let task_result = runnable.run(&self.queue);
 
         match task_result {
-            Ok(()) => Ok(task),
-            Err(error) => Err((task, error.description)),
+            Ok(()) => Ok(()),
+            Err(error) => Err(error.description),
         }
     }
 
-    fn finalize_task(&self, result: Result<Task, (Task, String)>) {
+    fn finalize_task(&self, task: Task, result: Result<(), String>) {
         match self.retention_mode {
             RetentionMode::KeepAll => {
                 match result {
-                    Ok(task) => self
+                    Ok(_) => self
                         .queue
                         .update_task_state(&task, FangTaskState::Finished)
                         .unwrap(),
-                    Err((task, error)) => self.queue.fail_task(&task, error).unwrap(),
+                    Err(error) => self.queue.fail_task(&task, error).unwrap(),
                 };
             }
             RetentionMode::RemoveAll => {
                 match result {
-                    Ok(task) => self.queue.remove_task(task.id).unwrap(),
-                    Err((task, _error)) => self.queue.remove_task(task.id).unwrap(),
+                    Ok(_) => self.queue.remove_task(task.id).unwrap(),
+                    Err(_error) => self.queue.remove_task(task.id).unwrap(),
                 };
             }
             RetentionMode::RemoveFinished => match result {
-                Ok(task) => {
+                Ok(_) => {
                     self.queue.remove_task(task.id).unwrap();
                 }
-                Err((task, error)) => {
+                Err(error) => {
                     self.queue.fail_task(&task, error).unwrap();
                 }
             },

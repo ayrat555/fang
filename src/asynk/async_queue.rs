@@ -49,6 +49,8 @@ pub enum FangTaskState {
     Failed,
     #[postgres(name = "finished")]
     Finished,
+    #[postgres(name = "retried")]
+    Retries,
 }
 
 impl Default for FangTaskState {

@@ -4,6 +4,7 @@ use crate::schema::fang_tasks;
 use crate::CronError;
 use crate::Scheduled::*;
 use chrono::DateTime;
+use chrono::Duration;
 use chrono::Utc;
 use cron::Schedule;
 use diesel::pg::PgConnection;
@@ -109,6 +110,13 @@ pub trait Queueable {
     fn fail_task(&self, task: &Task, error: String) -> Result<Task, QueueError>;
 
     fn schedule_task(&self, task: &dyn Runnable) -> Result<Task, QueueError>;
+
+    fn schedule_retry(
+        &self,
+        task: &Task,
+        backoff_in_seconds: u32,
+        error: String,
+    ) -> Result<Task, QueueError>;
 }
 
 #[derive(Clone, TypedBuilder)]
@@ -187,6 +195,17 @@ impl Queueable for Queue {
         let mut connection = self.get_connection().unwrap();
 
         Self::find_task_by_id_query(&mut connection, id)
+    }
+
+    fn schedule_retry(
+        &self,
+        task: &Task,
+        backoff_seconds: u32,
+        error: String,
+    ) -> Result<Task, QueueError> {
+        let mut connection = self.get_connection()?;
+
+        Self::schedule_retry_query(&mut connection, task, backoff_seconds, error)
     }
 }
 
@@ -396,7 +415,7 @@ impl Queue {
             .order(fang_tasks::scheduled_at.asc())
             .limit(1)
             .filter(fang_tasks::scheduled_at.le(Utc::now()))
-            .filter(fang_tasks::state.eq(FangTaskState::New))
+            .filter(fang_tasks::state.eq_any(vec![FangTaskState::New, FangTaskState::Retried]))
             .filter(fang_tasks::task_type.eq(task_type))
             .for_update()
             .skip_locked()
@@ -410,9 +429,31 @@ impl Queue {
     ) -> Option<Task> {
         fang_tasks::table
             .filter(fang_tasks::uniq_hash.eq(uniq_hash))
-            .filter(fang_tasks::state.eq(FangTaskState::New))
+            .filter(fang_tasks::state.eq_any(vec![FangTaskState::New, FangTaskState::Retried]))
             .first::<Task>(connection)
             .ok()
+    }
+
+    pub fn schedule_retry_query(
+        connection: &mut PgConnection,
+        task: &Task,
+        backoff_seconds: u32,
+        error: String,
+    ) -> Result<Task, QueueError> {
+        let now = Self::current_time();
+        let scheduled_at = now + Duration::seconds(backoff_seconds as i64);
+
+        let task = diesel::update(task)
+            .set((
+                fang_tasks::state.eq(FangTaskState::Retried),
+                fang_tasks::error_message.eq(error),
+                fang_tasks::retries.eq(task.retries + 1),
+                fang_tasks::scheduled_at.eq(scheduled_at),
+                fang_tasks::updated_at.eq(now),
+            ))
+            .get_result::<Task>(connection)?;
+
+        Ok(task)
     }
 }
 

@@ -5,4 +5,5 @@ pub enum FangTaskState {
     InProgress,
     Failed,
     Finished,
+    Retried,
 }

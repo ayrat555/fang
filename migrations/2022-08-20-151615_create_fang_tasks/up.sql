@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-CREATE TYPE fang_task_state AS ENUM ('new', 'in_progress', 'failed', 'finished');
+CREATE TYPE fang_task_state AS ENUM ('new', 'in_progress', 'failed', 'finished', 'retried');
 
 CREATE TABLE fang_tasks (
      id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
