@@ -36,14 +36,19 @@ where
         let runnable: Box<dyn Runnable> = serde_json::from_value(task.metadata.clone()).unwrap();
         let result = self.execute_task(&runnable);
 
-        if result.is_err() && task.retries < runnable.max_retries() {
-            let backoff_seconds = runnable.backoff(task.retries as u32);
+        match result {
+            Ok(_) => self.finalize_task(task, Ok(())),
+            Err(message) => {
+                if task.retries < runnable.max_retries() {
+                    let backoff_seconds = runnable.backoff(task.retries as u32);
 
-            self.queue
-                .schedule_retry(&task, backoff_seconds, result.unwrap_err())
-                .expect("Failed to retry");
-        } else {
-            self.finalize_task(task, result);
+                    self.queue
+                        .schedule_retry(&task, backoff_seconds, message)
+                        .expect("Failed to retry");
+                } else {
+                    self.finalize_task(task, Err(message));
+                }
+            }
         }
     }
 
@@ -209,6 +214,30 @@ mod worker_tests {
     }
 
     #[derive(Serialize, Deserialize)]
+    struct RetryTask {
+        pub number: u16,
+    }
+
+    #[typetag::serde]
+    impl Runnable for RetryTask {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
+            let message = format!("Saving Pepe. Attempt {}", self.number);
+
+            Err(FangError {
+                description: message,
+            })
+        }
+
+        fn max_retries(&self) -> i32 {
+            2
+        }
+
+        fn task_type(&self) -> String {
+            "Retry_task".to_string()
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
     struct TaskType1 {}
 
     #[typetag::serde]
@@ -337,5 +366,54 @@ mod worker_tests {
         );
 
         Queue::remove_tasks_of_type_query(&mut pooled_connection, "F_task").unwrap();
+    }
+
+    #[test]
+    #[ignore]
+    fn retries_task() {
+        let task = RetryTask { number: 10 };
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let mut worker = Worker::<Queue>::builder()
+            .queue(queue)
+            .retention_mode(RetentionMode::KeepAll)
+            .task_type(task.task_type())
+            .build();
+
+        let mut pooled_connection = worker.queue.connection_pool.get().unwrap();
+
+        let task = Queue::insert_query(&mut pooled_connection, &task, Utc::now()).unwrap();
+
+        assert_eq!(FangTaskState::New, task.state);
+
+        worker.run(task.clone());
+
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+
+        let found_task = Queue::find_task_by_id_query(&mut pooled_connection, task.id).unwrap();
+
+        assert_eq!(FangTaskState::Retried, found_task.state);
+        assert_eq!(1, found_task.retries);
+
+        worker.run_tasks_until_none().unwrap();
+
+        std::thread::sleep(std::time::Duration::from_millis(14000));
+
+        worker.run_tasks_until_none().unwrap();
+
+        let found_task = Queue::find_task_by_id_query(&mut pooled_connection, task.id).unwrap();
+
+        assert_eq!(FangTaskState::Failed, found_task.state);
+        assert_eq!(2, found_task.retries);
+
+        assert_eq!(
+            "Saving Pepe. Attempt 10".to_string(),
+            found_task.error_message.unwrap()
+        );
+
+        Queue::remove_tasks_of_type_query(&mut pooled_connection, "Retry_task").unwrap();
     }
 }
