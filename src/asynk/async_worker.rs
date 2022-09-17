@@ -318,6 +318,25 @@ mod async_worker_tests {
         }
     }
 
+    #[derive(Serialize, Deserialize, Clone)]
+    struct AsyncRetryTask {}
+
+    #[typetag::serde]
+    #[async_trait]
+    impl AsyncRunnable for AsyncRetryTask {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+            let message = "Failed".to_string();
+
+            Err(FangError {
+                description: message,
+            })
+        }
+
+        fn max_retries(&self) -> i32 {
+            2
+        }
+    }
+
     #[derive(Serialize, Deserialize)]
     struct AsyncTaskType1 {}
 
@@ -347,6 +366,7 @@ mod async_worker_tests {
             "type2".to_string()
         }
     }
+
     #[tokio::test]
     async fn execute_and_finishes_task() {
         let pool = pool().await;
@@ -407,6 +427,51 @@ mod async_worker_tests {
     }
 
     #[tokio::test]
+    async fn retries_task_test() {
+        let pool = pool().await;
+        let mut connection = pool.get().await.unwrap();
+        let transaction = connection.transaction().await.unwrap();
+
+        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+
+        let actual_task = AsyncRetryTask {};
+
+        let task = test.insert_task(&actual_task).await.unwrap();
+
+        let id = task.id;
+
+        let mut worker = AsyncWorkerTest::builder()
+            .queue(&mut test as &mut dyn AsyncQueueable)
+            .retention_mode(RetentionMode::KeepAll)
+            .build();
+
+        worker.run_tasks_until_none().await.unwrap();
+
+        let task = worker.queue.find_task_by_id(id).await.unwrap();
+
+        assert_eq!(id, task.id);
+        assert_eq!(FangTaskState::Retried, task.state);
+        assert_eq!(1, task.retries);
+
+        tokio::time::sleep(core::time::Duration::from_secs(5)).await;
+        worker.run_tasks_until_none().await.unwrap();
+
+        let task = worker.queue.find_task_by_id(id).await.unwrap();
+
+        assert_eq!(id, task.id);
+        assert_eq!(FangTaskState::Retried, task.state);
+        assert_eq!(2, task.retries);
+
+        tokio::time::sleep(core::time::Duration::from_secs(10)).await;
+        worker.run_tasks_until_none().await.unwrap();
+
+        let task = test.find_task_by_id(id).await.unwrap();
+        assert_eq!(id, task.id);
+        assert_eq!(FangTaskState::Failed, task.state);
+        assert_eq!("Failed".to_string(), task.error_message.unwrap());
+    }
+
+    #[tokio::test]
     async fn saves_error_for_failed_task() {
         let pool = pool().await;
         let mut connection = pool.get().await.unwrap();
@@ -434,6 +499,7 @@ mod async_worker_tests {
         );
         test.transaction.rollback().await.unwrap();
     }
+
     #[tokio::test]
     async fn executes_task_only_of_specific_type() {
         let pool = pool().await;
