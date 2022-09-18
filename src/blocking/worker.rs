@@ -133,10 +133,7 @@ where
             }
 
             RetentionMode::RemoveAll => {
-                match result {
-                    Ok(_) => self.queue.remove_task(task.id).unwrap(),
-                    Err(_error) => self.queue.remove_task(task.id).unwrap(),
-                };
+                self.queue.remove_task(task.id).unwrap();
             }
 
             RetentionMode::RemoveFinished => match result {
