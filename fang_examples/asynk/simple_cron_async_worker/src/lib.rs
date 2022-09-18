@@ -1,9 +1,9 @@
 use fang::async_trait;
 use fang::asynk::async_queue::AsyncQueueable;
-use fang::asynk::async_runnable::Error;
 use fang::serde::{Deserialize, Serialize};
 use fang::typetag;
 use fang::AsyncRunnable;
+use fang::FangError;
 use fang::Scheduled;
 
 #[derive(Serialize, Deserialize)]
@@ -13,7 +13,7 @@ pub struct MyCronTask {}
 #[async_trait]
 #[typetag::serde]
 impl AsyncRunnable for MyCronTask {
-    async fn run(&self, _queue: &mut dyn AsyncQueueable) -> Result<(), Error> {
+    async fn run(&self, _queue: &mut dyn AsyncQueueable) -> Result<(), FangError> {
         log::info!("CRON!!!!!!!!!!!!!!!",);
 
         Ok(())

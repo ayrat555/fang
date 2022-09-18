@@ -70,14 +70,9 @@ where
                     self.queue.fail_task(task, &error.description).await?;
                 }
             },
-            RetentionMode::RemoveAll => match result {
-                Ok(_) => {
-                    self.queue.remove_task(task.id).await?;
-                }
-                Err(_error) => {
-                    self.queue.remove_task(task.id).await?;
-                }
-            },
+            RetentionMode::RemoveAll => {
+                self.queue.remove_task(task.id).await?;
+            }
             RetentionMode::RemoveFinished => match result {
                 Ok(_) => {
                     self.queue.remove_task(task.id).await?;
