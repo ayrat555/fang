@@ -8,10 +8,10 @@ Background task processing library for Rust. It uses Postgres DB as a task queue
 
 ## Features
 
- Here are some of fang's key features:
+ Here are some of the fang's key features:
 
  - Async and threaded workers
-   Workers can be started in threads (threaded workers) or tokio tasks (async workers)
+   Workers can be started in threads (threaded workers) or `tokio` tasks (async workers)
  - Scheduled tasks
    Tasks can be scheduled at any time in the future
  - Periodic (CRON) tasks
@@ -28,13 +28,13 @@ Background task processing library for Rust. It uses Postgres DB as a task queue
 1. Add this to your Cargo.toml
 
 
-#### Blocking feature
+#### the Blocking feature
 ```toml
 [dependencies]
 fang = { version = "0.9" , features = ["blocking"], default-features = false }
 ```
 
-#### Asynk feature
+#### the Asynk feature
 ```toml
 [dependencies]
 fang = { version = "0.9" , features = ["asynk"], default-features = false }
@@ -47,14 +47,14 @@ fang = { version = "0.9" }
 
 *Supports rustc 1.62+*
 
-2. Create `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/migrations/2022-08-20-151615_create_fang_tasks/up.sql).
+2. Create the `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/migrations/2022-08-20-151615_create_fang_tasks/up.sql).
 
 ## Usage
 
 ### Defining a task
 
 #### Blocking feature
-Every task should implement `fang::Runnable` trait which is used by `fang` to execute it.
+Every task should implement the `fang::Runnable` trait which is used by `fang` to execute it.
 
 ```rust
 use fang::Error;
@@ -89,7 +89,7 @@ impl Runnable for MyTask {
     }
 
     // This will be useful if you would like to schedule tasks.
-    // default value: None (the task is not scheduled, it's just executed once)
+    // default value is None (the task is not scheduled, it's just executed once)
     fn cron(&self) -> Option<Scheduled> {
         let expression = "0/20 * * * Aug-Sep * 2022/1";
         Some(Scheduled::CronPattern(expression.to_string()))
@@ -99,13 +99,13 @@ impl Runnable for MyTask {
 
 As you can see from the example above, the trait implementation has `#[typetag::serde]` attribute which is used to deserialize the task.
 
-The second parameter of the `run` function is a struct that implements fang::Queueable, You can re-use it to manipulate the task queue, for example, to add a new job during the current job's execution. If you don't need it, just ignore it.
+The second parameter of the `run` function is a struct that implements `fang::Queueable`. You can re-use it to manipulate the task queue, for example, to add a new job during the current job's execution. If you don't need it, just ignore it.
 
 
 #### Asynk feature
 Every task should implement `fang::AsyncRunnable` trait which is used by `fang` to execute it.
 
-Be careful not to call two implementations of the AsyncRunnable trait with the same name, because it will cause a failure in the typetag crate.
+Be careful not to call two implementations of the AsyncRunnable trait with the same name, because it will cause a failure in the `typetag crate.
 ```rust
 use fang::AsyncRunnable;
 use fang::asynk::async_queue::AsyncQueueable;
@@ -137,7 +137,7 @@ impl AsyncRunnable for AsyncTask {
     }
 
     // This will be useful if you would like to schedule tasks.
-    // default value isNone
+    // default value is None
     fn cron(&self) -> Option<Scheduled> {
         let expression = "0/20 * * * Aug-Sep * 2022/1";
         Some(Scheduled::CronPattern(expression.to_string()))
@@ -160,11 +160,9 @@ If your timezone is UTC + 2 and you want to schedule at 11:00:
 
 ### Enqueuing a task
 
-#### Blocking feature
+#### the Blocking feature
 To enqueue a task use `Queue::enqueue_task`
 
-
-For Postgres Backend.
 ```rust
 use fang::Queue;
 
@@ -178,10 +176,9 @@ use fang::Queue;
 
 ```
 
-If `uniq` is set to true and the task is already in the storage, it won't be inserted.
+If `uniq` is set to true and the task is already in the storage, it won't be inserted again.
 
-
-#### Asynk feature
+#### the Asynk feature
 To enqueue a task use `AsyncQueueable::insert_task`.
 
 For Postgres backend.
@@ -204,9 +201,7 @@ let mut queue = AsyncQueue::builder()
 queue.connect(NoTls).await.unwrap();
 
 ```
-As an easy example, we are using NoTls type. If for some reason you would like to encrypt Postgres requestsm, you can implement a Tls type.
-
-It is well documented for [openssl](https://docs.rs/postgres-openssl/latest/postgres_openssl/) and [native-tls](https://docs.rs/postgres-native-tls/latest/postgres_native_tls/)
+As an easy example, we are using NoTls type. If for some reason you would like to encrypt Postgres requests, you can use [openssl](https://docs.rs/postgres-openssl/latest/postgres_openssl/)  or [native-tls](https://docs.rs/postgres-native-tls/latest/postgres_native_tls/).
 
 ```rust
 // AsyncTask from the first example
@@ -219,7 +214,7 @@ let task_returned = queue
 
 ### Starting workers
 
-#### Blocking feature
+#### the Blocking feature
 Every worker runs in a separate thread. In case of panic, they are always restarted.
 
 Use `WorkerPool` to start workers. Use `WorkerPool::builder` to create your worker pool and run tasks.
@@ -241,8 +236,8 @@ let mut worker_pool = WorkerPool::<Queue>::builder()
 worker_pool.start();
 ```
 
-#### Asynk feature
-Every worker runs in a separate tokio task. In case of panic, they are always restarted.
+#### the Asynk feature
+Every worker runs in a separate `tokio` task. In case of panic, they are always restarted.
 Use `AsyncWorkerPool` to start workers.
 
 ```rust
@@ -275,11 +270,11 @@ Check out:
 
 #### Blocking feature
 
-Just use `TypeBuilder` done for `WorkerPool`.
+Just use `TypeBuilder` for `WorkerPool`.
 
 #### Asynk feature
 
-Just use `TypeBuilder` done for `AsyncWorkerPool`.
+Just use `TypeBuilder` for `AsyncWorkerPool`.
 
 ### Configuring the type of workers
 
@@ -335,18 +330,18 @@ Set sleep params with worker pools `TypeBuilder` in both modules.
 2. Create your feature branch (`git checkout -b my-new-feature`)
 3. Commit your changes (`git commit -am 'Add some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)
-5. Create new Pull Request
+5. Create a new Pull Request
 
 ### Running tests locally
 - Install diesel_cli.
 ```
 cargo install diesel_cli
 ```
-- Install docker in your machine.
+- Install docker on your machine.
 
 - Run a Postgres docker container. (See in Makefile.)
 ```
-make db
+create DB
 ```
 
 - Run the migrations
