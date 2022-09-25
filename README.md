@@ -7,8 +7,8 @@
 Background task processing library for Rust. It uses Postgres DB as a task queue.
 
 ## Features
-- Asynk feature uses `tokio`. Workers are started in tokio tasks.
-- Blocking feature uses `std::thread`. Workers are started in a separated threads.
+- the Asynk feature. It uses `tokio`. Workers are started in tokio tasks.
+- the Blocking feature, It uses `std::thread`. Workers are started in separate threads.
 
 ## Installation
 
@@ -64,7 +64,7 @@ impl Runnable for MyTask {
         Ok(())
     }
 
-    // If you want to make the tasks of this type uniq.
+    // If you want to make tasks of this type unique.
     fn uniq(&self) -> bool {
       true
     }
@@ -76,11 +76,8 @@ impl Runnable for MyTask {
     }
 
     // This will be useful if you would like to schedule tasks.
-    // default value: None (task is not schedule just executes when it is fetched)
+    // default value: None (the task is not scheduled, it's just executed  once)
     fn cron(&self) -> Option<Scheduled> {
-        //               sec  min   hour   day of month   month   day of week   year
-        //               be careful works only with UTC hour.
-        //               https://www.timeanddate.com/worldclock/timezone/utc
         let expression = "0/20 * * * Aug-Sep * 2022/1";
         Some(Scheduled::CronPattern(expression.to_string()))
     }
@@ -89,13 +86,13 @@ impl Runnable for MyTask {
 
 As you can see from the example above, the trait implementation has `#[typetag::serde]` attribute which is used to deserialize the task.
 
-The second parameter  of the `run` function is a is an struct that implements fang::Queueable (fang::Queue for example), You can re-use it to manipulate the task queue, for example, to add a new job during the current job's execution. If you don't need it, just ignore it.
+The second parameter of the `run` function is a struct that implements fang::Queueable (fang::Queue for example), You can re-use it to manipulate the task queue, for example, to add a new job during the current job's execution. If you don't need it, just ignore it.
 
 
 #### Asynk feature
 Every task should implement `fang::AsyncRunnable` trait which is used by `fang` to execute it.
 
-Also be careful to not to call with the same name two impl of AsyncRunnable, because will cause a fail with typetag.
+Also be careful not to call with the same name two implementations of the AsyncRunnable trait, because it will cause a failure in the typetag crate.
 ```rust
 use fang::AsyncRunnable;
 use fang::asynk::async_queue::AsyncQueueable;
@@ -121,26 +118,23 @@ impl AsyncRunnable for AsyncTask {
     }
 
 
-    // If you want to make the tasks of this type uniq.
+    // If you want to make tasks of this type unique.
     fn uniq(&self) -> bool {
       true
     }
 
     // This will be useful if you would like to schedule tasks.
-    // default value: None (task is not schedule just executes when it is fetched)
+    // default value: None
     fn cron(&self) -> Option<Scheduled> {
-        //               sec  min   hour   day of month   month   day of week   year
-        //               be careful works only with UTC hour.
-        //               https://www.timeanddate.com/worldclock/timezone/utc
         let expression = "0/20 * * * Aug-Sep * 2022/1";
         Some(Scheduled::CronPattern(expression.to_string()))
     }
 }
 ```
 
-In both modules, tasks can be schedule to be execute once. Use ```Scheduled::ScheduleOnce``` enum variant to schedule in specific datetime.
+In both modules, tasks can be scheduled to be executed once. Use ```Scheduled::ScheduleOnce``` enum variant.
 
-Datetimes and cron pattern are interpreted in UTC timezone. So you should introduce an offset to schedule in the desire hour.
+Datetimes and cron patterns are interpreted in the UTC timezone. So you should introduce the offset to schedule in the desired hour.
 
 Example:
 
@@ -171,13 +165,12 @@ use fang::Queue;
 
 ```
 
-`Queue::insert_task` method will insert a task with uniqueness or not it depends on `uniq` method defined in a task.
-If uniq is set to true and the task is already in storage this will return the task in the storage.
+`Queue::insert_task` method will insert a task with the uniqueness or not it depends on `uniq` method defined in a task.
+If `uniq` is set to true and the task is already in the storage, it won't be inserted.
 
 
 #### Asynk feature
-To enqueue a task use `AsyncQueueable::insert_task`,
-depending of the backend that you prefer you will need to do it with a specific queue.
+To enqueue a task use `AsyncQueueable::insert_task`.
 
 For Postgres backend.
 ```rust
@@ -185,7 +178,7 @@ use fang::asynk::async_queue::AsyncQueue;
 use fang::NoTls;
 use fang::AsyncRunnable;
 
-// Create a AsyncQueue
+// Create an AsyncQueue
 let max_pool_size: u32 = 2;
 
 let mut queue = AsyncQueue::builder()
@@ -199,14 +192,14 @@ let mut queue = AsyncQueue::builder()
 queue.connect(NoTls).await.unwrap();
 
 ```
-For easy example we are using NoTls type, if for some reason you would like to encrypt postgres traffic.
+As an easy example, we are using NoTls type, if for some reason you would like to encrypt Postgres requests.
 
 You can implement a Tls type.
 
 It is well documented for [openssl](https://docs.rs/postgres-openssl/latest/postgres_openssl/) and [native-tls](https://docs.rs/postgres-native-tls/latest/postgres_native_tls/)
 
 ```rust
-// AsyncTask from first example
+// AsyncTask from the first example
 let task = AsyncTask { 8 };
 let task_returned = queue
   .insert_task(&task as &dyn AsyncRunnable)
@@ -300,7 +293,7 @@ Set retention mode with worker pools `TypeBuilder` in both modules.
 
 #### Blocking feature
 
-You can use use `SleepParams` to confugure sleep values:
+You can use use `SleepParams` to configure sleep values:
 
 ```rust
 pub struct SleepParams {
@@ -361,7 +354,7 @@ make tests
 make ignored
 ```
 
-- Kill docker container
+- Kill the docker container
 ```
 make stop
 ```

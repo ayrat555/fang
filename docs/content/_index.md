@@ -51,3 +51,8 @@ content = 'Tasks are not duplicated in the queue if they are unique'
 title = "Single-purpose workers"
 content = 'Tasks are stored in a single table but workers can execute only tasks of the specific type'
 +++
+
+[[extra.list]]
+title = "Retries"
+content = 'Tasks can be retried with a custom backoff mode'
++++
