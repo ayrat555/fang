@@ -78,6 +78,7 @@ impl Runnable for MyTask {
     }
 
     // If `uniq` is set to true and the task is already in the storage, it won't be inserted again
+    // The existing record will be returned for for any insertions operaiton
     fn uniq(&self) -> bool {
       true
     }
@@ -143,6 +144,7 @@ impl AsyncRunnable for AsyncTask {
 
 
     // If `uniq` is set to true and the task is already in the storage, it won't be inserted again
+    // The existing record will be returned for for any insertions operaiton
     fn uniq(&self) -> bool {
       true
     }
