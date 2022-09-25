@@ -8,7 +8,7 @@ Background task processing library for Rust. It uses Postgres DB as a task queue
 
 ## Features
 - the Asynk feature. It uses `tokio`. Workers are started in tokio tasks.
-- the Blocking feature, It uses `std::thread`. Workers are started in separate threads.
+- the Blocking feature. It uses `std::thread`. Workers are started in separate threads.
 
 ## Installation
 
@@ -70,13 +70,13 @@ impl Runnable for MyTask {
     }
 
     // This will be useful if you want to filter tasks.
-    // default value: "common".to_string()
+    // the default value is `common`
     fn task_type(&self) -> String {
       "my_task".to_string()
     }
 
     // This will be useful if you would like to schedule tasks.
-    // default value: None (the task is not scheduled, it's just executed  once)
+    // default value: None (the task is not scheduled, it's just executed once)
     fn cron(&self) -> Option<Scheduled> {
         let expression = "0/20 * * * Aug-Sep * 2022/1";
         Some(Scheduled::CronPattern(expression.to_string()))
@@ -86,13 +86,13 @@ impl Runnable for MyTask {
 
 As you can see from the example above, the trait implementation has `#[typetag::serde]` attribute which is used to deserialize the task.
 
-The second parameter of the `run` function is a struct that implements fang::Queueable (fang::Queue for example), You can re-use it to manipulate the task queue, for example, to add a new job during the current job's execution. If you don't need it, just ignore it.
+The second parameter of the `run` function is a struct that implements fang::Queueable, You can re-use it to manipulate the task queue, for example, to add a new job during the current job's execution. If you don't need it, just ignore it.
 
 
 #### Asynk feature
 Every task should implement `fang::AsyncRunnable` trait which is used by `fang` to execute it.
 
-Also be careful not to call with the same name two implementations of the AsyncRunnable trait, because it will cause a failure in the typetag crate.
+Be careful not to call two implementations of the AsyncRunnable trait with the same name, because it will cause a failure in the typetag crate.
 ```rust
 use fang::AsyncRunnable;
 use fang::asynk::async_queue::AsyncQueueable;
@@ -111,8 +111,8 @@ impl AsyncRunnable for AsyncTask {
     async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), Error> {
         Ok(())
     }
-    // this func is optional to impl
-    // Default task-type it is common
+    // this func is optional
+    // Default task_type is common
     fn task_type(&self) -> String {
         "my-task-type".to_string()
     }
@@ -124,7 +124,7 @@ impl AsyncRunnable for AsyncTask {
     }
 
     // This will be useful if you would like to schedule tasks.
-    // default value: None
+    // default value isNone
     fn cron(&self) -> Option<Scheduled> {
         let expression = "0/20 * * * Aug-Sep * 2022/1";
         Some(Scheduled::CronPattern(expression.to_string()))
@@ -138,7 +138,7 @@ Datetimes and cron patterns are interpreted in the UTC timezone. So you should i
 
 Example:
 
-If your hour is UTC + 2 and you would like to schedule at 11:00 all days, your expression will be this one.
+If your timezone is UTC + 2 and you want to schedule at 11:00:
 
 ```rust
  let expression = "0 0 9 * * * *";
@@ -165,7 +165,6 @@ use fang::Queue;
 
 ```
 
-`Queue::insert_task` method will insert a task with the uniqueness or not it depends on `uniq` method defined in a task.
 If `uniq` is set to true and the task is already in the storage, it won't be inserted.
 
 
@@ -192,9 +191,7 @@ let mut queue = AsyncQueue::builder()
 queue.connect(NoTls).await.unwrap();
 
 ```
-As an easy example, we are using NoTls type, if for some reason you would like to encrypt Postgres requests.
-
-You can implement a Tls type.
+As an easy example, we are using NoTls type. If for some reason you would like to encrypt Postgres requestsm, you can implement a Tls type.
 
 It is well documented for [openssl](https://docs.rs/postgres-openssl/latest/postgres_openssl/) and [native-tls](https://docs.rs/postgres-native-tls/latest/postgres_native_tls/)
 
@@ -258,8 +255,8 @@ Check out:
 - [Simple Cron Worker Example](https://github.com/ayrat555/fang/tree/master/fang_examples/blocking/simple_cron_worker) - simple worker example
 - [Simple Async Worker Example](https://github.com/ayrat555/fang/tree/master/fang_examples/asynk/simple_async_worker) - simple async worker example
 - [Simple Cron Async Worker Example](https://github.com/ayrat555/fang/tree/master/fang_examples/asynk/simple_cron_async_worker) - simple async worker example
-- [El Monitorro](https://github.com/ayrat555/el_monitorro) - telegram feed reader. It uses Fang blocking module to synchronize feeds and deliver updates to users.
-- [weather_bot_rust](https://github.com/pxp9/weather_bot_rust) - A bot that provides weather info. It uses Fang asynk module to process updates from Telegram users and schedule weather info.
+- [El Monitorro](https://github.com/ayrat555/el_monitorro) - telegram feed reader. It uses the Fang's blocking module to synchronize feeds and deliver updates to users.
+- [weather_bot_rust](https://github.com/pxp9/weather_bot_rust) - A bot that provides weather info. It uses the Fang's asynk module to process updates from Telegram users and schedule weather info.
 
 ### Configuration
 
