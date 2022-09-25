@@ -1,4 +1,4 @@
-pub mod error;
+mod error;
 pub mod fang_task_state;
 pub mod queue;
 pub mod runnable;

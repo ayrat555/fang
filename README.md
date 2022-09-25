@@ -6,21 +6,19 @@
 
 Background task processing library for Rust. It uses Postgres DB as a task queue.
 
-## Features
+## Key Features
 
- Here are some of the fang's key features:
-
- - Async and threaded workers
+ - Async and threaded workers.
    Workers can be started in threads (threaded workers) or `tokio` tasks (async workers)
- - Scheduled tasks
+ - Scheduled tasks.
    Tasks can be scheduled at any time in the future
- - Periodic (CRON) tasks
+ - Periodic (CRON) tasks.
    Tasks can be scheduled using cron expressions
- - Unique tasks
+ - Unique tasks.
    Tasks are not duplicated in the queue if they are unique
- - Single-purpose workers
+ - Single-purpose workers.
    Tasks are stored in a single table but workers can execute only tasks of the specific type
- - Retries
+ - Retries.
    Tasks can be retried with a custom backoff mode
 
 ## Installation
