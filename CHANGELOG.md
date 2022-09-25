@@ -1,5 +1,11 @@
 # Changelog
 
+## Not released
+
+### Added
+
+- Add retries for tasks - [#92](https://github.com/ayrat555/fang/pull/92)
+
 ## 0.9.1 (2022-09-14)
 
 ### Added

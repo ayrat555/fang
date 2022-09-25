@@ -1,5 +1,4 @@
 #![doc = include_str!("../README.md")]
-#![allow(clippy::extra_unused_lifetimes)]
 
 use std::time::Duration;
 use thiserror::Error;
@@ -30,6 +29,7 @@ impl Default for RetentionMode {
         RetentionMode::RemoveAll
     }
 }
+
 #[derive(Clone, Debug)]
 pub struct SleepParams {
     pub sleep_period: Duration,
