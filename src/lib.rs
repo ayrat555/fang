@@ -29,6 +29,7 @@ impl Default for RetentionMode {
         RetentionMode::RemoveAll
     }
 }
+
 #[derive(Clone, Debug)]
 pub struct SleepParams {
     pub sleep_period: Duration,

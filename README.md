@@ -94,6 +94,17 @@ impl Runnable for MyTask {
         let expression = "0/20 * * * Aug-Sep * 2022/1";
         Some(Scheduled::CronPattern(expression.to_string()))
     }
+
+    // the maximum number of retries. Set it to 0 to make it not retriable
+    // the default value is 20
+    fn max_retries(&self) -> i32 {
+      20
+    }
+
+    // backoff mode for retries
+    fn backoff(&self, attempt: u32) -> u32 {
+      u32::pow(2, attempt)
+    }
 }
 ```
 
@@ -105,7 +116,7 @@ The second parameter of the `run` function is a struct that implements `fang::Qu
 #### Asynk feature
 Every task should implement `fang::AsyncRunnable` trait which is used by `fang` to execute it.
 
-Be careful not to call two implementations of the AsyncRunnable trait with the same name, because it will cause a failure in the `typetag crate.
+Be careful not to call two implementations of the AsyncRunnable trait with the same name, because it will cause a failure in the `typetag` crate.
 ```rust
 use fang::AsyncRunnable;
 use fang::asynk::async_queue::AsyncQueueable;
@@ -142,12 +153,23 @@ impl AsyncRunnable for AsyncTask {
         let expression = "0/20 * * * Aug-Sep * 2022/1";
         Some(Scheduled::CronPattern(expression.to_string()))
     }
+
+    // the maximum number of retries. Set it to 0 to make it not retriable
+    // the default value is 20
+    fn max_retries(&self) -> i32 {
+      20
+    }
+
+    // backoff mode for retries
+    fn backoff(&self, attempt: u32) -> u32 {
+      u32::pow(2, attempt)
+    }
 }
 ```
 
-In both modules, tasks can be scheduled to be executed once. Use ```Scheduled::ScheduleOnce``` enum variant.
+In both modules, tasks can be scheduled to be executed once. Use `Scheduled::ScheduleOnce` enum variant.
 
-Datetimes and cron patterns are interpreted in the UTC timezone. So you should introduce the offset to schedule in the desired hour.
+Datetimes and cron patterns are interpreted in the UTC timezone. So you should introduce the offset to schedule in a different timezone.
 
 Example:
 
