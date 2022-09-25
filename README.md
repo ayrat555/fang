@@ -77,7 +77,7 @@ impl Runnable for MyTask {
         Ok(())
     }
 
-    // If you want to make tasks of this type unique.
+    // If `uniq` is set to true and the task is already in the storage, it won't be inserted again
     fn uniq(&self) -> bool {
       true
     }
@@ -89,7 +89,7 @@ impl Runnable for MyTask {
     }
 
     // This will be useful if you would like to schedule tasks.
-    // default value is None (the task is not scheduled, it's just executed once)
+    // default value is None (the task is not scheduled, it's just executed as soon as it's inserted)
     fn cron(&self) -> Option<Scheduled> {
         let expression = "0/20 * * * Aug-Sep * 2022/1";
         Some(Scheduled::CronPattern(expression.to_string()))
@@ -142,13 +142,13 @@ impl AsyncRunnable for AsyncTask {
     }
 
 
-    // If you want to make tasks of this type unique.
+    // If `uniq` is set to true and the task is already in the storage, it won't be inserted again
     fn uniq(&self) -> bool {
       true
     }
 
     // This will be useful if you would like to schedule tasks.
-    // default value is None
+    // default value is None (the task is not scheduled, it's just executed as soon as it's inserted)
     fn cron(&self) -> Option<Scheduled> {
         let expression = "0/20 * * * Aug-Sep * 2022/1";
         Some(Scheduled::CronPattern(expression.to_string()))
@@ -197,8 +197,6 @@ use fang::Queue;
  let task_inserted = queue.insert_task(&MyTask::new(1)).unwrap();
 
 ```
-
-If `uniq` is set to true and the task is already in the storage, it won't be inserted again.
 
 #### the Asynk feature
 To enqueue a task use `AsyncQueueable::insert_task`.
