@@ -363,7 +363,7 @@ cargo install diesel_cli
 
 - Run a Postgres docker container. (See in Makefile.)
 ```
-create DB
+make db
 ```
 
 - Run the migrations

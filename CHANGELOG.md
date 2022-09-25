@@ -5,6 +5,7 @@
 ### Added
 
 - Add retries for tasks - [#92](https://github.com/ayrat555/fang/pull/92)
+- Add `remove_task_by_metadata` method to the Queue - [#90](https://github.com/ayrat555/fang/pull/92)
 
 ## 0.9.1 (2022-09-14)
 
