@@ -5,23 +5,28 @@
 	<link href="https://fang.badykov.com/atom.xml" rel="self" type="application/atom+xml"/>
   <link href="https://fang.badykov.com"/>
 	<generator uri="https://www.getzola.org/">Zola</generator>
-	<updated>2022-09-14T11:47:07+00:00</updated>
+	<updated>2022-09-26T06:16:59+00:00</updated>
 	<id>https://fang.badykov.com/atom.xml</id>
 	<entry xml:lang="en">
 		<title>CHANGELOG</title>
-		<published>2022-09-14T11:47:07+00:00</published>
-		<updated>2022-09-14T11:47:07+00:00</updated>
+		<published>2022-09-26T06:16:59+00:00</published>
+		<updated>2022-09-26T06:16:59+00:00</updated>
 		<link rel="alternate" href="https://fang.badykov.com/docs/changelog/" type="text/html"/>
 		<id>https://fang.badykov.com/docs/changelog/</id>
 		<content type="html">&lt;h1 id=&quot;changelog&quot;&gt;Changelog&lt;&#x2F;h1&gt;
-&lt;h2 id=&quot;0-9-1-2022-09-14&quot;&gt;0.9.1 (2022-09-14)&lt;&#x2F;h2&gt;
+&lt;h2 id=&quot;not-released&quot;&gt;Not released&lt;&#x2F;h2&gt;
 &lt;h3 id=&quot;added&quot;&gt;Added&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Add retries for tasks - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;92&quot;&gt;#92&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-9-1-2022-09-14&quot;&gt;0.9.1 (2022-09-14)&lt;&#x2F;h2&gt;
+&lt;h3 id=&quot;added-1&quot;&gt;Added&lt;&#x2F;h3&gt;
 &lt;ul&gt;
 &lt;li&gt;Add methods to remove a task by uniq hash or id - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;90&quot;&gt;#90&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
 &lt;h2 id=&quot;0-9-0-2022-09-02&quot;&gt;0.9.0 (2022-09-02)&lt;&#x2F;h2&gt;
 &lt;h3 id=&quot;69&quot;&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;69&quot;&gt;#69&lt;&#x2F;a&gt;&lt;&#x2F;h3&gt;
-&lt;h3 id=&quot;added-1&quot;&gt;Added&lt;&#x2F;h3&gt;
+&lt;h3 id=&quot;added-2&quot;&gt;Added&lt;&#x2F;h3&gt;
 &lt;ul&gt;
 &lt;li&gt;Added cron support for scheduled tasks.&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
@@ -100,8 +105,8 @@
 	</entry>
 	<entry xml:lang="en">
 		<title>README</title>
-		<published>2022-09-14T11:47:07+00:00</published>
-		<updated>2022-09-14T11:47:07+00:00</updated>
+		<published>2022-09-26T06:16:59+00:00</published>
+		<updated>2022-09-26T06:16:59+00:00</updated>
 		<link rel="alternate" href="https://fang.badykov.com/docs/readme/" type="text/html"/>
 		<id>https://fang.badykov.com/docs/readme/</id>
 		<content type="html">&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;raw.githubusercontent.com&#x2F;ayrat555&#x2F;fang&#x2F;master&#x2F;logo.png&quot; alt=&quot;fang&quot; height=&quot;300px&quot;&gt;&lt;&#x2F;p&gt;
@@ -109,19 +114,30 @@
 &lt;h1 id=&quot;fang&quot;&gt;Fang&lt;&#x2F;h1&gt;
 &lt;p&gt;Background task processing library for Rust. It uses Postgres DB as a task queue.&lt;&#x2F;p&gt;
 &lt;h2 id=&quot;features&quot;&gt;Features&lt;&#x2F;h2&gt;
+&lt;p&gt;Here are some of the fang&#x27;s key features:&lt;&#x2F;p&gt;
 &lt;ul&gt;
-&lt;li&gt;Asynk feature uses &lt;code&gt;tokio&lt;&#x2F;code&gt;. Workers are started in tokio tasks.&lt;&#x2F;li&gt;
-&lt;li&gt;Blocking feature uses &lt;code&gt;std::thread&lt;&#x2F;code&gt;. Workers are started in a separated threads.&lt;&#x2F;li&gt;
+&lt;li&gt;Async and threaded workers
+Workers can be started in threads (threaded workers) or &lt;code&gt;tokio&lt;&#x2F;code&gt; tasks (async workers)&lt;&#x2F;li&gt;
+&lt;li&gt;Scheduled tasks
+Tasks can be scheduled at any time in the future&lt;&#x2F;li&gt;
+&lt;li&gt;Periodic (CRON) tasks
+Tasks can be scheduled using cron expressions&lt;&#x2F;li&gt;
+&lt;li&gt;Unique tasks
+Tasks are not duplicated in the queue if they are unique&lt;&#x2F;li&gt;
+&lt;li&gt;Single-purpose workers
+Tasks are stored in a single table but workers can execute only tasks of the specific type&lt;&#x2F;li&gt;
+&lt;li&gt;Retries
+Tasks can be retried with a custom backoff mode&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
 &lt;h2 id=&quot;installation&quot;&gt;Installation&lt;&#x2F;h2&gt;
 &lt;ol&gt;
 &lt;li&gt;Add this to your Cargo.toml&lt;&#x2F;li&gt;
 &lt;&#x2F;ol&gt;
-&lt;h4 id=&quot;blocking-feature&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
+&lt;h4 id=&quot;the-blocking-feature&quot;&gt;the Blocking feature&lt;&#x2F;h4&gt;
 &lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span&gt;[dependencies]
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.9&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; , &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;features &lt;&#x2F;span&gt;&lt;span&gt;= [&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;blocking&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;default-features &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false &lt;&#x2F;span&gt;&lt;span&gt;}
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
-&lt;h4 id=&quot;asynk-feature&quot;&gt;Asynk feature&lt;&#x2F;h4&gt;
+&lt;h4 id=&quot;the-asynk-feature&quot;&gt;the Asynk feature&lt;&#x2F;h4&gt;
 &lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span&gt;[dependencies]
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.9&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; , &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;features &lt;&#x2F;span&gt;&lt;span&gt;= [&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;asynk&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;default-features &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false &lt;&#x2F;span&gt;&lt;span&gt;}
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
@@ -130,12 +146,12 @@
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
 &lt;p&gt;&lt;em&gt;Supports rustc 1.62+&lt;&#x2F;em&gt;&lt;&#x2F;p&gt;
 &lt;ol start=&quot;2&quot;&gt;
-&lt;li&gt;Create &lt;code&gt;fang_tasks&lt;&#x2F;code&gt; table in the Postgres database. The migration can be found in &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;blob&#x2F;master&#x2F;migrations&#x2F;2022-08-20-151615_create_fang_tasks&#x2F;up.sql&quot;&gt;the migrations directory&lt;&#x2F;a&gt;.&lt;&#x2F;li&gt;
+&lt;li&gt;Create the &lt;code&gt;fang_tasks&lt;&#x2F;code&gt; table in the Postgres database. The migration can be found in &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;blob&#x2F;master&#x2F;migrations&#x2F;2022-08-20-151615_create_fang_tasks&#x2F;up.sql&quot;&gt;the migrations directory&lt;&#x2F;a&gt;.&lt;&#x2F;li&gt;
 &lt;&#x2F;ol&gt;
 &lt;h2 id=&quot;usage&quot;&gt;Usage&lt;&#x2F;h2&gt;
 &lt;h3 id=&quot;defining-a-task&quot;&gt;Defining a task&lt;&#x2F;h3&gt;
-&lt;h4 id=&quot;blocking-feature-1&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
-&lt;p&gt;Every task should implement &lt;code&gt;fang::Runnable&lt;&#x2F;code&gt; trait which is used by &lt;code&gt;fang&lt;&#x2F;code&gt; to execute it.&lt;&#x2F;p&gt;
+&lt;h4 id=&quot;blocking-feature&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
+&lt;p&gt;Every task should implement the &lt;code&gt;fang::Runnable&lt;&#x2F;code&gt; trait which is used by &lt;code&gt;fang&lt;&#x2F;code&gt; to execute it.&lt;&#x2F;p&gt;
 &lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::Error;
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::Runnable;
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::typetag;
@@ -156,33 +172,42 @@
 &lt;&#x2F;span&gt;&lt;span&gt;        Ok(())
 &lt;&#x2F;span&gt;&lt;span&gt;    }
 &lt;&#x2F;span&gt;&lt;span&gt;
-&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; If you want to make the tasks of this type uniq.
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; If `uniq` is set to true and the task is already in the storage, it won&amp;#39;t be inserted again
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; The existing record will be returned for for any insertions operaiton
 &lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;uniq&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;bool &lt;&#x2F;span&gt;&lt;span&gt;{
 &lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true
 &lt;&#x2F;span&gt;&lt;span&gt;    }
 &lt;&#x2F;span&gt;&lt;span&gt;
 &lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; This will be useful if you want to filter tasks.
-&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; default value: &amp;quot;common&amp;quot;.to_string()
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; the default value is `common`
 &lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;task_type&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; String {
 &lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;my_task&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span&gt;()
 &lt;&#x2F;span&gt;&lt;span&gt;    }
 &lt;&#x2F;span&gt;&lt;span&gt;
 &lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; This will be useful if you would like to schedule tasks.
-&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; default value: None (task is not schedule just executes when it is fetched)
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; default value is None (the task is not scheduled, it&amp;#39;s just executed as soon as it&amp;#39;s inserted)
 &lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;cron&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; Option&amp;lt;Scheduled&amp;gt; {
-&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F;               sec  min   hour   day of month   month   day of week   year
-&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F;               be careful works only with UTC hour.
-&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F;               https:&#x2F;&#x2F;www.timeanddate.com&#x2F;worldclock&#x2F;timezone&#x2F;utc
 &lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; expression = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0&#x2F;20 * * * Aug-Sep * 2022&#x2F;1&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
 &lt;&#x2F;span&gt;&lt;span&gt;        Some(Scheduled::CronPattern(expression.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span&gt;()))
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; the maximum number of retries. Set it to 0 to make it not retriable
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; the default value is 20
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;max_retries&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;i32 &lt;&#x2F;span&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;20
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; backoff mode for retries
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;backoff&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;attempt&lt;&#x2F;span&gt;&lt;span&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32 &lt;&#x2F;span&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32&lt;&#x2F;span&gt;&lt;span&gt;::pow(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;2&lt;&#x2F;span&gt;&lt;span&gt;, attempt)
 &lt;&#x2F;span&gt;&lt;span&gt;    }
 &lt;&#x2F;span&gt;&lt;span&gt;}
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
 &lt;p&gt;As you can see from the example above, the trait implementation has &lt;code&gt;#[typetag::serde]&lt;&#x2F;code&gt; attribute which is used to deserialize the task.&lt;&#x2F;p&gt;
-&lt;p&gt;The second parameter  of the &lt;code&gt;run&lt;&#x2F;code&gt; function is a is an struct that implements fang::Queueable (fang::Queue for example), You can re-use it to manipulate the task queue, for example, to add a new job during the current job&#x27;s execution. If you don&#x27;t need it, just ignore it.&lt;&#x2F;p&gt;
-&lt;h4 id=&quot;asynk-feature-1&quot;&gt;Asynk feature&lt;&#x2F;h4&gt;
+&lt;p&gt;The second parameter of the &lt;code&gt;run&lt;&#x2F;code&gt; function is a struct that implements &lt;code&gt;fang::Queueable&lt;&#x2F;code&gt;. You can re-use it to manipulate the task queue, for example, to add a new job during the current job&#x27;s execution. If you don&#x27;t need it, just ignore it.&lt;&#x2F;p&gt;
+&lt;h4 id=&quot;asynk-feature&quot;&gt;Asynk feature&lt;&#x2F;h4&gt;
 &lt;p&gt;Every task should implement &lt;code&gt;fang::AsyncRunnable&lt;&#x2F;code&gt; trait which is used by &lt;code&gt;fang&lt;&#x2F;code&gt; to execute it.&lt;&#x2F;p&gt;
-&lt;p&gt;Also be careful to not to call with the same name two impl of AsyncRunnable, because will cause a fail with typetag.&lt;&#x2F;p&gt;
+&lt;p&gt;Be careful not to call two implementations of the AsyncRunnable trait with the same name, because it will cause a failure in the &lt;code&gt;typetag&lt;&#x2F;code&gt; crate.&lt;&#x2F;p&gt;
 &lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::AsyncRunnable;
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::asynk::async_queue::AsyncQueueable;
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::serde::{Deserialize, Serialize};
@@ -200,39 +225,47 @@
 &lt;&#x2F;span&gt;&lt;span&gt;    async &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;run&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;_queueable&lt;&#x2F;span&gt;&lt;span&gt;: &amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;mut&lt;&#x2F;span&gt;&lt;span&gt; dyn AsyncQueueable) -&amp;gt; Result&amp;lt;(), Error&amp;gt; {
 &lt;&#x2F;span&gt;&lt;span&gt;        Ok(())
 &lt;&#x2F;span&gt;&lt;span&gt;    }
-&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; this func is optional to impl
-&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; Default task-type it is common
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; this func is optional
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; Default task_type is common
 &lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;task_type&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; String {
 &lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;my-task-type&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span&gt;()
 &lt;&#x2F;span&gt;&lt;span&gt;    }
 &lt;&#x2F;span&gt;&lt;span&gt;
 &lt;&#x2F;span&gt;&lt;span&gt;
-&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; If you want to make the tasks of this type uniq.
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; If `uniq` is set to true and the task is already in the storage, it won&amp;#39;t be inserted again
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; The existing record will be returned for for any insertions operaiton
 &lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;uniq&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;bool &lt;&#x2F;span&gt;&lt;span&gt;{
 &lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true
 &lt;&#x2F;span&gt;&lt;span&gt;    }
 &lt;&#x2F;span&gt;&lt;span&gt;
 &lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; This will be useful if you would like to schedule tasks.
-&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; default value: None (task is not schedule just executes when it is fetched)
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; default value is None (the task is not scheduled, it&amp;#39;s just executed as soon as it&amp;#39;s inserted)
 &lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;cron&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; Option&amp;lt;Scheduled&amp;gt; {
-&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F;               sec  min   hour   day of month   month   day of week   year
-&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F;               be careful works only with UTC hour.
-&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F;               https:&#x2F;&#x2F;www.timeanddate.com&#x2F;worldclock&#x2F;timezone&#x2F;utc
 &lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; expression = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0&#x2F;20 * * * Aug-Sep * 2022&#x2F;1&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
 &lt;&#x2F;span&gt;&lt;span&gt;        Some(Scheduled::CronPattern(expression.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span&gt;()))
 &lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; the maximum number of retries. Set it to 0 to make it not retriable
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; the default value is 20
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;max_retries&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;i32 &lt;&#x2F;span&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;20
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; backoff mode for retries
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;backoff&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;attempt&lt;&#x2F;span&gt;&lt;span&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32 &lt;&#x2F;span&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32&lt;&#x2F;span&gt;&lt;span&gt;::pow(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;2&lt;&#x2F;span&gt;&lt;span&gt;, attempt)
+&lt;&#x2F;span&gt;&lt;span&gt;    }
 &lt;&#x2F;span&gt;&lt;span&gt;}
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
-&lt;p&gt;In both modules, tasks can be schedule to be execute once. Use &lt;code&gt;Scheduled::ScheduleOnce&lt;&#x2F;code&gt; enum variant to schedule in specific datetime.&lt;&#x2F;p&gt;
-&lt;p&gt;Datetimes and cron pattern are interpreted in UTC timezone. So you should introduce an offset to schedule in the desire hour.&lt;&#x2F;p&gt;
+&lt;p&gt;In both modules, tasks can be scheduled to be executed once. Use &lt;code&gt;Scheduled::ScheduleOnce&lt;&#x2F;code&gt; enum variant.&lt;&#x2F;p&gt;
+&lt;p&gt;Datetimes and cron patterns are interpreted in the UTC timezone. So you should introduce the offset to schedule in a different timezone.&lt;&#x2F;p&gt;
 &lt;p&gt;Example:&lt;&#x2F;p&gt;
-&lt;p&gt;If your hour is UTC + 2 and you would like to schedule at 11:00 all days, your expression will be this one.&lt;&#x2F;p&gt;
+&lt;p&gt;If your timezone is UTC + 2 and you want to schedule at 11:00:&lt;&#x2F;p&gt;
 &lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span&gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; expression = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0 0 9 * * * *&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
 &lt;h3 id=&quot;enqueuing-a-task&quot;&gt;Enqueuing a task&lt;&#x2F;h3&gt;
-&lt;h4 id=&quot;blocking-feature-2&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
+&lt;h4 id=&quot;the-blocking-feature-1&quot;&gt;the Blocking feature&lt;&#x2F;h4&gt;
 &lt;p&gt;To enqueue a task use &lt;code&gt;Queue::enqueue_task&lt;&#x2F;code&gt;&lt;&#x2F;p&gt;
-&lt;p&gt;For Postgres Backend.&lt;&#x2F;p&gt;
 &lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::Queue;
 &lt;&#x2F;span&gt;&lt;span&gt;
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; create a r2d2 pool
@@ -244,17 +277,14 @@
 &lt;&#x2F;span&gt;&lt;span&gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; task_inserted = queue.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;insert_task&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;MyTask::new(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;)).&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span&gt;();
 &lt;&#x2F;span&gt;&lt;span&gt;
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
-&lt;p&gt;&lt;code&gt;Queue::insert_task&lt;&#x2F;code&gt; method will insert a task with uniqueness or not it depends on &lt;code&gt;uniq&lt;&#x2F;code&gt; method defined in a task.
-If uniq is set to true and the task is already in storage this will return the task in the storage.&lt;&#x2F;p&gt;
-&lt;h4 id=&quot;asynk-feature-2&quot;&gt;Asynk feature&lt;&#x2F;h4&gt;
-&lt;p&gt;To enqueue a task use &lt;code&gt;AsyncQueueable::insert_task&lt;&#x2F;code&gt;,
-depending of the backend that you prefer you will need to do it with a specific queue.&lt;&#x2F;p&gt;
+&lt;h4 id=&quot;the-asynk-feature-1&quot;&gt;the Asynk feature&lt;&#x2F;h4&gt;
+&lt;p&gt;To enqueue a task use &lt;code&gt;AsyncQueueable::insert_task&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
 &lt;p&gt;For Postgres backend.&lt;&#x2F;p&gt;
 &lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::asynk::async_queue::AsyncQueue;
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::NoTls;
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::AsyncRunnable;
 &lt;&#x2F;span&gt;&lt;span&gt;
-&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; Create a AsyncQueue
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; Create an AsyncQueue
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; max_pool_size: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32 &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;2&lt;&#x2F;span&gt;&lt;span&gt;;
 &lt;&#x2F;span&gt;&lt;span&gt;
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let mut&lt;&#x2F;span&gt;&lt;span&gt; queue = AsyncQueue::builder()
@@ -268,10 +298,8 @@ depending of the backend that you prefer you will need to do it with a specific 
 &lt;&#x2F;span&gt;&lt;span&gt;queue.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;connect&lt;&#x2F;span&gt;&lt;span&gt;(NoTls).await.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span&gt;();
 &lt;&#x2F;span&gt;&lt;span&gt;
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
-&lt;p&gt;For easy example we are using NoTls type, if for some reason you would like to encrypt postgres traffic.&lt;&#x2F;p&gt;
-&lt;p&gt;You can implement a Tls type.&lt;&#x2F;p&gt;
-&lt;p&gt;It is well documented for &lt;a href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;postgres-openssl&#x2F;latest&#x2F;postgres_openssl&#x2F;&quot;&gt;openssl&lt;&#x2F;a&gt; and &lt;a href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;postgres-native-tls&#x2F;latest&#x2F;postgres_native_tls&#x2F;&quot;&gt;native-tls&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
-&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; AsyncTask from first example
+&lt;p&gt;As an easy example, we are using NoTls type. If for some reason you would like to encrypt Postgres requests, you can use &lt;a href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;postgres-openssl&#x2F;latest&#x2F;postgres_openssl&#x2F;&quot;&gt;openssl&lt;&#x2F;a&gt;  or &lt;a href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;postgres-native-tls&#x2F;latest&#x2F;postgres_native_tls&#x2F;&quot;&gt;native-tls&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; AsyncTask from the first example
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; task = AsyncTask { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;8 &lt;&#x2F;span&gt;&lt;span&gt;};
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let&lt;&#x2F;span&gt;&lt;span&gt; task_returned = queue
 &lt;&#x2F;span&gt;&lt;span&gt;  .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;insert_task&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;task as &amp;amp;dyn AsyncRunnable)
@@ -279,7 +307,7 @@ depending of the backend that you prefer you will need to do it with a specific 
 &lt;&#x2F;span&gt;&lt;span&gt;  .&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;unwrap&lt;&#x2F;span&gt;&lt;span&gt;();
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
 &lt;h3 id=&quot;starting-workers&quot;&gt;Starting workers&lt;&#x2F;h3&gt;
-&lt;h4 id=&quot;blocking-feature-3&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
+&lt;h4 id=&quot;the-blocking-feature-2&quot;&gt;the Blocking feature&lt;&#x2F;h4&gt;
 &lt;p&gt;Every worker runs in a separate thread. In case of panic, they are always restarted.&lt;&#x2F;p&gt;
 &lt;p&gt;Use &lt;code&gt;WorkerPool&lt;&#x2F;code&gt; to start workers. Use &lt;code&gt;WorkerPool::builder&lt;&#x2F;code&gt; to create your worker pool and run tasks.&lt;&#x2F;p&gt;
 &lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::WorkerPool;
@@ -296,8 +324,8 @@ depending of the backend that you prefer you will need to do it with a specific 
 &lt;&#x2F;span&gt;&lt;span&gt;
 &lt;&#x2F;span&gt;&lt;span&gt;worker_pool.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;start&lt;&#x2F;span&gt;&lt;span&gt;();
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
-&lt;h4 id=&quot;asynk-feature-3&quot;&gt;Asynk feature&lt;&#x2F;h4&gt;
-&lt;p&gt;Every worker runs in a separate tokio task. In case of panic, they are always restarted.
+&lt;h4 id=&quot;the-asynk-feature-2&quot;&gt;the Asynk feature&lt;&#x2F;h4&gt;
+&lt;p&gt;Every worker runs in a separate &lt;code&gt;tokio&lt;&#x2F;code&gt; task. In case of panic, they are always restarted.
 Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&gt;
 &lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::asynk::async_worker_pool::AsyncWorkerPool;
 &lt;&#x2F;span&gt;&lt;span&gt;
@@ -319,14 +347,14 @@ Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&g
 &lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;tree&#x2F;master&#x2F;fang_examples&#x2F;blocking&#x2F;simple_cron_worker&quot;&gt;Simple Cron Worker Example&lt;&#x2F;a&gt; - simple worker example&lt;&#x2F;li&gt;
 &lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;tree&#x2F;master&#x2F;fang_examples&#x2F;asynk&#x2F;simple_async_worker&quot;&gt;Simple Async Worker Example&lt;&#x2F;a&gt; - simple async worker example&lt;&#x2F;li&gt;
 &lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;tree&#x2F;master&#x2F;fang_examples&#x2F;asynk&#x2F;simple_cron_async_worker&quot;&gt;Simple Cron Async Worker Example&lt;&#x2F;a&gt; - simple async worker example&lt;&#x2F;li&gt;
-&lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;el_monitorro&quot;&gt;El Monitorro&lt;&#x2F;a&gt; - telegram feed reader. It uses Fang blocking module to synchronize feeds and deliver updates to users.&lt;&#x2F;li&gt;
-&lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;pxp9&#x2F;weather_bot_rust&quot;&gt;weather_bot_rust&lt;&#x2F;a&gt; - A bot that provides weather info. It uses Fang asynk module to process updates from Telegram users and schedule weather info.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;el_monitorro&quot;&gt;El Monitorro&lt;&#x2F;a&gt; - telegram feed reader. It uses the Fang&#x27;s blocking module to synchronize feeds and deliver updates to users.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;pxp9&#x2F;weather_bot_rust&quot;&gt;weather_bot_rust&lt;&#x2F;a&gt; - A bot that provides weather info. It uses the Fang&#x27;s asynk module to process updates from Telegram users and schedule weather info.&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
 &lt;h3 id=&quot;configuration&quot;&gt;Configuration&lt;&#x2F;h3&gt;
-&lt;h4 id=&quot;blocking-feature-4&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
-&lt;p&gt;Just use &lt;code&gt;TypeBuilder&lt;&#x2F;code&gt; done for &lt;code&gt;WorkerPool&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
-&lt;h4 id=&quot;asynk-feature-4&quot;&gt;Asynk feature&lt;&#x2F;h4&gt;
-&lt;p&gt;Just use &lt;code&gt;TypeBuilder&lt;&#x2F;code&gt; done for &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;h4 id=&quot;blocking-feature-1&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
+&lt;p&gt;Just use &lt;code&gt;TypeBuilder&lt;&#x2F;code&gt; for &lt;code&gt;WorkerPool&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;h4 id=&quot;asynk-feature-1&quot;&gt;Asynk feature&lt;&#x2F;h4&gt;
+&lt;p&gt;Just use &lt;code&gt;TypeBuilder&lt;&#x2F;code&gt; for &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
 &lt;h3 id=&quot;configuring-the-type-of-workers&quot;&gt;Configuring the type of workers&lt;&#x2F;h3&gt;
 &lt;h3 id=&quot;configuring-retention-mode&quot;&gt;Configuring retention mode&lt;&#x2F;h3&gt;
 &lt;p&gt;By default, all successfully finished tasks are removed from the DB, failed tasks aren&#x27;t.&lt;&#x2F;p&gt;
@@ -339,8 +367,8 @@ Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&g
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
 &lt;p&gt;Set retention mode with worker pools &lt;code&gt;TypeBuilder&lt;&#x2F;code&gt; in both modules.&lt;&#x2F;p&gt;
 &lt;h3 id=&quot;configuring-sleep-values&quot;&gt;Configuring sleep values&lt;&#x2F;h3&gt;
-&lt;h4 id=&quot;blocking-feature-5&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
-&lt;p&gt;You can use use &lt;code&gt;SleepParams&lt;&#x2F;code&gt; to confugure sleep values:&lt;&#x2F;p&gt;
+&lt;h4 id=&quot;blocking-feature-2&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
+&lt;p&gt;You can use use &lt;code&gt;SleepParams&lt;&#x2F;code&gt; to configure sleep values:&lt;&#x2F;p&gt;
 &lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub struct &lt;&#x2F;span&gt;&lt;span&gt;SleepParams {
 &lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;sleep_period&lt;&#x2F;span&gt;&lt;span&gt;: Duration,     &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; default value is 5 seconds
 &lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;pub &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;max_sleep_period&lt;&#x2F;span&gt;&lt;span&gt;: Duration, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; default value is 15 seconds
@@ -364,7 +392,7 @@ Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&g
 &lt;li&gt;Create your feature branch (&lt;code&gt;git checkout -b my-new-feature&lt;&#x2F;code&gt;)&lt;&#x2F;li&gt;
 &lt;li&gt;Commit your changes (&lt;code&gt;git commit -am &#x27;Add some feature&#x27;&lt;&#x2F;code&gt;)&lt;&#x2F;li&gt;
 &lt;li&gt;Push to the branch (&lt;code&gt;git push origin my-new-feature&lt;&#x2F;code&gt;)&lt;&#x2F;li&gt;
-&lt;li&gt;Create new Pull Request&lt;&#x2F;li&gt;
+&lt;li&gt;Create a new Pull Request&lt;&#x2F;li&gt;
 &lt;&#x2F;ol&gt;
 &lt;h3 id=&quot;running-tests-locally&quot;&gt;Running tests locally&lt;&#x2F;h3&gt;
 &lt;ul&gt;
@@ -374,7 +402,7 @@ Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&g
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
 &lt;ul&gt;
 &lt;li&gt;
-&lt;p&gt;Install docker in your machine.&lt;&#x2F;p&gt;
+&lt;p&gt;Install docker on your machine.&lt;&#x2F;p&gt;
 &lt;&#x2F;li&gt;
 &lt;li&gt;
 &lt;p&gt;Run a Postgres docker container. (See in Makefile.)&lt;&#x2F;p&gt;
@@ -398,7 +426,7 @@ Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&g
 &lt;pre style=&quot;background-color:#2b303b;color:#c0c5ce;&quot;&gt;&lt;code&gt;&lt;span&gt;make ignored
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
 &lt;ul&gt;
-&lt;li&gt;Kill docker container&lt;&#x2F;li&gt;
+&lt;li&gt;Kill the docker container&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
 &lt;pre style=&quot;background-color:#2b303b;color:#c0c5ce;&quot;&gt;&lt;code&gt;&lt;span&gt;make stop
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
