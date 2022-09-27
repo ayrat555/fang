@@ -5,16 +5,16 @@
 	<link href="https://fang.badykov.com/atom.xml" rel="self" type="application/atom+xml"/>
   <link href="https://fang.badykov.com"/>
 	<generator uri="https://www.getzola.org/">Zola</generator>
-	<updated>2022-09-27T14:59:18+00:00</updated>
+	<updated>2022-09-27T19:01:31+00:00</updated>
 	<id>https://fang.badykov.com/atom.xml</id>
 	<entry xml:lang="en">
 		<title>CHANGELOG</title>
-		<published>2022-09-27T14:59:18+00:00</published>
-		<updated>2022-09-27T14:59:18+00:00</updated>
+		<published>2022-09-27T19:01:31+00:00</published>
+		<updated>2022-09-27T19:01:31+00:00</updated>
 		<link rel="alternate" href="https://fang.badykov.com/docs/changelog/" type="text/html"/>
 		<id>https://fang.badykov.com/docs/changelog/</id>
 		<content type="html">&lt;h1 id=&quot;changelog&quot;&gt;Changelog&lt;&#x2F;h1&gt;
-&lt;h2 id=&quot;0-10-0&quot;&gt;0.10.0&lt;&#x2F;h2&gt;
+&lt;h2 id=&quot;0-10-0-2022-09-27&quot;&gt;0.10.0 (2022-09-27)&lt;&#x2F;h2&gt;
 &lt;h3 id=&quot;added&quot;&gt;Added&lt;&#x2F;h3&gt;
 &lt;ul&gt;
 &lt;li&gt;Add retries for tasks - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;92&quot;&gt;#92&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
@@ -109,8 +109,8 @@
 	</entry>
 	<entry xml:lang="en">
 		<title>README</title>
-		<published>2022-09-27T14:59:18+00:00</published>
-		<updated>2022-09-27T14:59:18+00:00</updated>
+		<published>2022-09-27T19:01:31+00:00</published>
+		<updated>2022-09-27T19:01:31+00:00</updated>
 		<link rel="alternate" href="https://fang.badykov.com/docs/readme/" type="text/html"/>
 		<id>https://fang.badykov.com/docs/readme/</id>
 		<content type="html">&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;raw.githubusercontent.com&#x2F;ayrat555&#x2F;fang&#x2F;master&#x2F;logo.png&quot; alt=&quot;fang&quot; height=&quot;300px&quot;&gt;&lt;&#x2F;p&gt;
