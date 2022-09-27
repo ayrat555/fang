@@ -1,10 +1,14 @@
 # Changelog
 
-## Not released
+## 0.10.0
 
 ### Added
 
 - Add retries for tasks - [#92](https://github.com/ayrat555/fang/pull/92)
+
+### Improved
+
+- Update the cron crate - [#97](https://github.com/ayrat555/fang/pull/97)
 
 ## 0.9.1 (2022-09-14)
 
