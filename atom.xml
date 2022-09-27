@@ -5,19 +5,23 @@
 	<link href="https://fang.badykov.com/atom.xml" rel="self" type="application/atom+xml"/>
   <link href="https://fang.badykov.com"/>
 	<generator uri="https://www.getzola.org/">Zola</generator>
-	<updated>2022-09-26T06:16:59+00:00</updated>
+	<updated>2022-09-27T14:59:18+00:00</updated>
 	<id>https://fang.badykov.com/atom.xml</id>
 	<entry xml:lang="en">
 		<title>CHANGELOG</title>
-		<published>2022-09-26T06:16:59+00:00</published>
-		<updated>2022-09-26T06:16:59+00:00</updated>
+		<published>2022-09-27T14:59:18+00:00</published>
+		<updated>2022-09-27T14:59:18+00:00</updated>
 		<link rel="alternate" href="https://fang.badykov.com/docs/changelog/" type="text/html"/>
 		<id>https://fang.badykov.com/docs/changelog/</id>
 		<content type="html">&lt;h1 id=&quot;changelog&quot;&gt;Changelog&lt;&#x2F;h1&gt;
-&lt;h2 id=&quot;not-released&quot;&gt;Not released&lt;&#x2F;h2&gt;
+&lt;h2 id=&quot;0-10-0&quot;&gt;0.10.0&lt;&#x2F;h2&gt;
 &lt;h3 id=&quot;added&quot;&gt;Added&lt;&#x2F;h3&gt;
 &lt;ul&gt;
 &lt;li&gt;Add retries for tasks - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;92&quot;&gt;#92&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h3 id=&quot;improved&quot;&gt;Improved&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Update the cron crate from 0.11 to 0.12 - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;97&quot;&gt;#97&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
 &lt;h2 id=&quot;0-9-1-2022-09-14&quot;&gt;0.9.1 (2022-09-14)&lt;&#x2F;h2&gt;
 &lt;h3 id=&quot;added-1&quot;&gt;Added&lt;&#x2F;h3&gt;
@@ -30,7 +34,7 @@
 &lt;ul&gt;
 &lt;li&gt;Added cron support for scheduled tasks.&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
-&lt;h3 id=&quot;improved&quot;&gt;Improved&lt;&#x2F;h3&gt;
+&lt;h3 id=&quot;improved-1&quot;&gt;Improved&lt;&#x2F;h3&gt;
 &lt;ul&gt;
 &lt;li&gt;Major refactoring of the blocking module.&lt;&#x2F;li&gt;
 &lt;li&gt;Delete the graceful shutdown in blocking module.&lt;&#x2F;li&gt;
@@ -105,8 +109,8 @@
 	</entry>
 	<entry xml:lang="en">
 		<title>README</title>
-		<published>2022-09-26T06:16:59+00:00</published>
-		<updated>2022-09-26T06:16:59+00:00</updated>
+		<published>2022-09-27T14:59:18+00:00</published>
+		<updated>2022-09-27T14:59:18+00:00</updated>
 		<link rel="alternate" href="https://fang.badykov.com/docs/readme/" type="text/html"/>
 		<id>https://fang.badykov.com/docs/readme/</id>
 		<content type="html">&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;raw.githubusercontent.com&#x2F;ayrat555&#x2F;fang&#x2F;master&#x2F;logo.png&quot; alt=&quot;fang&quot; height=&quot;300px&quot;&gt;&lt;&#x2F;p&gt;
@@ -116,17 +120,17 @@
 &lt;h2 id=&quot;features&quot;&gt;Features&lt;&#x2F;h2&gt;
 &lt;p&gt;Here are some of the fang&#x27;s key features:&lt;&#x2F;p&gt;
 &lt;ul&gt;
-&lt;li&gt;Async and threaded workers
+&lt;li&gt;Async and threaded workers.
 Workers can be started in threads (threaded workers) or &lt;code&gt;tokio&lt;&#x2F;code&gt; tasks (async workers)&lt;&#x2F;li&gt;
-&lt;li&gt;Scheduled tasks
+&lt;li&gt;Scheduled tasks.
 Tasks can be scheduled at any time in the future&lt;&#x2F;li&gt;
-&lt;li&gt;Periodic (CRON) tasks
+&lt;li&gt;Periodic (CRON) tasks.
 Tasks can be scheduled using cron expressions&lt;&#x2F;li&gt;
-&lt;li&gt;Unique tasks
+&lt;li&gt;Unique tasks.
 Tasks are not duplicated in the queue if they are unique&lt;&#x2F;li&gt;
-&lt;li&gt;Single-purpose workers
+&lt;li&gt;Single-purpose workers.
 Tasks are stored in a single table but workers can execute only tasks of the specific type&lt;&#x2F;li&gt;
-&lt;li&gt;Retries
+&lt;li&gt;Retries.
 Tasks can be retried with a custom backoff mode&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
 &lt;h2 id=&quot;installation&quot;&gt;Installation&lt;&#x2F;h2&gt;
@@ -135,14 +139,14 @@ Tasks can be retried with a custom backoff mode&lt;&#x2F;li&gt;
 &lt;&#x2F;ol&gt;
 &lt;h4 id=&quot;the-blocking-feature&quot;&gt;the Blocking feature&lt;&#x2F;h4&gt;
 &lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span&gt;[dependencies]
-&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.9&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; , &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;features &lt;&#x2F;span&gt;&lt;span&gt;= [&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;blocking&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;default-features &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false &lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.10&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; , &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;features &lt;&#x2F;span&gt;&lt;span&gt;= [&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;blocking&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;default-features &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false &lt;&#x2F;span&gt;&lt;span&gt;}
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
 &lt;h4 id=&quot;the-asynk-feature&quot;&gt;the Asynk feature&lt;&#x2F;h4&gt;
 &lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span&gt;[dependencies]
-&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.9&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; , &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;features &lt;&#x2F;span&gt;&lt;span&gt;= [&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;asynk&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;default-features &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false &lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.10&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; , &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;features &lt;&#x2F;span&gt;&lt;span&gt;= [&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;asynk&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;default-features &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false &lt;&#x2F;span&gt;&lt;span&gt;}
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
 &lt;h4 id=&quot;both-features&quot;&gt;Both features&lt;&#x2F;h4&gt;
-&lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.9&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; }
+&lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.10&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; }
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
 &lt;p&gt;&lt;em&gt;Supports rustc 1.62+&lt;&#x2F;em&gt;&lt;&#x2F;p&gt;
 &lt;ol start=&quot;2&quot;&gt;
