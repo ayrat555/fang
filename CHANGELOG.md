@@ -8,7 +8,7 @@
 
 ### Improved
 
-- Update the cron crate - [#97](https://github.com/ayrat555/fang/pull/97)
+- Update the cron crate from 0.11 to 0.12 - [#97](https://github.com/ayrat555/fang/pull/97)
 
 ## 0.9.1 (2022-09-14)
 
