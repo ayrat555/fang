@@ -101,6 +101,7 @@ pub struct FangError {
     pub description: String,
 }
 
+#[doc(hidden)]
 #[cfg(feature = "blocking")]
 extern crate diesel;
 
@@ -127,6 +128,7 @@ pub use chrono::Utc;
 
 #[cfg(feature = "blocking")]
 pub mod blocking;
+
 #[cfg(feature = "blocking")]
 pub use blocking::*;
 

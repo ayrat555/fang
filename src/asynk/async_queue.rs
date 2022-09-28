@@ -113,39 +113,59 @@ impl From<cron::error::Error> for AsyncQueueError {
     }
 }
 
+/// This traits define the operations that can do an asyncronous queue.
+/// This trait can be implemented for diferent storages.
+/// The storage implemented is PostgreSQL (planned to implement more in future).
+
 #[async_trait]
 pub trait AsyncQueueable: Send {
+    /// This method should retrieve one task of the `task_type` if `task_type` is `None` will try to
+    /// fetch a task which type is `DEFAULT_TASK_TYPE` and also updates the state of the task to
+    /// `FangTaskState::InProgress`.
+    ///
     async fn fetch_and_touch_task(
         &mut self,
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError>;
 
+    /// Enqueue a task in the storage, The task will be executed as soon as possible if you have
+    /// created a AsyncWorkerPool that has the same `task_type`.
     async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
 
+    /// This will remove all tasks from storage does not matter the `task_type`.
     async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError>;
 
+    /// Remove all tasks that are scheduled in the future.
     async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError>;
 
+    /// Remove a task by his identifier.
     async fn remove_task(&mut self, id: Uuid) -> Result<u64, AsyncQueueError>;
 
+    /// Remove a task by his metadata (struct fields values.)
     async fn remove_task_by_metadata(
         &mut self,
         task: &dyn AsyncRunnable,
     ) -> Result<u64, AsyncQueueError>;
 
+    /// Removes all tasks that have one specified `task_type`.
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError>;
 
+    /// Retrieve a task from storage by its `id`.
     async fn find_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError>;
 
+    /// Update the `FangTaskState` specified.
+    /// See `FangTaskState` enum to see the possible states.
     async fn update_task_state(
         &mut self,
         task: Task,
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError>;
 
+    /// Update the state of a task to `FangTaskState::Failed`, and sets an error_message.
     async fn fail_task(&mut self, task: Task, error_message: &str)
         -> Result<Task, AsyncQueueError>;
 
+    /// Schedules a Task which have implemented `AsyncRunnable::cron` method.
     async fn schedule_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
 
     async fn schedule_retry(
@@ -155,6 +175,20 @@ pub trait AsyncQueueable: Send {
         error: &str,
     ) -> Result<Task, AsyncQueueError>;
 }
+
+/// An async queue that can be used for enqueue tasks.
+/// It uses a PostgreSQL storage. It must to be connected to perform any operation.
+/// To connect a `AsyncQueue` to PostgreSQL database call `connect` method.
+/// A Queue can be created with the TypedBuilder.
+///
+///    ```rust
+///         let mut queue = AsyncQueue::builder()
+///             .uri("postgres://postgres:postgres@localhost/fang")
+///             .max_pool_size(max_pool_size)
+///             .build();
+///     ```
+///
+/// `AsyncQueueable` is implemented for `AsyncQueue` so every method of `AsyncQueueable`.
 
 #[derive(TypedBuilder, Debug, Clone)]
 pub struct AsyncQueue<Tls>
@@ -344,6 +378,7 @@ where
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
+    /// Check if AsyncQueue is connected.
     pub fn check_if_connection(&self) -> Result<(), AsyncQueueError> {
         if self.connected {
             Ok(())
@@ -351,6 +386,8 @@ where
             Err(AsyncQueueError::NotConnectedError)
         }
     }
+
+    /// Connect a `AsyncQueue` if is not connected
     pub async fn connect(&mut self, tls: Tls) -> Result<(), AsyncQueueError> {
         let manager = PostgresConnectionManager::new_from_stringlike(self.uri.clone(), tls)?;
 
@@ -363,6 +400,7 @@ where
         self.connected = true;
         Ok(())
     }
+
     async fn remove_all_tasks_query(
         transaction: &mut Transaction<'_>,
     ) -> Result<u64, AsyncQueueError> {
