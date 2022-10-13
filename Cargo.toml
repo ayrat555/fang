@@ -1,6 +1,6 @@
 [package]
 name = "fang"
-version = "0.9.1"
+version = "0.10.0"
 authors = ["Ayrat Badykov <ayratin555@gmail.com>" , "Pepe Márquez <pepe.marquezromero@gmail.com>"]
 description = "Background job processing library for Rust"
 repository = "https://github.com/ayrat555/fang"
@@ -20,7 +20,7 @@ blocking = ["diesel", "diesel-derive-enum", "dotenv"]
 asynk = ["bb8-postgres",  "postgres-types", "tokio", "async-trait", "async-recursion"]
 
 [dependencies]
-cron = "0.11"
+cron = "0.12"
 chrono = "0.4"
 hex = "0.4"
 log = "0.4"

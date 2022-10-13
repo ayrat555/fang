@@ -8,6 +8,8 @@ Background task processing library for Rust. It uses Postgres DB as a task queue
 
 ## Key Features
 
+ Here are some of the fang's key features:
+
  - Async and threaded workers.
    Workers can be started in threads (threaded workers) or `tokio` tasks (async workers)
  - Scheduled tasks.
@@ -29,18 +31,18 @@ Background task processing library for Rust. It uses Postgres DB as a task queue
 #### the Blocking feature
 ```toml
 [dependencies]
-fang = { version = "0.9" , features = ["blocking"], default-features = false }
+fang = { version = "0.10" , features = ["blocking"], default-features = false }
 ```
 
 #### the Asynk feature
 ```toml
 [dependencies]
-fang = { version = "0.9" , features = ["asynk"], default-features = false }
+fang = { version = "0.10" , features = ["asynk"], default-features = false }
 ```
 
 #### Both features
 ```toml
-fang = { version = "0.9" }
+fang = { version = "0.10" }
 ```
 
 *Supports rustc 1.62+*
