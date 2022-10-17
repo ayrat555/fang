@@ -41,7 +41,7 @@ impl From<SerdeError> for FangError {
 #[typetag::serde(tag = "type")]
 #[async_trait]
 pub trait AsyncRunnable: Send + Sync {
-    /// Execute the task. It should define its logic
+    /// Execute the task. This method should define its logic
     async fn run(&self, client: &mut dyn AsyncQueueable) -> Result<(), FangError>;
 
     /// Define the type of the task.
