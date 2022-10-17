@@ -161,7 +161,7 @@ pub trait AsyncQueueable: Send {
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError>;
 
-    /// Update the state of a task to `FangTaskState::Failed`, and sets an error_message.
+    /// Update the state of a task to `FangTaskState::Failed` and set an error_message.
     async fn fail_task(&mut self, task: Task, error_message: &str)
         -> Result<Task, AsyncQueueError>;
 
