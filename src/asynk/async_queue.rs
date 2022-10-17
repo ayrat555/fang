@@ -141,7 +141,7 @@ pub trait AsyncQueueable: Send {
     /// Remove a task by its id.
     async fn remove_task(&mut self, id: Uuid) -> Result<u64, AsyncQueueError>;
 
-    /// Remove a task by its metadata (struct fields values.)
+    /// Remove a task by its metadata (struct fields values)
     async fn remove_task_by_metadata(
         &mut self,
         task: &dyn AsyncRunnable,
