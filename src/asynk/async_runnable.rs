@@ -45,7 +45,7 @@ pub trait AsyncRunnable: Send + Sync {
     async fn run(&self, client: &mut dyn AsyncQueueable) -> Result<(), FangError>;
 
     /// Define the type of the task.
-    /// By default `COMMON_TYPE` constant is the task type
+    /// The `common` task type is used by default
     fn task_type(&self) -> String {
         COMMON_TYPE.to_string()
     }
