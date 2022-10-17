@@ -56,7 +56,7 @@ pub trait AsyncRunnable: Send + Sync {
         false
     }
 
-    /// This will define if a task is periodic or is scheduled once in the time.
+    /// This method defines if a task is periodic or it should be executed once in the future.
     ///
     /// Be careful it works only with the UTC timezone.
     ///
