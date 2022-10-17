@@ -44,7 +44,7 @@ pub trait AsyncRunnable: Send + Sync {
     /// Execute the task. It should define its logic
     async fn run(&self, client: &mut dyn AsyncQueueable) -> Result<(), FangError>;
 
-    /// This will define what is the task type.
+    /// Define the type of the task.
     /// By default `COMMON_TYPE` constant is the task type
     fn task_type(&self) -> String {
         COMMON_TYPE.to_string()
