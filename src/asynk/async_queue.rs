@@ -147,7 +147,7 @@ pub trait AsyncQueueable: Send {
         task: &dyn AsyncRunnable,
     ) -> Result<u64, AsyncQueueError>;
 
-    /// Removes all tasks that have one specified `task_type`.
+    /// Removes all tasks that have the specified `task_type`.
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError>;
 
     /// Retrieve a task from storage by its `id`.
