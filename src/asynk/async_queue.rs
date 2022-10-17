@@ -132,7 +132,7 @@ pub trait AsyncQueueable: Send {
     /// created a AsyncWorkerPool that has the same `task_type`.
     async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
 
-    /// This will remove all tasks from storage does not matter the `task_type`.
+    /// The method will remove all tasks from the queue
     async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError>;
 
     /// Remove all tasks that are scheduled in the future.
