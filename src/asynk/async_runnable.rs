@@ -80,7 +80,7 @@ pub trait AsyncRunnable: Send + Sync {
         None
     }
 
-    /// This will define the number of retries that will do if a task fails.
+    /// Define the maximum number of retries the task will be retried.
     /// By default the number of retries is 20.
     fn max_retries(&self) -> i32 {
         RETRIES_NUMBER
