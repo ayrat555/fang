@@ -37,7 +37,7 @@ impl From<SerdeError> for FangError {
     }
 }
 
-/// Implement this trait to insert your own type of task.
+/// Implement this trait to use your custom tasks.
 #[typetag::serde(tag = "type")]
 #[async_trait]
 pub trait AsyncRunnable: Send + Sync {
