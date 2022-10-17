@@ -58,19 +58,25 @@ pub trait AsyncRunnable: Send + Sync {
 
     /// This will define if a task is periodic or is scheduled once in the time.
     /// You can see [how cron format works](https://docs.oracle.com/cd/E12058_01/doc/doc.1014/e12030/cron_expressions.htm)
+    ///
     /// Be careful works only with UTC timezone.
+    ///
     /// [Web to check timezones](https://www.timeanddate.com/worldclock/timezone/utc)
     ///
     /// Example:
     ///
-    //!```rust
-    //! fn cron(&self) -> Option<Scheduled> {
-    //!     let expression = "0/20 * * * Aug-Sep * 2022/1";
-    //!     Some(Scheduled::CronPattern(expression.to_string()))
-    //! }
-    //!```
+    ///
+    /**
+    ```rust
+     fn cron(&self) -> Option<Scheduled> {
+         let expression = "0/20 * * * Aug-Sep * 2022/1";
+         Some(Scheduled::CronPattern(expression.to_string()))
+     }
+    ```
+    */
+
     /// In order to schedule once a task use, `Scheduled::ScheduleOnce` variant.
-    /// And make a Date. 
+    /// And make a Date.
     fn cron(&self) -> Option<Scheduled> {
         None
     }
@@ -80,7 +86,7 @@ pub trait AsyncRunnable: Send + Sync {
     fn max_retries(&self) -> i32 {
         RETRIES_NUMBER
     }
-    
+
     /// This will define the number of seconds that will increment after an attempt of a fail task.
     /// By default is exponential,  2^(attempt)
     fn backoff(&self, attempt: u32) -> u32 {
