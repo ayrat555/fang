@@ -138,7 +138,7 @@ pub trait AsyncQueueable: Send {
     /// Remove all tasks that are scheduled in the future.
     async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError>;
 
-    /// Remove a task by his identifier.
+    /// Remove a task by its id.
     async fn remove_task(&mut self, id: Uuid) -> Result<u64, AsyncQueueError>;
 
     /// Remove a task by his metadata (struct fields values.)
