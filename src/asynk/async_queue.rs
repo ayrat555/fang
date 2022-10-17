@@ -153,7 +153,7 @@ pub trait AsyncQueueable: Send {
     /// Retrieve a task from storage by its `id`.
     async fn find_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError>;
 
-    /// Update the `FangTaskState` specified.
+    /// Update the state field of the specified task
     /// See `FangTaskState` enum to see the possible states.
     async fn update_task_state(
         &mut self,
