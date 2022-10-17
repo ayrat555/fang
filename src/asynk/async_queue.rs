@@ -387,7 +387,7 @@ where
         }
     }
 
-    /// Connect a `AsyncQueue` if is not connected
+    /// Connect to the db if not connected
     pub async fn connect(&mut self, tls: Tls) -> Result<(), AsyncQueueError> {
         let manager = PostgresConnectionManager::new_from_stringlike(self.uri.clone(), tls)?;
 
