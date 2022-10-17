@@ -59,7 +59,7 @@ pub trait AsyncRunnable: Send + Sync {
     /// This will define if a task is periodic or is scheduled once in the time.
     /// You can see [how cron format works](https://docs.oracle.com/cd/E12058_01/doc/doc.1014/e12030/cron_expressions.htm)
     ///
-    /// Be careful works only with UTC timezone.
+    /// Be careful it works only with the UTC timezone.
     ///
     /// [Web to check timezones](https://www.timeanddate.com/worldclock/timezone/utc)
     ///
