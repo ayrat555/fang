@@ -81,7 +81,7 @@ pub trait AsyncRunnable: Send + Sync {
     }
 
     /// This will define the number of retries that will do if a task fails.
-    /// By default the number of retries will be `RETRIES_NUMBER` constant, which value is 20.
+    /// By default the number of retries is 20.
     fn max_retries(&self) -> i32 {
         RETRIES_NUMBER
     }
