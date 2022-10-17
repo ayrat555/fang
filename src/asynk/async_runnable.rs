@@ -51,7 +51,7 @@ pub trait AsyncRunnable: Send + Sync {
     }
 
     /// If set to true, no new tasks with the same metadata will be inserted
-    /// By default is set to false.
+    /// By default it is set to false.
     fn uniq(&self) -> bool {
         false
     }
