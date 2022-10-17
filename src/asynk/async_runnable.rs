@@ -75,7 +75,7 @@ pub trait AsyncRunnable: Send + Sync {
     ```
     */
 
-    /// In order to schedule once a task use, `Scheduled::ScheduleOnce` variant.
+    /// In order to schedule  a task once, use the `Scheduled::ScheduleOnce` enum variant.
     /// And make a Date.
     fn cron(&self) -> Option<Scheduled> {
         None
