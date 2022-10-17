@@ -119,7 +119,7 @@ impl From<cron::error::Error> for AsyncQueueError {
 
 #[async_trait]
 pub trait AsyncQueueable: Send {
-    /// This method should retrieve one task of the `task_type` if `task_type` is `None` will try to
+    /// This method should retrieve one task of the `task_type` type. If `task_type` is `None` it will try to
     /// fetch a task which type is `DEFAULT_TASK_TYPE` and also updates the state of the task to
     /// `FangTaskState::InProgress`.
     ///
