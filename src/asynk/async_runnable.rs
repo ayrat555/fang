@@ -86,7 +86,7 @@ pub trait AsyncRunnable: Send + Sync {
         RETRIES_NUMBER
     }
 
-    /// This will define the number of seconds that will increment after an attempt of a fail task.
+    /// Define the backoff mode
     /// By default is exponential,  2^(attempt)
     fn backoff(&self, attempt: u32) -> u32 {
         u32::pow(2, attempt)
