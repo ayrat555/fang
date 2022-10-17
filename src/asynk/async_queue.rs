@@ -378,7 +378,7 @@ where
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
-    /// Check if AsyncQueue is connected.
+    /// Check if the connection with db is established
     pub fn check_if_connection(&self) -> Result<(), AsyncQueueError> {
         if self.connected {
             Ok(())
