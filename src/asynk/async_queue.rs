@@ -165,7 +165,7 @@ pub trait AsyncQueueable: Send {
     async fn fail_task(&mut self, task: Task, error_message: &str)
         -> Result<Task, AsyncQueueError>;
 
-    /// Schedules a Task which have implemented `AsyncRunnable::cron` method.
+    /// Schedule a task.
     async fn schedule_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
 
     async fn schedule_retry(
