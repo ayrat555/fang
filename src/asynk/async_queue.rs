@@ -129,7 +129,7 @@ pub trait AsyncQueueable: Send {
     ) -> Result<Option<Task>, AsyncQueueError>;
 
     /// Enqueue a task to the queue, The task will be executed as soon as possible by the worker of the same type
-    /// created a AsyncWorkerPool that has the same `task_type`.
+    /// created by an AsyncWorkerPool.
     async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
 
     /// The method will remove all tasks from the queue
