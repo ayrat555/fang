@@ -128,7 +128,7 @@ pub trait AsyncQueueable: Send {
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError>;
 
-    /// Enqueue a task in the storage, The task will be executed as soon as possible if you have
+    /// Enqueue a task to the queue, The task will be executed as soon as possible by the worker of the same type
     /// created a AsyncWorkerPool that has the same `task_type`.
     async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
 
