@@ -85,7 +85,7 @@ pub trait AsyncRunnable: Send + Sync {
     }
 
     /// Define the backoff mode
-    /// By default is exponential,  2^(attempt)
+    /// By default, it is exponential,  2^(attempt)
     fn backoff(&self, attempt: u32) -> u32 {
         u32::pow(2, attempt)
     }
