@@ -50,7 +50,7 @@ pub trait AsyncRunnable: Send + Sync {
         COMMON_TYPE.to_string()
     }
 
-    /// If set to true, library will handle the uniqueness of the task that implements this trait.
+    /// If set to true, no new tasks with the same metadata will be inserted
     /// By default is set to false.
     fn uniq(&self) -> bool {
         false
