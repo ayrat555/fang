@@ -176,7 +176,7 @@ pub trait AsyncQueueable: Send {
     ) -> Result<Task, AsyncQueueError>;
 }
 
-/// An async queue that can be used for enqueue tasks.
+/// An async queue that can be used to enqueue tasks.
 /// It uses a PostgreSQL storage. It must to be connected to perform any operation.
 /// To connect a `AsyncQueue` to PostgreSQL database call `connect` method.
 /// A Queue can be created with the TypedBuilder.
