@@ -61,7 +61,6 @@ pub trait AsyncRunnable: Send + Sync {
     ///
     /// Be careful it works only with the UTC timezone.
     ///
-    /// [Web to check timezones](https://www.timeanddate.com/worldclock/timezone/utc)
     ///
     /// Example:
     ///
