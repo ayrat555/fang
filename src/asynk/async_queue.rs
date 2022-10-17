@@ -188,7 +188,6 @@ pub trait AsyncQueueable: Send {
 ///             .build();
 ///     ```
 ///
-/// `AsyncQueueable` is implemented for `AsyncQueue` so every method of `AsyncQueueable`.
 
 #[derive(TypedBuilder, Debug, Clone)]
 pub struct AsyncQueue<Tls>
