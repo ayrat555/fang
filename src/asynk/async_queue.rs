@@ -113,7 +113,7 @@ impl From<cron::error::Error> for AsyncQueueError {
     }
 }
 
-/// This traits define the operations that can do an asyncronous queue.
+/// This trait defines operations for an asynchronous queue.
 /// This trait can be implemented for diferent storages.
 /// The storage implemented is PostgreSQL (planned to implement more in future).
 
