@@ -6,7 +6,7 @@
 
 Background task processing library for Rust. It uses Postgres DB as a task queue.
 
-## Features
+## Key Features
 
  Here are some of the fang's key features:
 

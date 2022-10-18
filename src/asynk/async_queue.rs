@@ -113,39 +113,59 @@ impl From<cron::error::Error> for AsyncQueueError {
     }
 }
 
+/// This trait defines operations for an asynchronous queue.
+/// The trait can be implemented for different storage backends.
+/// For now, the trait is only implemented for PostgreSQL. More backends are planned to be implemented in the future.
+
 #[async_trait]
 pub trait AsyncQueueable: Send {
+    /// This method should retrieve one task of the `task_type` type. If `task_type` is `None` it will try to
+    /// fetch a task of the type `common`. After fetching it should update the state of the task to
+    /// `FangTaskState::InProgress`.
+    ///
     async fn fetch_and_touch_task(
         &mut self,
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError>;
 
+    /// Enqueue a task to the queue, The task will be executed as soon as possible by the worker of the same type
+    /// created by an AsyncWorkerPool.
     async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
 
+    /// The method will remove all tasks from the queue
     async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError>;
 
+    /// Remove all tasks that are scheduled in the future.
     async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError>;
 
+    /// Remove a task by its id.
     async fn remove_task(&mut self, id: Uuid) -> Result<u64, AsyncQueueError>;
 
+    /// Remove a task by its metadata (struct fields values)
     async fn remove_task_by_metadata(
         &mut self,
         task: &dyn AsyncRunnable,
     ) -> Result<u64, AsyncQueueError>;
 
+    /// Removes all tasks that have the specified `task_type`.
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError>;
 
+    /// Retrieve a task from storage by its `id`.
     async fn find_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError>;
 
+    /// Update the state field of the specified task
+    /// See the `FangTaskState` enum for possible states.
     async fn update_task_state(
         &mut self,
         task: Task,
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError>;
 
+    /// Update the state of a task to `FangTaskState::Failed` and set an error_message.
     async fn fail_task(&mut self, task: Task, error_message: &str)
         -> Result<Task, AsyncQueueError>;
 
+    /// Schedule a task.
     async fn schedule_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
 
     async fn schedule_retry(
@@ -155,6 +175,19 @@ pub trait AsyncQueueable: Send {
         error: &str,
     ) -> Result<Task, AsyncQueueError>;
 }
+
+/// An async queue that can be used to enqueue tasks.
+/// It uses a PostgreSQL storage. It must be connected to perform any operation.
+/// To connect an `AsyncQueue` to PostgreSQL database call the `connect` method.
+/// A Queue can be created with the TypedBuilder.
+///
+///    ```rust
+///         let mut queue = AsyncQueue::builder()
+///             .uri("postgres://postgres:postgres@localhost/fang")
+///             .max_pool_size(max_pool_size)
+///             .build();
+///     ```
+///
 
 #[derive(TypedBuilder, Debug, Clone)]
 pub struct AsyncQueue<Tls>
@@ -344,6 +377,7 @@ where
     <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
+    /// Check if the connection with db is established
     pub fn check_if_connection(&self) -> Result<(), AsyncQueueError> {
         if self.connected {
             Ok(())
@@ -351,6 +385,8 @@ where
             Err(AsyncQueueError::NotConnectedError)
         }
     }
+
+    /// Connect to the db if not connected
     pub async fn connect(&mut self, tls: Tls) -> Result<(), AsyncQueueError> {
         let manager = PostgresConnectionManager::new_from_stringlike(self.uri.clone(), tls)?;
 
@@ -363,6 +399,7 @@ where
         self.connected = true;
         Ok(())
     }
+
     async fn remove_all_tasks_query(
         transaction: &mut Transaction<'_>,
     ) -> Result<u64, AsyncQueueError> {
