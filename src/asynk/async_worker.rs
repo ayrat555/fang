@@ -28,11 +28,7 @@ impl<AQueue> AsyncWorker<AQueue>
 where
     AQueue: AsyncQueueable + Clone + Sync + 'static,
 {
-    pub async fn run(
-        &mut self,
-        task: Task,
-        runnable: Box<dyn AsyncRunnable>,
-    ) -> Result<(), FangError> {
+    async fn run(&mut self, task: Task, runnable: Box<dyn AsyncRunnable>) -> Result<(), FangError> {
         let result = runnable.run(&mut self.queue).await;
 
         match result {
@@ -86,13 +82,13 @@ where
         Ok(())
     }
 
-    pub async fn sleep(&mut self) {
+    async fn sleep(&mut self) {
         self.sleep_params.maybe_increase_sleep_period();
 
         tokio::time::sleep(self.sleep_params.sleep_period).await;
     }
 
-    pub async fn run_tasks(&mut self) -> Result<(), FangError> {
+    pub(crate) async fn run_tasks(&mut self) -> Result<(), FangError> {
         loop {
             //fetch task
             match self
