@@ -37,7 +37,7 @@ impl<AQueue> AsyncWorkerPool<AQueue>
 where
     AQueue: AsyncQueueable + Clone + Sync + 'static,
 {
-    /// Starts the AsyncWorkerPool loop.
+    /// Starts the configured number of workers
     /// This is necessary in order to execute tasks.
     pub async fn start(&mut self) {
         for idx in 0..self.number_of_workers {
