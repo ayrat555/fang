@@ -8,8 +8,6 @@ use log::error;
 use tokio::task::JoinHandle;
 use typed_builder::TypedBuilder;
 
-/// A executioner of tasks, it executes tasks only of one given task_type, it sleeps when they are
-/// not tasks to be executed.
 #[derive(TypedBuilder, Clone)]
 pub struct AsyncWorkerPool<AQueue>
 where
