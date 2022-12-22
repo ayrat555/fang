@@ -25,7 +25,7 @@ where
     /// retention_mode controls the treatment of the tasks once they are finished.
     #[builder(default, setter(into))]
     pub retention_mode: RetentionMode,
-    /// Number of workers of the AsyncWorkerPool.
+    /// the number of workers of the AsyncWorkerPool.
     #[builder(setter(into))]
     pub number_of_workers: u32,
     /// The type of tasks that will be executed by `AsyncWorkerPool`.
