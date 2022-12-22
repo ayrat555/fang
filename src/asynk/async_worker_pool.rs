@@ -17,7 +17,6 @@ where
     /// the AsyncWorkerPool uses a queue to control the tasks that will be executed.
     pub queue: AQueue,
     /// sleep_params controls how much time a worker will sleep while waiting for tasks
-    /// execute.
     #[builder(default, setter(into))]
     pub sleep_params: SleepParams,
     /// retention_mode controls if  tasks should be persisted after execution
