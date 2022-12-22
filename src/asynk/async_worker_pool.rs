@@ -18,7 +18,7 @@ where
     #[builder(setter(into))]
     /// the AsyncWorkerPool uses a queue to control the tasks that will be executed.
     pub queue: AQueue,
-    /// sleep_params controls how much time tokio process sleeps when they are not tasks to
+    /// sleep_params controls how much time a worker will sleep while waiting for tasks
     /// execute.
     #[builder(default, setter(into))]
     pub sleep_params: SleepParams,
