@@ -9,7 +9,7 @@ use crate::{RetentionMode, SleepParams};
 use log::error;
 use typed_builder::TypedBuilder;
 
-/// A executioner of tasks, it executes tasks only of one given task_type, it sleeps when they are
+/// it executes tasks only of task_type type, it sleeps when there are no tasks in the queue
 /// not tasks to be executed.
 #[derive(TypedBuilder)]
 pub struct AsyncWorker<AQueue>
