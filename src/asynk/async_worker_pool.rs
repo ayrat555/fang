@@ -16,7 +16,7 @@ where
     AQueue: AsyncQueueable + Clone + Sync + 'static,
 {
     #[builder(setter(into))]
-    /// AsyncWorkerPool uses a queue to control the tasks that will be executing.
+    /// the AsyncWorkerPool uses a queue to control the tasks that will be executed.
     pub queue: AQueue,
     /// sleep_params controls how much time tokio process sleeps when they are not tasks to
     /// execute.
