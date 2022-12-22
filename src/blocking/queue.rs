@@ -136,7 +136,7 @@ pub trait Queueable {
 
 /// An async queue that can be used to enqueue tasks.
 /// It uses a PostgreSQL storage. It must be connected to perform any operation.
-/// To connect an `Queue` to PostgreSQL database call the `get_connection` method.
+/// To connect a `Queue` to the PostgreSQL database call the `get_connection` method.
 /// A Queue can be created with the TypedBuilder.
 ///
 ///    ```rust
