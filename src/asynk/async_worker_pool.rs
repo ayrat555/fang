@@ -22,7 +22,7 @@ where
     /// execute.
     #[builder(default, setter(into))]
     pub sleep_params: SleepParams,
-    /// retention_mode controls the treatment of the tasks once they are finished.
+    /// retention_mode controls if  tasks should be persisted after execution
     #[builder(default, setter(into))]
     pub retention_mode: RetentionMode,
     /// the number of workers of the AsyncWorkerPool.
