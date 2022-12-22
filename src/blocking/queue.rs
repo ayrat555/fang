@@ -84,7 +84,7 @@ impl From<cron::error::Error> for QueueError {
     }
 }
 
-/// This trait defines operations for an synchronous queue.
+/// This trait defines operations for a synchronous queue.
 /// The trait can be implemented for different storage backends.
 /// For now, the trait is only implemented for PostgreSQL. More backends are planned to be implemented in the future.
 pub trait Queueable {
