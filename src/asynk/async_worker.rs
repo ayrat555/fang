@@ -10,7 +10,6 @@ use log::error;
 use typed_builder::TypedBuilder;
 
 /// it executes tasks only of task_type type, it sleeps when there are no tasks in the queue
-/// not tasks to be executed.
 #[derive(TypedBuilder)]
 pub struct AsyncWorker<AQueue>
 where
