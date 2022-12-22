@@ -14,13 +14,18 @@ where
     AQueue: AsyncQueueable + Clone + Sync + 'static,
 {
     #[builder(setter(into))]
+    /// the AsyncWorkerPool uses a queue to control the tasks that will be executed.
     pub queue: AQueue,
+    /// sleep_params controls how much time a worker will sleep while waiting for tasks
     #[builder(default, setter(into))]
     pub sleep_params: SleepParams,
+    /// retention_mode controls if  tasks should be persisted after execution
     #[builder(default, setter(into))]
     pub retention_mode: RetentionMode,
+    /// the number of workers of the AsyncWorkerPool.
     #[builder(setter(into))]
     pub number_of_workers: u32,
+    /// The type of tasks that will be executed by `AsyncWorkerPool`.
     #[builder(default=DEFAULT_TASK_TYPE.to_string(), setter(into))]
     pub task_type: String,
 }
@@ -29,6 +34,8 @@ impl<AQueue> AsyncWorkerPool<AQueue>
 where
     AQueue: AsyncQueueable + Clone + Sync + 'static,
 {
+    /// Starts the configured number of workers
+    /// This is necessary in order to execute tasks.
     pub async fn start(&mut self) {
         for idx in 0..self.number_of_workers {
             let pool = self.clone();
@@ -37,7 +44,7 @@ where
     }
 
     #[async_recursion]
-    pub async fn supervise_task(pool: AsyncWorkerPool<AQueue>, restarts: u64, worker_number: u32) {
+    async fn supervise_task(pool: AsyncWorkerPool<AQueue>, restarts: u64, worker_number: u32) {
         let restarts = restarts + 1;
         let join_handle = Self::spawn_worker(
             pool.queue.clone(),
@@ -56,7 +63,7 @@ where
         }
     }
 
-    pub async fn spawn_worker(
+    async fn spawn_worker(
         queue: AQueue,
         sleep_params: SleepParams,
         retention_mode: RetentionMode,
@@ -66,7 +73,7 @@ where
             Self::run_worker(queue, sleep_params, retention_mode, task_type).await
         })
     }
-    pub async fn run_worker(
+    async fn run_worker(
         queue: AQueue,
         sleep_params: SleepParams,
         retention_mode: RetentionMode,

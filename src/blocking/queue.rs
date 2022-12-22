@@ -84,29 +84,46 @@ impl From<cron::error::Error> for QueueError {
     }
 }
 
+/// This trait defines operations for a synchronous queue.
+/// The trait can be implemented for different storage backends.
+/// For now, the trait is only implemented for PostgreSQL. More backends are planned to be implemented in the future.
 pub trait Queueable {
+    /// This method should retrieve one task of the `task_type` type. If `task_type` is `None` it will try to
+    /// fetch a task of the type `common`. After fetching it should update the state of the task to
+    /// `FangTaskState::InProgress`.
     fn fetch_and_touch_task(&self, task_type: String) -> Result<Option<Task>, QueueError>;
 
+    /// Enqueue a task to the queue, The task will be executed as soon as possible by the worker of the same type
+    /// created by an `WorkerPool`.
     fn insert_task(&self, params: &dyn Runnable) -> Result<Task, QueueError>;
 
+    /// The method will remove all tasks from the queue
     fn remove_all_tasks(&self) -> Result<usize, QueueError>;
 
+    /// Remove all tasks that are scheduled in the future.
     fn remove_all_scheduled_tasks(&self) -> Result<usize, QueueError>;
 
+    /// Removes all tasks that have the specified `task_type`.
     fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, QueueError>;
 
+    /// Remove a task by its id.
     fn remove_task(&self, id: Uuid) -> Result<usize, QueueError>;
 
     /// To use this function task has to be uniq. uniq() has to return true.
     /// If task is not uniq this function will not do anything.
+    /// Remove a task by its metadata (struct fields values)
     fn remove_task_by_metadata(&self, task: &dyn Runnable) -> Result<usize, QueueError>;
 
     fn find_task_by_id(&self, id: Uuid) -> Option<Task>;
 
+    /// Update the state field of the specified task
+    /// See the `FangTaskState` enum for possible states.
     fn update_task_state(&self, task: &Task, state: FangTaskState) -> Result<Task, QueueError>;
 
+    /// Update the state of a task to `FangTaskState::Failed` and set an error_message.
     fn fail_task(&self, task: &Task, error: &str) -> Result<Task, QueueError>;
 
+    /// Schedule a task.
     fn schedule_task(&self, task: &dyn Runnable) -> Result<Task, QueueError>;
 
     fn schedule_retry(
@@ -117,6 +134,27 @@ pub trait Queueable {
     ) -> Result<Task, QueueError>;
 }
 
+/// An async queue that can be used to enqueue tasks.
+/// It uses a PostgreSQL storage. It must be connected to perform any operation.
+/// To connect a `Queue` to the PostgreSQL database call the `get_connection` method.
+/// A Queue can be created with the TypedBuilder.
+///
+///    ```rust
+///         // Set DATABASE_URL enviroment variable if you would like to try this function.
+///         pub fn connection_pool(pool_size: u32) -> r2d2::Pool<r2d2::ConnectionManager<PgConnection>> {
+///             let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+///
+///             let manager = r2d2::ConnectionManager::<PgConnection>::new(database_url);
+///
+///             r2d2::Pool::builder()
+///             .max_size(pool_size)
+///             .build(manager)
+///             .unwrap()
+///         }
+///
+///         let queue = Queue::builder().connection_pool(connection_pool(3)).build();
+///     ```
+///
 #[derive(Clone, TypedBuilder)]
 pub struct Queue {
     #[builder(setter(into))]
@@ -208,6 +246,7 @@ impl Queueable for Queue {
 }
 
 impl Queue {
+    /// Connect to the db if not connected
     pub fn get_connection(&self) -> Result<PoolConnection, QueueError> {
         let result = self.connection_pool.get();
 

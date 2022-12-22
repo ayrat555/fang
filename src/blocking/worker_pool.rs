@@ -13,16 +13,22 @@ pub struct WorkerPool<BQueue>
 where
     BQueue: Queueable + Clone + Sync + Send + 'static,
 {
-    #[builder(setter(into))]
-    pub number_of_workers: u32,
+    /// the AsyncWorkerPool uses a queue to control the tasks that will be executed.
     #[builder(setter(into))]
     pub queue: BQueue,
-    #[builder(setter(into), default)]
-    pub task_type: String,
+    /// sleep_params controls how much time a worker will sleep while waiting for tasks
+    /// execute.
     #[builder(setter(into), default)]
     pub sleep_params: SleepParams,
+    /// retention_mode controls if  tasks should be persisted after execution
     #[builder(setter(into), default)]
     pub retention_mode: RetentionMode,
+    /// the number of workers of the AsyncWorkerPool.
+    #[builder(setter(into))]
+    pub number_of_workers: u32,
+    /// The type of tasks that will be executed by `AsyncWorkerPool`.
+    #[builder(setter(into), default)]
+    pub task_type: String,
 }
 
 #[derive(Clone, TypedBuilder)]
@@ -46,6 +52,8 @@ impl<BQueue> WorkerPool<BQueue>
 where
     BQueue: Queueable + Clone + Sync + Send + 'static,
 {
+    /// Starts the configured number of workers
+    /// This is necessary in order to execute tasks.
     pub fn start(&mut self) -> Result<(), FangError> {
         for idx in 1..self.number_of_workers + 1 {
             let name = format!("worker_{}{}", self.task_type, idx);

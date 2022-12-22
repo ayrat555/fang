@@ -13,6 +13,8 @@ use log::error;
 use std::thread;
 use typed_builder::TypedBuilder;
 
+/// A executioner of tasks, it executes tasks only of one given task_type, it sleeps when they are
+/// not tasks to be executed.
 #[derive(TypedBuilder)]
 pub struct Worker<BQueue>
 where
@@ -52,7 +54,7 @@ where
         }
     }
 
-    pub fn run_tasks(&mut self) -> Result<(), FangError> {
+    pub(crate) fn run_tasks(&mut self) -> Result<(), FangError> {
         loop {
             match self.queue.fetch_and_touch_task(self.task_type.clone()) {
                 Ok(Some(task)) => {
@@ -114,7 +116,7 @@ where
         self.sleep_params.maybe_reset_sleep_period();
     }
 
-    pub fn sleep(&mut self) {
+    fn sleep(&mut self) {
         self.sleep_params.maybe_increase_sleep_period();
 
         thread::sleep(self.sleep_params.sleep_period);

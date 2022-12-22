@@ -9,6 +9,7 @@ use crate::{RetentionMode, SleepParams};
 use log::error;
 use typed_builder::TypedBuilder;
 
+/// it executes tasks only of task_type type, it sleeps when there are no tasks in the queue
 #[derive(TypedBuilder)]
 pub struct AsyncWorker<AQueue>
 where
@@ -28,11 +29,7 @@ impl<AQueue> AsyncWorker<AQueue>
 where
     AQueue: AsyncQueueable + Clone + Sync + 'static,
 {
-    pub async fn run(
-        &mut self,
-        task: Task,
-        runnable: Box<dyn AsyncRunnable>,
-    ) -> Result<(), FangError> {
+    async fn run(&mut self, task: Task, runnable: Box<dyn AsyncRunnable>) -> Result<(), FangError> {
         let result = runnable.run(&mut self.queue).await;
 
         match result {
@@ -86,13 +83,13 @@ where
         Ok(())
     }
 
-    pub async fn sleep(&mut self) {
+    async fn sleep(&mut self) {
         self.sleep_params.maybe_increase_sleep_period();
 
         tokio::time::sleep(self.sleep_params.sleep_period).await;
     }
 
-    pub async fn run_tasks(&mut self) -> Result<(), FangError> {
+    pub(crate) async fn run_tasks(&mut self) -> Result<(), FangError> {
         loop {
             //fetch task
             match self
