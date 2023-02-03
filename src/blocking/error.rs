@@ -6,14 +6,14 @@ use std::io::Error as IoError;
 
 impl From<IoError> for FangError {
     fn from(error: IoError) -> Self {
-        let description = format!("{:?}", error);
+        let description = format!("{error:?}");
         FangError { description }
     }
 }
 
 impl From<QueueError> for FangError {
     fn from(error: QueueError) -> Self {
-        let description = format!("{:?}", error);
+        let description = format!("{error:?}");
         FangError { description }
     }
 }

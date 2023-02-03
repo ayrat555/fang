@@ -56,7 +56,7 @@ where
     /// This is necessary in order to execute tasks.
     pub fn start(&mut self) -> Result<(), FangError> {
         for idx in 1..self.number_of_workers + 1 {
-            let name = format!("worker_{}{}", self.task_type, idx);
+            let name = format!("worker_{}{idx}", self.task_type);
 
             let worker_thread = WorkerThread::builder()
                 .name(name.clone())
