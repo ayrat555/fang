@@ -9,7 +9,7 @@ lead = '<b>Fang</b> is a background task processing for Rust. It uses Postgres D
 url = "/docs/readme"
 
 url_button = "Get started"
-repo_version = "GitHub v0.10.0"
+repo_version = "GitHub v0.10.1"
 repo_license = "Open-source MIT License."
 repo_url = "https://github.com/ayrat555/fang"
 
