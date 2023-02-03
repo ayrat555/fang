@@ -12,7 +12,7 @@ pub const RETRIES_NUMBER: i32 = 20;
 
 impl From<AsyncQueueError> for FangError {
     fn from(error: AsyncQueueError) -> Self {
-        let message = format!("{:?}", error);
+        let message = format!("{error:?}");
         FangError {
             description: message,
         }
