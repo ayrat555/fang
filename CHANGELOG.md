@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.1 (2023-02-03)
+
+### Improved
+
+- Update typed-builder requirement from 0.11 to 0.12 - [#108](https://github.com/ayrat555/fang/pull/108)
+- Add dodcumentation - [#96](https://github.com/ayrat555/fang/pull/96), [#104](https://github.com/ayrat555/fang/pull/104)
+- Fix clippy warnings - [#109](https://github.com/ayrat555/fang/pull/109)
+
 ## 0.10.0 (2022-09-27)
 
 ### Added
