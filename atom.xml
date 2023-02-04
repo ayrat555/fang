@@ -5,21 +5,28 @@
 	<link href="https://fang.badykov.com/atom.xml" rel="self" type="application/atom+xml"/>
   <link href="https://fang.badykov.com"/>
 	<generator uri="https://www.getzola.org/">Zola</generator>
-	<updated>2022-09-27T19:01:31+00:00</updated>
+	<updated>2023-02-04T03:52:47+00:00</updated>
 	<id>https://fang.badykov.com/atom.xml</id>
 	<entry xml:lang="en">
 		<title>CHANGELOG</title>
-		<published>2022-09-27T19:01:31+00:00</published>
-		<updated>2022-09-27T19:01:31+00:00</updated>
+		<published>2023-02-04T03:52:47+00:00</published>
+		<updated>2023-02-04T03:52:47+00:00</updated>
 		<link rel="alternate" href="https://fang.badykov.com/docs/changelog/" type="text/html"/>
 		<id>https://fang.badykov.com/docs/changelog/</id>
 		<content type="html">&lt;h1 id=&quot;changelog&quot;&gt;Changelog&lt;&#x2F;h1&gt;
+&lt;h2 id=&quot;0-10-1-2023-02-03&quot;&gt;0.10.1 (2023-02-03)&lt;&#x2F;h2&gt;
+&lt;h3 id=&quot;improved&quot;&gt;Improved&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Update typed-builder requirement from 0.11 to 0.12 - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;108&quot;&gt;#108&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;Add dodcumentation - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;96&quot;&gt;#96&lt;&#x2F;a&gt;, &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;104&quot;&gt;#104&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;Fix clippy warnings - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;109&quot;&gt;#109&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
 &lt;h2 id=&quot;0-10-0-2022-09-27&quot;&gt;0.10.0 (2022-09-27)&lt;&#x2F;h2&gt;
 &lt;h3 id=&quot;added&quot;&gt;Added&lt;&#x2F;h3&gt;
 &lt;ul&gt;
 &lt;li&gt;Add retries for tasks - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;92&quot;&gt;#92&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
-&lt;h3 id=&quot;improved&quot;&gt;Improved&lt;&#x2F;h3&gt;
+&lt;h3 id=&quot;improved-1&quot;&gt;Improved&lt;&#x2F;h3&gt;
 &lt;ul&gt;
 &lt;li&gt;Update the cron crate from 0.11 to 0.12 - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;97&quot;&gt;#97&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
@@ -34,7 +41,7 @@
 &lt;ul&gt;
 &lt;li&gt;Added cron support for scheduled tasks.&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
-&lt;h3 id=&quot;improved-1&quot;&gt;Improved&lt;&#x2F;h3&gt;
+&lt;h3 id=&quot;improved-2&quot;&gt;Improved&lt;&#x2F;h3&gt;
 &lt;ul&gt;
 &lt;li&gt;Major refactoring of the blocking module.&lt;&#x2F;li&gt;
 &lt;li&gt;Delete the graceful shutdown in blocking module.&lt;&#x2F;li&gt;
@@ -109,15 +116,15 @@
 	</entry>
 	<entry xml:lang="en">
 		<title>README</title>
-		<published>2022-09-27T19:01:31+00:00</published>
-		<updated>2022-09-27T19:01:31+00:00</updated>
+		<published>2023-02-04T03:52:47+00:00</published>
+		<updated>2023-02-04T03:52:47+00:00</updated>
 		<link rel="alternate" href="https://fang.badykov.com/docs/readme/" type="text/html"/>
 		<id>https://fang.badykov.com/docs/readme/</id>
 		<content type="html">&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;raw.githubusercontent.com&#x2F;ayrat555&#x2F;fang&#x2F;master&#x2F;logo.png&quot; alt=&quot;fang&quot; height=&quot;300px&quot;&gt;&lt;&#x2F;p&gt;
 &lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;crates.io&#x2F;crates&#x2F;fang&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;img.shields.io&#x2F;crates&#x2F;v&#x2F;fang.svg&quot; alt=&quot;Crates.io&quot; &#x2F;&gt;&lt;&#x2F;a&gt; &lt;a href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;fang&#x2F;&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;img.shields.io&#x2F;badge&#x2F;docs-website-blue.svg&quot; alt=&quot;docs page&quot; &#x2F;&gt;&lt;&#x2F;a&gt; &lt;img src=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;actions&#x2F;workflows&#x2F;rust.yml&#x2F;badge.svg&quot; alt=&quot;test&quot; &#x2F;&gt; &lt;img src=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;actions&#x2F;workflows&#x2F;style.yml&#x2F;badge.svg&quot; alt=&quot;style&quot; &#x2F;&gt;&lt;&#x2F;p&gt;
 &lt;h1 id=&quot;fang&quot;&gt;Fang&lt;&#x2F;h1&gt;
 &lt;p&gt;Background task processing library for Rust. It uses Postgres DB as a task queue.&lt;&#x2F;p&gt;
-&lt;h2 id=&quot;features&quot;&gt;Features&lt;&#x2F;h2&gt;
+&lt;h2 id=&quot;key-features&quot;&gt;Key Features&lt;&#x2F;h2&gt;
 &lt;p&gt;Here are some of the fang&#x27;s key features:&lt;&#x2F;p&gt;
 &lt;ul&gt;
 &lt;li&gt;Async and threaded workers.
