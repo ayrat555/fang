@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.2 (2023-02-23)
+
+### Improved
+
+- update `diesel-derive-enum` from `2.0.0-rc.0` to `2.0.1` - [#111](https://github.com/ayrat555/fang/pull/111)
+- use `dotenvy` instead of `dotenv` - [#111](https://github.com/ayrat555/fang/pull/111)
+- update `tokio` from `1.20` to `1.25` - [#111](https://github.com/ayrat555/fang/pull/111)
+
 ## 0.10.1 (2023-02-03)
 
 ### Improved

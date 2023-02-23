@@ -1,6 +1,6 @@
 /// Possible states of the task
 #[derive(diesel_derive_enum::DbEnum, Debug, Eq, PartialEq, Clone)]
-#[DieselTypePath = "crate::schema::sql_types::FangTaskState"]
+#[ExistingTypePath = "crate::schema::sql_types::FangTaskState"]
 pub enum FangTaskState {
     /// The task is ready to be executed
     New,
