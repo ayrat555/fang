@@ -22,7 +22,7 @@ use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
 #[cfg(test)]
-use dotenv::dotenv;
+use dotenvy::dotenv;
 #[cfg(test)]
 use std::env;
 
