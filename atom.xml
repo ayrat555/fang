@@ -1,21 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
-	<title>Fang</title>
-	<subtitle>Fang is a background task processing for Rust. It uses Postgres DB as a task queue.</subtitle>
-	<link href="https://fang.badykov.com/atom.xml" rel="self" type="application/atom+xml"/>
-  <link href="https://fang.badykov.com"/>
-	<generator uri="https://www.getzola.org/">Zola</generator>
-	<updated>2023-02-04T03:52:47+00:00</updated>
-	<id>https://fang.badykov.com/atom.xml</id>
-	<entry xml:lang="en">
-		<title>CHANGELOG</title>
-		<published>2023-02-04T03:52:47+00:00</published>
-		<updated>2023-02-04T03:52:47+00:00</updated>
-		<link rel="alternate" href="https://fang.badykov.com/docs/changelog/" type="text/html"/>
-		<id>https://fang.badykov.com/docs/changelog/</id>
-		<content type="html">&lt;h1 id=&quot;changelog&quot;&gt;Changelog&lt;&#x2F;h1&gt;
-&lt;h2 id=&quot;0-10-1-2023-02-03&quot;&gt;0.10.1 (2023-02-03)&lt;&#x2F;h2&gt;
+    <title>Fang</title>
+    <subtitle>Fang is a background task processing for Rust. It uses Postgres DB as a task queue.</subtitle>
+    <link href="https://fang.badykov.com/atom.xml" rel="self" type="application/atom+xml"/>
+    <link href="https://fang.badykov.com"/>
+    <generator uri="https://www.getzola.org/">Zola</generator>
+    <updated>2023-02-26T09:36:00+00:00</updated>
+    <id>https://fang.badykov.com/atom.xml</id>
+    <entry xml:lang="en">
+        <title>CHANGELOG</title>
+        <published>2023-02-26T09:36:00+00:00</published>
+        <updated>2023-02-26T09:36:00+00:00</updated>
+        <author>
+          <name>Unknown</name>
+        </author>
+        <link rel="alternate" href="https://fang.badykov.com/docs/changelog/" type="text/html"/>
+        <id>https://fang.badykov.com/docs/changelog/</id>
+        <content type="html">&lt;h1 id=&quot;changelog&quot;&gt;Changelog&lt;&#x2F;h1&gt;
+&lt;h2 id=&quot;0-10-2-2023-02-23&quot;&gt;0.10.2 (2023-02-23)&lt;&#x2F;h2&gt;
 &lt;h3 id=&quot;improved&quot;&gt;Improved&lt;&#x2F;h3&gt;
+&lt;ul&gt;
+&lt;li&gt;update &lt;code&gt;diesel-derive-enum&lt;&#x2F;code&gt; from &lt;code&gt;2.0.0-rc.0&lt;&#x2F;code&gt; to &lt;code&gt;2.0.1&lt;&#x2F;code&gt; - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;111&quot;&gt;#111&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;use &lt;code&gt;dotenvy&lt;&#x2F;code&gt; instead of &lt;code&gt;dotenv&lt;&#x2F;code&gt; - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;111&quot;&gt;#111&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;update &lt;code&gt;tokio&lt;&#x2F;code&gt; from &lt;code&gt;1.20&lt;&#x2F;code&gt; to &lt;code&gt;1.25&lt;&#x2F;code&gt; - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;111&quot;&gt;#111&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h2 id=&quot;0-10-1-2023-02-03&quot;&gt;0.10.1 (2023-02-03)&lt;&#x2F;h2&gt;
+&lt;h3 id=&quot;improved-1&quot;&gt;Improved&lt;&#x2F;h3&gt;
 &lt;ul&gt;
 &lt;li&gt;Update typed-builder requirement from 0.11 to 0.12 - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;108&quot;&gt;#108&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
 &lt;li&gt;Add dodcumentation - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;96&quot;&gt;#96&lt;&#x2F;a&gt;, &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;104&quot;&gt;#104&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
@@ -26,7 +36,7 @@
 &lt;ul&gt;
 &lt;li&gt;Add retries for tasks - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;92&quot;&gt;#92&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
-&lt;h3 id=&quot;improved-1&quot;&gt;Improved&lt;&#x2F;h3&gt;
+&lt;h3 id=&quot;improved-2&quot;&gt;Improved&lt;&#x2F;h3&gt;
 &lt;ul&gt;
 &lt;li&gt;Update the cron crate from 0.11 to 0.12 - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;97&quot;&gt;#97&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
@@ -41,7 +51,7 @@
 &lt;ul&gt;
 &lt;li&gt;Added cron support for scheduled tasks.&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
-&lt;h3 id=&quot;improved-2&quot;&gt;Improved&lt;&#x2F;h3&gt;
+&lt;h3 id=&quot;improved-3&quot;&gt;Improved&lt;&#x2F;h3&gt;
 &lt;ul&gt;
 &lt;li&gt;Major refactoring of the blocking module.&lt;&#x2F;li&gt;
 &lt;li&gt;Delete the graceful shutdown in blocking module.&lt;&#x2F;li&gt;
@@ -113,14 +123,17 @@
 &lt;li&gt;The first release on crates.io&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
 </content>
-	</entry>
-	<entry xml:lang="en">
-		<title>README</title>
-		<published>2023-02-04T03:52:47+00:00</published>
-		<updated>2023-02-04T03:52:47+00:00</updated>
-		<link rel="alternate" href="https://fang.badykov.com/docs/readme/" type="text/html"/>
-		<id>https://fang.badykov.com/docs/readme/</id>
-		<content type="html">&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;raw.githubusercontent.com&#x2F;ayrat555&#x2F;fang&#x2F;master&#x2F;logo.png&quot; alt=&quot;fang&quot; height=&quot;300px&quot;&gt;&lt;&#x2F;p&gt;
+    </entry>
+    <entry xml:lang="en">
+        <title>README</title>
+        <published>2023-02-26T09:36:00+00:00</published>
+        <updated>2023-02-26T09:36:00+00:00</updated>
+        <author>
+          <name>Unknown</name>
+        </author>
+        <link rel="alternate" href="https://fang.badykov.com/docs/readme/" type="text/html"/>
+        <id>https://fang.badykov.com/docs/readme/</id>
+        <content type="html">&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;raw.githubusercontent.com&#x2F;ayrat555&#x2F;fang&#x2F;master&#x2F;logo.png&quot; alt=&quot;fang&quot; height=&quot;300px&quot;&gt;&lt;&#x2F;p&gt;
 &lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;crates.io&#x2F;crates&#x2F;fang&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;img.shields.io&#x2F;crates&#x2F;v&#x2F;fang.svg&quot; alt=&quot;Crates.io&quot; &#x2F;&gt;&lt;&#x2F;a&gt; &lt;a href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;fang&#x2F;&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;img.shields.io&#x2F;badge&#x2F;docs-website-blue.svg&quot; alt=&quot;docs page&quot; &#x2F;&gt;&lt;&#x2F;a&gt; &lt;img src=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;actions&#x2F;workflows&#x2F;rust.yml&#x2F;badge.svg&quot; alt=&quot;test&quot; &#x2F;&gt; &lt;img src=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;actions&#x2F;workflows&#x2F;style.yml&#x2F;badge.svg&quot; alt=&quot;style&quot; &#x2F;&gt;&lt;&#x2F;p&gt;
 &lt;h1 id=&quot;fang&quot;&gt;Fang&lt;&#x2F;h1&gt;
 &lt;p&gt;Background task processing library for Rust. It uses Postgres DB as a task queue.&lt;&#x2F;p&gt;
@@ -451,14 +464,17 @@ Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&g
 &lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
 </content>
-	</entry>
-	<entry xml:lang="en">
-		<title>Fang 0.9</title>
-		<published>2022-09-09T16:45:22+00:00</published>
-		<updated>2022-09-09T16:45:22+00:00</updated>
-		<link rel="alternate" href="https://fang.badykov.com/blog/fang-09-release/" type="text/html"/>
-		<id>https://fang.badykov.com/blog/fang-09-release/</id>
-		<content type="html">&lt;h2 id=&quot;major-changes&quot;&gt;Major changes&lt;&#x2F;h2&gt;
+    </entry>
+    <entry xml:lang="en">
+        <title>Fang 0.9</title>
+        <published>2022-09-09T16:45:22+00:00</published>
+        <updated>2022-09-09T16:45:22+00:00</updated>
+        <author>
+          <name>Unknown</name>
+        </author>
+        <link rel="alternate" href="https://fang.badykov.com/blog/fang-09-release/" type="text/html"/>
+        <id>https://fang.badykov.com/blog/fang-09-release/</id>
+        <content type="html">&lt;h2 id=&quot;major-changes&quot;&gt;Major changes&lt;&#x2F;h2&gt;
 &lt;ul&gt;
 &lt;li&gt;Simplify the database schema&lt;&#x2F;li&gt;
 &lt;li&gt;Improve the way tasks are scheduled&lt;&#x2F;li&gt;
@@ -585,14 +601,17 @@ Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&g
 &lt;p&gt;The project is available on &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&quot;&gt;GitHub&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
 &lt;p&gt;The new release and this post is written in collaboration between  &lt;a href=&quot;https:&#x2F;&#x2F;pxp9.github.io&#x2F;&quot;&gt;Pepe Márquez Romero&lt;&#x2F;a&gt; (&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;pxp9&quot;&gt;github&lt;&#x2F;a&gt;) and &lt;a href=&quot;https:&#x2F;&#x2F;www.badykov.com&#x2F;&quot;&gt;Ayrat Badykov&lt;&#x2F;a&gt; (&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&quot;&gt;github&lt;&#x2F;a&gt;).&lt;&#x2F;p&gt;
 </content>
-	</entry>
-	<entry xml:lang="en">
-		<title>Fang, async background processing for Rust</title>
-		<published>2022-08-06T08:00:00+00:00</published>
-		<updated>2022-08-06T08:00:00+00:00</updated>
-		<link rel="alternate" href="https://fang.badykov.com/blog/async-processing/" type="text/html"/>
-		<id>https://fang.badykov.com/blog/async-processing/</id>
-		<content type="html">&lt;p&gt;Even though the first stable version of Rust was released in 2015, there are still some holes in its ecosystem for solving common tasks. One of which is background processing.&lt;&#x2F;p&gt;
+    </entry>
+    <entry xml:lang="en">
+        <title>Fang, async background processing for Rust</title>
+        <published>2022-08-06T08:00:00+00:00</published>
+        <updated>2022-08-06T08:00:00+00:00</updated>
+        <author>
+          <name>Unknown</name>
+        </author>
+        <link rel="alternate" href="https://fang.badykov.com/blog/async-processing/" type="text/html"/>
+        <id>https://fang.badykov.com/blog/async-processing/</id>
+        <content type="html">&lt;p&gt;Even though the first stable version of Rust was released in 2015, there are still some holes in its ecosystem for solving common tasks. One of which is background processing.&lt;&#x2F;p&gt;
 &lt;p&gt;In software engineering background processing is a common approach for solving several problems:&lt;&#x2F;p&gt;
 &lt;ul&gt;
 &lt;li&gt;Carry out periodic tasks. For example, deliver notifications, update cached values.&lt;&#x2F;li&gt;
@@ -733,25 +752,31 @@ Async provides significantly reduced CPU and memory overhead, especially for wor
 &lt;p&gt;The project is available on &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&quot;&gt;GitHub&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
 &lt;p&gt;The async feature and this post is written in collaboration between &lt;a href=&quot;https:&#x2F;&#x2F;www.badykov.com&#x2F;&quot;&gt;Ayrat Badykov&lt;&#x2F;a&gt; (&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&quot;&gt;github&lt;&#x2F;a&gt;) and &lt;a href=&quot;https:&#x2F;&#x2F;pxp9.github.io&#x2F;&quot;&gt;Pepe Márquez Romero&lt;&#x2F;a&gt; (&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;pxp9&quot;&gt;github&lt;&#x2F;a&gt;)&lt;&#x2F;p&gt;
 </content>
-	</entry>
-	<entry xml:lang="en">
-		<title>Ayrat Badykov</title>
-		<published>2021-04-01T08:50:45+00:00</published>
-		<updated>2021-04-01T08:50:45+00:00</updated>
-		<link rel="alternate" href="https://fang.badykov.com/authors/ayrat-badykov/" type="text/html"/>
-		<id>https://fang.badykov.com/authors/ayrat-badykov/</id>
-		<content type="html">&lt;p&gt;Co-creator of &lt;strong&gt;Fang&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+    </entry>
+    <entry xml:lang="en">
+        <title>Ayrat Badykov</title>
+        <published>2021-04-01T08:50:45+00:00</published>
+        <updated>2021-04-01T08:50:45+00:00</updated>
+        <author>
+          <name>Unknown</name>
+        </author>
+        <link rel="alternate" href="https://fang.badykov.com/authors/ayrat-badykov/" type="text/html"/>
+        <id>https://fang.badykov.com/authors/ayrat-badykov/</id>
+        <content type="html">&lt;p&gt;Co-creator of &lt;strong&gt;Fang&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
 &lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&quot;&gt;@ayrat555&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
 </content>
-	</entry>
-	<entry xml:lang="en">
-		<title>Pepe Márquez Romero</title>
-		<published>2021-04-01T08:50:45+00:00</published>
-		<updated>2021-04-01T08:50:45+00:00</updated>
-		<link rel="alternate" href="https://fang.badykov.com/authors/pepe-marquez/" type="text/html"/>
-		<id>https://fang.badykov.com/authors/pepe-marquez/</id>
-		<content type="html">&lt;p&gt;Co-creator of &lt;strong&gt;Fang&lt;&#x2F;strong&gt;.&lt;&#x2F;p&gt;
+    </entry>
+    <entry xml:lang="en">
+        <title>Pepe Márquez Romero</title>
+        <published>2021-04-01T08:50:45+00:00</published>
+        <updated>2021-04-01T08:50:45+00:00</updated>
+        <author>
+          <name>Unknown</name>
+        </author>
+        <link rel="alternate" href="https://fang.badykov.com/authors/pepe-marquez/" type="text/html"/>
+        <id>https://fang.badykov.com/authors/pepe-marquez/</id>
+        <content type="html">&lt;p&gt;Co-creator of &lt;strong&gt;Fang&lt;&#x2F;strong&gt;.&lt;&#x2F;p&gt;
 &lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;pxp9&quot;&gt;@pxp9&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
 </content>
-	</entry>
+    </entry>
 </feed>
