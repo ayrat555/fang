@@ -3,23 +3,10 @@ set -e
 
 BRANCH="gh-pages"
 
-current_time() {
-  
-  TIME=$(date -u --rfc-3339=seconds)
-
-  DATE=$(echo $TIME | cut -d' ' -f1)
-  HOUR=$(echo $TIME | cut -d' ' -f2)
-  
-  VALID_TIME=${DATE}T${HOUR}
-  
-  echo $VALID_TIME
-
-}
-
 build() {
   echo "Starting building..."
 
-  TIME=$(current_time)
+  TIME=$(date +"%m-%d-%YT%H:%M:%S.00Z")
 
   printf "+++\ntitle = \"CHANGELOG\"\ndate = $TIME\nupdated = $TIME\ndraft = false\nweight = 410\nsort_by = \"weight\"\ntemplate = \"docs/page.html\"\n\n[extra]\ntoc = true\ntop = false\n+++\n\n" > docs/content/docs/CHANGELOG.md
 
@@ -29,7 +16,7 @@ build() {
 
   cat README.md >> docs/content/docs/README.md
 
-  
+
   cp -R docs ../docs_backup
   rm -r *
   cp -R ../docs_backup ./docs
