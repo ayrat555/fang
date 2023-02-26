@@ -6,7 +6,7 @@ BRANCH="gh-pages"
 build() {
   echo "Starting building..."
 
-  TIME=$(date +"%m-%d-%YT%H:%M:%S.00Z")
+  TIME=$(date +"%Y-%m-%dT%H:%M:%S.00Z")
 
   printf "+++\ntitle = \"CHANGELOG\"\ndate = $TIME\nupdated = $TIME\ndraft = false\nweight = 410\nsort_by = \"weight\"\ntemplate = \"docs/page.html\"\n\n[extra]\ntoc = true\ntop = false\n+++\n\n" > docs/content/docs/CHANGELOG.md
 
