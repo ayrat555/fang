@@ -36,20 +36,15 @@ pub enum CronError {
 /// All possible options for retaining tasks in the db after their execution.
 ///
 /// The default mode is [`RetentionMode::RemoveAll`]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum RetentionMode {
     /// Keep all tasks
     KeepAll,
     /// Remove all tasks
+    #[default]
     RemoveAll,
     /// Remove only successfully finished tasks
     RemoveFinished,
-}
-
-impl Default for RetentionMode {
-    fn default() -> Self {
-        RetentionMode::RemoveAll
-    }
 }
 
 /// Configuration parameters for putting workers to sleep

@@ -40,10 +40,11 @@ const RETRY_TASK_QUERY: &str = include_str!("queries/retry_task.sql");
 
 pub const DEFAULT_TASK_TYPE: &str = "common";
 
-#[derive(Debug, Eq, PartialEq, Clone, ToSql, FromSql)]
+#[derive(Debug, Eq, PartialEq, Clone, ToSql, FromSql, Default)]
 #[postgres(name = "fang_task_state")]
 pub enum FangTaskState {
     #[postgres(name = "new")]
+    #[default]
     New,
     #[postgres(name = "in_progress")]
     InProgress,
@@ -53,12 +54,6 @@ pub enum FangTaskState {
     Finished,
     #[postgres(name = "retried")]
     Retried,
-}
-
-impl Default for FangTaskState {
-    fn default() -> Self {
-        FangTaskState::New
-    }
 }
 
 #[derive(TypedBuilder, Debug, Eq, PartialEq, Clone)]
