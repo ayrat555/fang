@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.3 (2023-03-18)
+
+- update `typed-builder` to 0.14 - [#115](https://github.com/ayrat555/fang/pull/115)
+
 ## 0.10.2 (2023-02-23)
 
 ### Improved

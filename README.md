@@ -31,18 +31,18 @@ Background task processing library for Rust. It uses Postgres DB as a task queue
 #### the Blocking feature
 ```toml
 [dependencies]
-fang = { version = "0.10" , features = ["blocking"], default-features = false }
+fang = { version = "0.10.3" , features = ["blocking"], default-features = false }
 ```
 
 #### the Asynk feature
 ```toml
 [dependencies]
-fang = { version = "0.10" , features = ["asynk"], default-features = false }
+fang = { version = "0.10.3" , features = ["asynk"], default-features = false }
 ```
 
 #### Both features
 ```toml
-fang = { version = "0.10" }
+fang = { version = "0.10.3" }
 ```
 
 *Supports rustc 1.62+*
