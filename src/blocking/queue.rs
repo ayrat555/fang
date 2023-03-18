@@ -88,9 +88,8 @@ impl From<cron::error::Error> for QueueError {
 /// The trait can be implemented for different storage backends.
 /// For now, the trait is only implemented for PostgreSQL. More backends are planned to be implemented in the future.
 pub trait Queueable {
-    /// This method should retrieve one task of the `task_type` type. If `task_type` is `None` it will try to
-    /// fetch a task of the type `common`. After fetching it should update the state of the task to
-    /// `FangTaskState::InProgress`.
+    /// This method should retrieve one task of the `task_type` type. After fetching it should update the state
+    /// of the task to `FangTaskState::InProgress`.
     fn fetch_and_touch_task(&self, task_type: String) -> Result<Option<Task>, QueueError>;
 
     /// Enqueue a task to the queue, The task will be executed as soon as possible by the worker of the same type
