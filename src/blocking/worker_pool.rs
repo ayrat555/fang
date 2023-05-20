@@ -1,4 +1,5 @@
 use crate::queue::Queueable;
+use crate::runnable::COMMON_TYPE;
 use crate::worker::Worker;
 use crate::FangError;
 use crate::RetentionMode;
@@ -27,7 +28,7 @@ where
     #[builder(setter(into))]
     pub number_of_workers: u32,
     /// The type of tasks that will be executed by `AsyncWorkerPool`.
-    #[builder(setter(into), default)]
+    #[builder(setter(into), default=COMMON_TYPE.into())]
     pub task_type: String,
 }
 
