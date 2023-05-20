@@ -57,7 +57,7 @@ fang = { version = "0.10.3" }
 Every task should implement the `fang::Runnable` trait which is used by `fang` to execute it.
 
 ```rust
-use fang::Error;
+use fang::FangError;
 use fang::Runnable;
 use fang::typetag;
 use fang::PgConnection;
@@ -71,7 +71,7 @@ struct MyTask {
 
 #[typetag::serde]
 impl Runnable for MyTask {
-    fn run(&self, _queue: &dyn Queueable) -> Result<(), Error> {
+    fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
         println!("the number is {}", self.number);
 
         Ok(())
