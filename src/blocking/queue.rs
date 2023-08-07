@@ -1,7 +1,7 @@
-use crate::fang_task_state::FangTaskState;
 use crate::runnable::Runnable;
 use crate::schema::fang_tasks;
 use crate::CronError;
+use crate::FangTaskState;
 use crate::Scheduled::*;
 use chrono::DateTime;
 use chrono::Duration;

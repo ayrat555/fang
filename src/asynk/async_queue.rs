@@ -1,6 +1,8 @@
 use crate::asynk::async_runnable::AsyncRunnable;
 use crate::CronError;
+use crate::FangTaskState;
 use crate::Scheduled::*;
+use crate::Task;
 use async_trait::async_trait;
 use bb8_postgres::bb8::Pool;
 use bb8_postgres::bb8::RunError;
@@ -13,7 +15,7 @@ use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 use cron::Schedule;
-use postgres_types::{FromSql, ToSql};
+use postgres_types::ToSql;
 use sha2::{Digest, Sha256};
 use std::str::FromStr;
 use thiserror::Error;
@@ -39,46 +41,6 @@ const FIND_TASK_BY_ID_QUERY: &str = include_str!("queries/find_task_by_id.sql");
 const RETRY_TASK_QUERY: &str = include_str!("queries/retry_task.sql");
 
 pub const DEFAULT_TASK_TYPE: &str = "common";
-
-#[derive(Debug, Eq, PartialEq, Clone, ToSql, FromSql, Default)]
-#[postgres(name = "fang_task_state")]
-pub enum FangTaskState {
-    #[postgres(name = "new")]
-    #[default]
-    New,
-    #[postgres(name = "in_progress")]
-    InProgress,
-    #[postgres(name = "failed")]
-    Failed,
-    #[postgres(name = "finished")]
-    Finished,
-    #[postgres(name = "retried")]
-    Retried,
-}
-
-#[derive(TypedBuilder, Debug, Eq, PartialEq, Clone)]
-pub struct Task {
-    #[builder(setter(into))]
-    pub id: Uuid,
-    #[builder(setter(into))]
-    pub metadata: serde_json::Value,
-    #[builder(setter(into))]
-    pub error_message: Option<String>,
-    #[builder(default, setter(into))]
-    pub state: FangTaskState,
-    #[builder(setter(into))]
-    pub task_type: String,
-    #[builder(setter(into))]
-    pub uniq_hash: Option<String>,
-    #[builder(setter(into))]
-    pub retries: i32,
-    #[builder(setter(into))]
-    pub scheduled_at: DateTime<Utc>,
-    #[builder(setter(into))]
-    pub created_at: DateTime<Utc>,
-    #[builder(setter(into))]
-    pub updated_at: DateTime<Utc>,
-}
 
 #[derive(Debug, Error)]
 pub enum AsyncQueueError {
