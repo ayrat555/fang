@@ -155,11 +155,11 @@ mod worker_tests {
     use super::RetentionMode;
     use super::Runnable;
     use super::Worker;
-    use crate::fang_task_state::FangTaskState;
     use crate::queue::Queue;
     use crate::queue::Queueable;
     use crate::typetag;
     use crate::FangError;
+    use crate::FangTaskState;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
 

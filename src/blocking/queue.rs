@@ -498,11 +498,11 @@ mod queue_tests {
     use super::Queue;
     use super::Queueable;
     use crate::chrono::SubsecRound;
-    use crate::fang_task_state::FangTaskState;
     use crate::runnable::Runnable;
     use crate::runnable::COMMON_TYPE;
     use crate::typetag;
     use crate::FangError;
+    use crate::FangTaskState;
     use crate::Scheduled;
     use chrono::DateTime;
     use chrono::Duration;

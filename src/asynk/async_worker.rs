@@ -246,10 +246,10 @@ mod async_worker_tests {
     use super::AsyncWorkerTest;
     use crate::asynk::async_queue::AsyncQueueTest;
     use crate::asynk::async_queue::AsyncQueueable;
-    use crate::asynk::async_queue::FangTaskState;
     use crate::asynk::async_worker::Task;
     use crate::asynk::AsyncRunnable;
     use crate::FangError;
+    use crate::FangTaskState;
     use crate::RetentionMode;
     use crate::Scheduled;
     use async_trait::async_trait;
