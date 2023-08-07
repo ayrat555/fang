@@ -8,4 +8,5 @@ edition = "2021"
 [dependencies]
 
 fang-error-derive-macro = { path = "../" }
-fang = { version = "0.10" }
+fang = { path = "../../../" }
+
