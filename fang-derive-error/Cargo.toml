@@ -1,5 +1,5 @@
 [package]
-name = "fang-error-derive-macro"
+name = "fang-derive-error"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,4 +12,6 @@ proc-macro = true
 [dependencies]
 syn = {version="2.0",features=["full","fold"]}
 quote = "1.0"
-fang = { path = "../../" }
+
+[dev-dependencies]
+fang = { path = "../fang" }
