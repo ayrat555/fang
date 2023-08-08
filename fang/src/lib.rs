@@ -202,3 +202,6 @@ pub use bb8_postgres::tokio_postgres::tls::NoTls;
 #[cfg(feature = "asynk")]
 #[doc(hidden)]
 pub use async_trait::async_trait;
+
+#[cfg(feature = "derive-error")]
+pub use fang_derive_error::ToFangError;
