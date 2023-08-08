@@ -7,6 +7,6 @@ edition = "2021"
 
 [dependencies]
 
-fang-error-derive-macro = { path = "../" }
-fang = { path = "../../../" }
+fang-derive-error = { path = "../" }
+fang = { path = "../../fang" }
 

@@ -1,5 +1,11 @@
 [workspace]
 members = [
-  "fang","fang-derive-error"
+  "fang",
+  "fang-derive-error",
+  "fang-derive-error/example",
+  "fang/fang_examples/asynk/simple_async_worker",
+  "fang/fang_examples/asynk/simple_cron_async_worker",
+  "fang/fang_examples/blocking/simple_cron_worker",
+  "fang/fang_examples/blocking/simple_worker"
 ]
 resolver = "2"

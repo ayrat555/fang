@@ -1,5 +1,5 @@
-use fang::FangError as Fg;
-use fang_error_derive_macro::ToFangError;
+use fang::FangError;
+use fang_derive_error::ToFangError;
 use std::fmt::Debug;
 #[derive(Debug, ToFangError)]
 pub enum MyAwesomeError {
@@ -7,7 +7,7 @@ pub enum MyAwesomeError {
     MyVariantErrorTwo(u32),
 }
 
-fn some_func_error() -> Result<(), Fg> {
+fn some_func_error() -> Result<(), FangError> {
     let one = 1;
 
     if one == 1 {
@@ -17,7 +17,7 @@ fn some_func_error() -> Result<(), Fg> {
     }
 }
 
-fn some_other_error() -> Result<(), Fg> {
+fn some_other_error() -> Result<(), FangError> {
     let one = 1;
 
     if one == 1 {

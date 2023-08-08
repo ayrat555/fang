@@ -15,9 +15,8 @@ fn implement_fang_error_macro(ast: &DeriveInput) -> TokenStream {
     let name = &ast.ident;
 
     let gen = quote! {
-        use fang::FangError;
         impl From<#name> for FangError where #name : Debug {
-            fn from(error: #name) ->  FangError {
+            fn from(error: #name) ->  Self {
                 FangError { description: format!("{error:?}") }
             }
         }
