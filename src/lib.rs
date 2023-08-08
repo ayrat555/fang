@@ -5,6 +5,7 @@ use diesel::{Identifiable, Queryable};
 use std::time::Duration;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
+use uuid::Uuid;
 
 #[cfg(feature = "asynk")]
 use postgres_types::{FromSql, ToSql};
@@ -117,7 +118,7 @@ pub enum FangTaskState {
     #[cfg(feature = "asynk")]
     #[default]
     New,
-    /// The task is being executing.
+    /// The task is being executed.
     ///
     /// The task may stay in this state forever
     /// if an unexpected error happened
@@ -210,4 +211,3 @@ pub use bb8_postgres::tokio_postgres::tls::NoTls;
 #[cfg(feature = "asynk")]
 #[doc(hidden)]
 pub use async_trait::async_trait;
-use uuid::Uuid;
