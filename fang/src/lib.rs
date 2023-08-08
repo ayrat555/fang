@@ -103,47 +103,38 @@ pub struct FangError {
 
 /// Possible states of the task
 #[derive(Debug, Eq, PartialEq, Clone)]
-#[cfg(feature = "asynk")]
-#[derive(ToSql, FromSql, Default)]
-#[cfg(feature = "asynk")]
-#[postgres(name = "fang_task_state")]
-#[cfg(feature = "blocking")]
-#[derive(diesel_derive_enum::DbEnum)]
-#[cfg(feature = "blocking")]
-#[ExistingTypePath = "crate::schema::sql_types::FangTaskStateEnum"]
+#[cfg_attr(feature = "blocking", derive(diesel_derive_enum::DbEnum))]
+#[cfg_attr(feature = "asynk", derive(ToSql, FromSql, Default))]
+#[cfg_attr(feature = "asynk", postgres(name = "fang_task_state"))]
+#[cfg_attr(
+    feature = "blocking",
+    ExistingTypePath = "crate::schema::sql_types::FangTaskStateEnum"
+)]
 pub enum FangTaskState {
     /// The task is ready to be executed
-    #[cfg(feature = "asynk")]
-    #[postgres(name = "new")]
-    #[cfg(feature = "asynk")]
-    #[default]
+    #[cfg_attr(feature = "asynk", postgres(name = "new"))]
+    #[cfg_attr(feature = "asynk", default)]
     New,
     /// The task is being executed.
     ///
     /// The task may stay in this state forever
     /// if an unexpected error happened
-    #[cfg(feature = "asynk")]
-    #[postgres(name = "in_progress")]
+    #[cfg_attr(feature = "asynk", postgres(name = "in_progress"))]
     InProgress,
     /// The task failed
-    #[cfg(feature = "asynk")]
-    #[postgres(name = "failed")]
+    #[cfg_attr(feature = "asynk", postgres(name = "failed"))]
     Failed,
     /// The task finished successfully
-    #[cfg(feature = "asynk")]
-    #[postgres(name = "finished")]
+    #[cfg_attr(feature = "asynk", postgres(name = "finished"))]
     Finished,
     /// The task is being retried. It means it failed but it's scheduled to be executed again
-    #[cfg(feature = "asynk")]
-    #[postgres(name = "retried")]
+    #[cfg_attr(feature = "asynk", postgres(name = "retried"))]
     Retried,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, TypedBuilder)]
-#[cfg(feature = "blocking")]
-#[derive(Queryable, Identifiable)]
-#[cfg(feature = "blocking")]
-#[diesel(table_name = fang_tasks)]
+#[cfg_attr(feature = "blocking", derive(Queryable, Identifiable))]
+#[cfg_attr(feature = "blocking",  diesel(table_name = fang_tasks))]
 pub struct Task {
     #[builder(setter(into))]
     pub id: Uuid,

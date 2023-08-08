@@ -36,12 +36,12 @@ uuid = { version = "1.1", features = ["v4"] }
 fang-derive-error = { path = "../fang-derive-error" , optional = true}
 
 [dependencies.diesel]
-version = "2.0"
+version = "2.1"
 features = ["postgres", "serde_json", "chrono", "uuid", "r2d2"]
 optional = true
 
 [dependencies.diesel-derive-enum]
-version = "2.0.1"
+version = "2.1"
 features = ["postgres"]
 optional = true
 
