@@ -56,7 +56,8 @@ jobs:
           args: diesel_cli --no-default-features --features "postgres"
 
       - name: Setup db
-        run: diesel setup --database-url postgres://postgres:postgres@localhost/fang 
+        working-directory: ./fang
+        run: diesel setup
 
       - name: Run tests
         uses: actions-rs/cargo@v1
