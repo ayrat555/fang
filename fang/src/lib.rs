@@ -110,7 +110,7 @@ pub struct FangError {
 #[cfg(feature = "blocking")]
 #[derive(diesel_derive_enum::DbEnum)]
 #[cfg(feature = "blocking")]
-#[ExistingTypePath = "crate::schema::sql_types::FangTaskState"]
+#[ExistingTypePath = "crate::schema::sql_types::FangTaskStateEnum"]
 pub enum FangTaskState {
     /// The task is ready to be executed
     #[cfg(feature = "asynk")]
