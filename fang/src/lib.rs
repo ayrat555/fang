@@ -1,9 +1,14 @@
 #![doc = include_str!("../../README.md")]
 
+#[cfg(feature = "blocking")]
+use diesel::{Identifiable, Queryable};
 use std::time::Duration;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
+use uuid::Uuid;
 
+#[cfg(feature = "asynk")]
+use postgres_types::{FromSql, ToSql};
 /// Represents a schedule for scheduled tasks.
 ///
 /// It's used in the [`AsyncRunnable::cron`] and [`Runnable::cron`]
@@ -94,6 +99,72 @@ impl Default for SleepParams {
 pub struct FangError {
     /// A description of an error
     pub description: String,
+}
+
+/// Possible states of the task
+#[derive(Debug, Eq, PartialEq, Clone)]
+#[cfg(feature = "asynk")]
+#[derive(ToSql, FromSql, Default)]
+#[cfg(feature = "asynk")]
+#[postgres(name = "fang_task_state")]
+#[cfg(feature = "blocking")]
+#[derive(diesel_derive_enum::DbEnum)]
+#[cfg(feature = "blocking")]
+#[ExistingTypePath = "crate::schema::sql_types::FangTaskState"]
+pub enum FangTaskState {
+    /// The task is ready to be executed
+    #[cfg(feature = "asynk")]
+    #[postgres(name = "new")]
+    #[cfg(feature = "asynk")]
+    #[default]
+    New,
+    /// The task is being executed.
+    ///
+    /// The task may stay in this state forever
+    /// if an unexpected error happened
+    #[cfg(feature = "asynk")]
+    #[postgres(name = "in_progress")]
+    InProgress,
+    /// The task failed
+    #[cfg(feature = "asynk")]
+    #[postgres(name = "failed")]
+    Failed,
+    /// The task finished successfully
+    #[cfg(feature = "asynk")]
+    #[postgres(name = "finished")]
+    Finished,
+    /// The task is being retried. It means it failed but it's scheduled to be executed again
+    #[cfg(feature = "asynk")]
+    #[postgres(name = "retried")]
+    Retried,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, TypedBuilder)]
+#[cfg(feature = "blocking")]
+#[derive(Queryable, Identifiable)]
+#[cfg(feature = "blocking")]
+#[diesel(table_name = fang_tasks)]
+pub struct Task {
+    #[builder(setter(into))]
+    pub id: Uuid,
+    #[builder(setter(into))]
+    pub metadata: serde_json::Value,
+    #[builder(setter(into))]
+    pub error_message: Option<String>,
+    #[builder(setter(into))]
+    pub state: FangTaskState,
+    #[builder(setter(into))]
+    pub task_type: String,
+    #[builder(setter(into))]
+    pub uniq_hash: Option<String>,
+    #[builder(setter(into))]
+    pub retries: i32,
+    #[builder(setter(into))]
+    pub scheduled_at: DateTime<Utc>,
+    #[builder(setter(into))]
+    pub created_at: DateTime<Utc>,
+    #[builder(setter(into))]
+    pub updated_at: DateTime<Utc>,
 }
 
 #[doc(hidden)]

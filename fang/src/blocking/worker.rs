@@ -1,12 +1,12 @@
 #![allow(clippy::borrowed_box)]
 #![allow(clippy::unnecessary_unwrap)]
 
-use crate::fang_task_state::FangTaskState;
 use crate::queue::Queueable;
 use crate::queue::Task;
 use crate::runnable::Runnable;
 use crate::runnable::COMMON_TYPE;
 use crate::FangError;
+use crate::FangTaskState;
 use crate::Scheduled::*;
 use crate::{RetentionMode, SleepParams};
 use log::error;
@@ -155,11 +155,11 @@ mod worker_tests {
     use super::RetentionMode;
     use super::Runnable;
     use super::Worker;
-    use crate::fang_task_state::FangTaskState;
     use crate::queue::Queue;
     use crate::queue::Queueable;
     use crate::typetag;
     use crate::FangError;
+    use crate::FangTaskState;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
 
