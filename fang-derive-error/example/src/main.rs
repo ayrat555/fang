@@ -1,11 +1,5 @@
+use example::MyAwesomeError;
 use fang::FangError;
-use fang_derive_error::ToFangError;
-use std::fmt::Debug;
-#[derive(Debug, ToFangError)]
-pub enum MyAwesomeError {
-    MyVariantErrorOne(String),
-    MyVariantErrorTwo(u32),
-}
 
 fn some_func_error() -> Result<(), FangError> {
     let one = 1;
