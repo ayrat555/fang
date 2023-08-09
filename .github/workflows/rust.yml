@@ -59,6 +59,10 @@ jobs:
         working-directory: ./fang
         run: diesel setup
 
+      - name: Change working dir
+        working-directory: ./..
+        run: pwd
+
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
