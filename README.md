@@ -31,18 +31,24 @@ Background task processing library for Rust. It uses Postgres DB as a task queue
 #### the Blocking feature
 ```toml
 [dependencies]
-fang = { version = "0.10.3" , features = ["blocking"], default-features = false }
+fang = { version = "0.10.4" , features = ["blocking"], default-features = false }
 ```
 
 #### the Asynk feature
 ```toml
 [dependencies]
-fang = { version = "0.10.3" , features = ["asynk"], default-features = false }
+fang = { version = "0.10.4" , features = ["asynk"], default-features = false }
 ```
 
-#### Both features
+#### the Asynk feature with derive macro
 ```toml
-fang = { version = "0.10.3" }
+[dependencies]
+fang = { version = "0.10.4" , features = ["asynk", "derive-error" ], default-features = false }
+```
+
+#### All features
+```toml
+fang = { version = "0.10.4" }
 ```
 
 *Supports rustc 1.62+*
@@ -56,12 +62,39 @@ fang = { version = "0.10.3" }
 #### Blocking feature
 Every task should implement the `fang::Runnable` trait which is used by `fang` to execute it.
 
+If you have a `CustomError`, it is recommended to implement `From<FangError>`. So this way you can use [? operator](https://stackoverflow.com/questions/42917566/what-is-this-question-mark-operator-about#42921174) inside the `run` function available in `fang::Runnable` trait.
+
+
+You can easily implement it with the macro `ToFangError`. This macro is only available in the feature `derive-error`.
+
 ```rust
 use fang::FangError;
 use fang::Runnable;
 use fang::typetag;
 use fang::PgConnection;
 use fang::serde::{Deserialize, Serialize};
+use fang::ToFangError;
+use std::fmt::Debug;
+
+
+#[derive(Debug, ToFangError)]
+enum CustomError {
+  ErrorOne(String),
+  ErrorTwo(u32),
+}
+
+fn my_func(num : u16) -> Result<(), CustomError> {
+
+  if num == 0 {
+    CustomError::ErrorOne("is zero".to_string())
+  }
+
+  if num > 500 {
+    CustomError::ErrorTwo(num)
+  }
+
+  Ok(())
+}
 
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "fang::serde")]
@@ -73,6 +106,10 @@ struct MyTask {
 impl Runnable for MyTask {
     fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
         println!("the number is {}", self.number);
+
+        my_func(self.number)?; 
+        // You can use ? operator because 
+        // From<FangError> is implemented thanks to ToFangError derive macro.
 
         Ok(())
     }
