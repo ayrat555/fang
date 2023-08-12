@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.4 (2023-08-12) - [#125](https://github.com/ayrat555/fang/pull/125)
+
+- reorganize repo in two crates `fang` and `fang-derive-error`
+- added macro crate `fang-derive-error` that provides `ToFangError` derive macro.
+- refactor `FangTaskState` enum and `Task` struct.
+
 ## 0.10.3 (2023-03-18)
 
 - update `typed-builder` to 0.14 - [#115](https://github.com/ayrat555/fang/pull/115)
