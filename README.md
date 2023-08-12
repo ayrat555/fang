@@ -86,11 +86,11 @@ enum CustomError {
 fn my_func(num : u16) -> Result<(), CustomError> {
 
   if num == 0 {
-    CustomError::ErrorOne("is zero".to_string())
+    Err(CustomError::ErrorOne("is zero".to_string()))
   }
 
   if num > 500 {
-    CustomError::ErrorTwo(num)
+    Err(CustomError::ErrorTwo(num))
   }
 
   Ok(())
