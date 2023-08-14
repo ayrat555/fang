@@ -1,5 +1,5 @@
 [package]
-name = "simple_worker"
+name = "simple_cron_worker"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 fang = { path = "../../../" , features = ["blocking"]}
-dotenv = "0.15.0"
+dotenvy = "0.15"
 env_logger = "0.9.0"
 log = "0.4.0"
 diesel = { version = "2", features = ["postgres", "r2d2"] }

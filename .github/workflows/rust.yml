@@ -56,7 +56,12 @@ jobs:
           args: diesel_cli --no-default-features --features "postgres"
 
       - name: Setup db
+        working-directory: ./fang
         run: diesel setup
+
+      - name: Change working dir
+        working-directory: ./..
+        run: pwd
 
       - name: Run tests
         uses: actions-rs/cargo@v1

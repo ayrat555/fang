@@ -1,19 +1,24 @@
+use dotenvy::dotenv;
 use fang::asynk::async_queue::AsyncQueue;
 use fang::asynk::async_queue::AsyncQueueable;
 use fang::asynk::async_worker_pool::AsyncWorkerPool;
 use fang::AsyncRunnable;
 use fang::NoTls;
-use simple_cron_async_worker::MyCronTask;
+use simple_async_worker::MyFailingTask;
+use simple_async_worker::MyTask;
+use std::env;
 use std::time::Duration;
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
     env_logger::init();
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     log::info!("Starting...");
     let max_pool_size: u32 = 3;
     let mut queue = AsyncQueue::builder()
-        .uri("postgres://postgres:postgres@localhost/fang")
+        .uri(database_url)
         .max_pool_size(max_pool_size)
         .build();
 
@@ -30,10 +35,22 @@ async fn main() {
     pool.start().await;
     log::info!("Workers started ...");
 
-    let task = MyCronTask {};
+    let task1 = MyTask::new(0);
+    let task2 = MyTask::new(20_000);
+    let task3 = MyFailingTask::new(50_000);
 
     queue
-        .schedule_task(&task as &dyn AsyncRunnable)
+        .insert_task(&task1 as &dyn AsyncRunnable)
+        .await
+        .unwrap();
+
+    queue
+        .insert_task(&task2 as &dyn AsyncRunnable)
+        .await
+        .unwrap();
+
+    queue
+        .insert_task(&task3 as &dyn AsyncRunnable)
         .await
         .unwrap();
 

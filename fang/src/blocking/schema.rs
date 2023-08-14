@@ -3,18 +3,18 @@
 pub mod sql_types {
     #[derive(diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "fang_task_state"))]
-    pub struct FangTaskState;
+    pub struct FangTaskStateEnum;
 }
 
 diesel::table! {
     use diesel::sql_types::*;
-    use super::sql_types::FangTaskState;
+    use super::sql_types::FangTaskStateEnum;
 
     fang_tasks (id) {
         id -> Uuid,
         metadata -> Jsonb,
         error_message -> Nullable<Text>,
-        state -> FangTaskState,
+        state -> FangTaskStateEnum,
         task_type -> Varchar,
         uniq_hash -> Nullable<Bpchar>,
         retries -> Int4,

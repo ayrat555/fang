@@ -1,5 +1,5 @@
 use diesel::r2d2;
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use fang::PgConnection;
 use fang::Queue;
 use fang::Queueable;
