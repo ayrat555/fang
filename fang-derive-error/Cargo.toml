@@ -2,7 +2,8 @@
 name = "fang-derive-error"
 version = "0.1.0"
 edition = "2021"
-
+description = "A fang macro that facilitates to implement From<FangError>"
+license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 
