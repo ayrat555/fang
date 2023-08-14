@@ -22,6 +22,7 @@ derive-error = ["fang-derive-error"]
 
 [dev-dependencies]
 fang-derive-error = { version = "0.1.0"}
+serial_test = "2.0.0"
 
 [dependencies]
 cron = "0.12"
