@@ -162,6 +162,7 @@ mod worker_tests {
     use crate::FangTaskState;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
+    use serial_test::serial;
 
     #[derive(Serialize, Deserialize)]
     struct WorkerTaskTest {
@@ -260,6 +261,7 @@ mod worker_tests {
     // Worker tests has to commit because the worker operations commits
     #[test]
     #[ignore]
+    #[serial]
     fn executes_and_finishes_task() {
         let task = WorkerTaskTest { number: 10 };
 
@@ -290,6 +292,7 @@ mod worker_tests {
 
     #[test]
     #[ignore]
+    #[serial]
     fn executes_task_only_of_specific_type() {
         let task1 = TaskType1 {};
         let task2 = TaskType2 {};
@@ -328,6 +331,7 @@ mod worker_tests {
 
     #[test]
     #[ignore]
+    #[serial]
     fn saves_error_for_failed_task() {
         let task = FailedTask { number: 10 };
 
@@ -362,6 +366,7 @@ mod worker_tests {
 
     #[test]
     #[ignore]
+    #[serial]
     fn retries_task() {
         let task = RetryTask { number: 10 };
 
