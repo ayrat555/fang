@@ -7,7 +7,7 @@ db:
 clippy:
 	cargo clippy --all-features
 diesel:
-	DATABASE_URL=postgres://postgres:postgres@localhost/fang diesel migration run
+	cd fang && DATABASE_URL=postgres://postgres:postgres@localhost/fang diesel migration run
 stop:
 	docker kill postgres
 tests:
