@@ -72,16 +72,23 @@ impl Runnable for ScheduledPepeTask {
     }
 }
 
+/// This macro creates a module with tests for a `Queueable` type.
+///
+/// Arguments:
+/// + `$mod`: Name for the module
+/// + `$q`: Fully qualified type that implements `Queueable`
+/// + `$e`: An expression that returns a value of `$q` suitable for testing.
+///   + Multiple values returned by `$e` must be able to be interacted with concurrently without interfering with each other.
 macro_rules! test_queue {
     ($mod:ident, $q:ty, $e:expr) => {
         mod $mod {
-            use crate::blocking::queue::queue_tests::{AyratTask, PepeTask, ScheduledPepeTask};
-            use crate::chrono::SubsecRound;
-            use crate::queue::Queueable;
-            use crate::runnable::COMMON_TYPE;
-            use crate::FangTaskState;
             use chrono::Duration;
+            use chrono::SubsecRound;
             use chrono::Utc;
+            use $crate::blocking::queue::queue_tests::{AyratTask, PepeTask, ScheduledPepeTask};
+            use $crate::queue::Queueable;
+            use $crate::runnable::COMMON_TYPE;
+            use $crate::FangTaskState;
 
             #[test]
             fn insert_task_test() {
