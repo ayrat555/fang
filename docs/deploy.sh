@@ -4,7 +4,7 @@ set -e
 BRANCH="gh-pages"
 
 build() {
-  echo "Starting building..."
+  echo "Starting building!!..."
 
   TIME=$(date +"%Y-%m-%dT%H:%M:%S.00Z")
 
@@ -34,7 +34,7 @@ deploy() {
   git config user.name "GitHub Actions"
   git config user.email "github-actions-bot@users.noreply.github.com"
 
-  rm -r docs/themes
+  rm -rf docs/themes
   git add .
   git commit -m "Deploy new version docs"
   git push --force "https://${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ${BRANCH}
