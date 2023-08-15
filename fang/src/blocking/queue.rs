@@ -245,6 +245,20 @@ impl Queueable for Queue {
 }
 
 impl Queue {
+    /// Provides a Queue that does not commit to the DB
+    #[cfg(test)]
+    pub fn test() -> Self {
+        let pool = Self::connection_pool(1);
+        pool.get()
+            .map(|mut conn| conn.begin_test_transaction())
+            .expect("Could not get a connection from the pool")
+            .expect("Could not begin test transaction");
+
+        Self::builder()
+            .connection_pool(pool)
+            .build()
+    }
+
     /// Connect to the db if not connected
     pub fn get_connection(&self) -> Result<PoolConnection, QueueError> {
         let result = self.connection_pool.get();
@@ -508,7 +522,6 @@ mod queue_tests {
     use chrono::Duration;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
-    use serial_test::serial;
 
     #[derive(Serialize, Deserialize)]
     struct PepeTask {
@@ -576,15 +589,10 @@ mod queue_tests {
     }
 
     #[test]
-    #[serial]
     fn insert_task_test() {
         let task = PepeTask { number: 10 };
 
-        let pool = Queue::connection_pool(5);
-
-        let queue = Queue::builder().connection_pool(pool).build();
-
-        queue.remove_all_tasks().unwrap();
+        let queue = Queue::test();
 
         let task = queue.insert_task(&task).unwrap();
 
@@ -599,16 +607,11 @@ mod queue_tests {
     }
 
     #[test]
-    #[serial]
     fn fetch_task_fetches_the_oldest_task() {
         let task1 = PepeTask { number: 10 };
         let task2 = PepeTask { number: 11 };
 
-        let pool = Queue::connection_pool(5);
-
-        let queue = Queue::builder().connection_pool(pool).build();
-
-        queue.remove_all_tasks().unwrap();
+        let queue = Queue::test();
 
         let task1 = queue.insert_task(&task1).unwrap();
         let _task2 = queue.insert_task(&task2).unwrap();
@@ -621,15 +624,10 @@ mod queue_tests {
     }
 
     #[test]
-    #[serial]
     fn update_task_state_test() {
         let task = PepeTask { number: 10 };
 
-        let pool = Queue::connection_pool(5);
-
-        let queue = Queue::builder().connection_pool(pool).build();
-
-        queue.remove_all_tasks().unwrap();
+        let queue = Queue::test();
 
         let task = queue.insert_task(&task).unwrap();
 
@@ -646,15 +644,10 @@ mod queue_tests {
     }
 
     #[test]
-    #[serial]
     fn fail_task_updates_state_field_and_sets_error_message() {
         let task = PepeTask { number: 10 };
 
-        let pool = Queue::connection_pool(5);
-
-        let queue = Queue::builder().connection_pool(pool).build();
-
-        queue.remove_all_tasks().unwrap();
+        let queue = Queue::test();
 
         let task = queue.insert_task(&task).unwrap();
 
@@ -674,15 +667,10 @@ mod queue_tests {
     }
 
     #[test]
-    #[serial]
     fn fetch_and_touch_updates_state() {
         let task = PepeTask { number: 10 };
 
-        let pool = Queue::connection_pool(5);
-
-        let queue = Queue::builder().connection_pool(pool).build();
-
-        queue.remove_all_tasks().unwrap();
+        let queue = Queue::test();
 
         let task = queue.insert_task(&task).unwrap();
 
@@ -701,13 +689,8 @@ mod queue_tests {
    }
 
     #[test]
-    #[serial]
     fn fetch_and_touch_returns_none() {
-        let pool = Queue::connection_pool(5);
-
-        let queue = Queue::builder().connection_pool(pool).build();
-
-        queue.remove_all_tasks().unwrap();
+        let queue = Queue::test();
 
         let found_task = queue.fetch_and_touch_task(COMMON_TYPE.to_string()).unwrap();
 
@@ -715,15 +698,10 @@ mod queue_tests {
     }
 
     #[test]
-    #[serial]
     fn insert_task_uniq_test() {
         let task = PepeTask { number: 10 };
 
-        let pool = Queue::connection_pool(5);
-
-        let queue = Queue::builder().connection_pool(pool).build();
-
-        queue.remove_all_tasks().unwrap();
+        let queue = Queue::test();
 
         let task1 = queue.insert_task(&task).unwrap();
         let task2 = queue.insert_task(&task).unwrap();
@@ -731,11 +709,8 @@ mod queue_tests {
     }
 
     #[test]
-    #[serial]
     fn schedule_task_test() {
-        let pool = Queue::connection_pool(5);
-        let queue = Queue::builder().connection_pool(pool).build();
-        queue.remove_all_tasks().unwrap();
+        let queue = Queue::test();
         let datetime = (Utc::now() + Duration::seconds(7)).round_subsecs(0);
 
         let task = &ScheduledPepeTask {
@@ -754,11 +729,8 @@ mod queue_tests {
     }
 
     #[test]
-    #[serial]
     fn remove_all_scheduled_tasks_test() {
-        let pool = Queue::connection_pool(5);
-        let queue = Queue::builder().connection_pool(pool).build();
-        queue.remove_all_tasks().unwrap();
+        let queue = Queue::test();
         let datetime = (Utc::now() + Duration::seconds(7)).round_subsecs(0);
 
         let task1 = &ScheduledPepeTask {
@@ -779,16 +751,11 @@ mod queue_tests {
     }
 
     #[test]
-    #[serial]
     fn remove_all_tasks_test() {
         let task1 = PepeTask { number: 10 };
         let task2 = PepeTask { number: 11 };
 
-        let pool = Queue::connection_pool(5);
-
-        let queue = Queue::builder().connection_pool(pool).build();
-
-        queue.remove_all_tasks().unwrap();
+        let queue = Queue::test();
 
         let task1 = queue.insert_task(&task1).unwrap();
         let task2 = queue.insert_task(&task2).unwrap();
@@ -801,16 +768,11 @@ mod queue_tests {
     }
 
     #[test]
-    #[serial]
     fn remove_task() {
         let task1 = PepeTask { number: 10 };
         let task2 = PepeTask { number: 11 };
 
-        let pool = Queue::connection_pool(5);
-
-        let queue = Queue::builder().connection_pool(pool).build();
-
-        queue.remove_all_tasks().unwrap();
+        let queue = Queue::test();
 
         let task1 = queue.insert_task(&task1).unwrap();
         let task2 = queue.insert_task(&task2).unwrap();
@@ -825,16 +787,11 @@ mod queue_tests {
     }
 
     #[test]
-    #[serial]
     fn remove_task_of_type() {
         let task1 = PepeTask { number: 10 };
         let task2 = AyratTask { number: 10 };
 
-        let pool = Queue::connection_pool(5);
-
-        let queue = Queue::builder().connection_pool(pool).build();
-
-        queue.remove_all_tasks().unwrap();
+        let queue = Queue::test();
 
         let task1 = queue.insert_task(&task1).unwrap();
         let task2 = queue.insert_task(&task2).unwrap();
@@ -849,16 +806,13 @@ mod queue_tests {
     }
 
     #[test]
-    #[serial]
     fn remove_task_by_metadata() {
         let m_task1 = PepeTask { number: 10 };
         let m_task2 = PepeTask { number: 11 };
         let m_task3 = AyratTask { number: 10 };
 
-        let pool = Queue::connection_pool(5);
+        let queue = Queue::test();
 
-        let queue = Queue::builder().connection_pool(pool).build();
-        queue.remove_all_tasks().unwrap();
         let task1 = queue.insert_task(&m_task1).unwrap();
         let task2 = queue.insert_task(&m_task2).unwrap();
         let task3 = queue.insert_task(&m_task3).unwrap();
