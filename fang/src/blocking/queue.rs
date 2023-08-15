@@ -257,9 +257,7 @@ impl Queue {
             .expect("Could not get a connection from the pool")
             .expect("Could not begin test transaction");
 
-        Self::builder()
-            .connection_pool(pool)
-            .build()
+        Self::builder().connection_pool(pool).build()
     }
 
     /// Connect to the db if not connected
@@ -511,4 +509,4 @@ impl Queue {
 }
 
 #[cfg(test)]
-queue_tests::test_queue!{postgres, crate::queue::Queue, crate::queue::Queue::test()}
+queue_tests::test_queue! {postgres, crate::queue::Queue, crate::queue::Queue::test()}

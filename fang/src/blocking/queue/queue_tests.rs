@@ -1,8 +1,8 @@
+use crate::blocking::queue::Queueable;
 use crate::runnable::Runnable;
 use crate::typetag;
 use crate::FangError;
 use crate::Scheduled;
-use crate::blocking::queue::Queueable;
 use chrono::DateTime;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -75,15 +75,14 @@ impl Runnable for ScheduledPepeTask {
 macro_rules! test_queue {
     ($mod:ident, $q:ty, $e:expr) => {
         mod $mod {
-            use crate::queue::Queueable;
+            use crate::blocking::queue::queue_tests::{AyratTask, PepeTask, ScheduledPepeTask};
             use crate::chrono::SubsecRound;
+            use crate::queue::Queueable;
             use crate::runnable::COMMON_TYPE;
             use crate::FangTaskState;
-            use crate::blocking::queue::queue_tests::{PepeTask, ScheduledPepeTask, AyratTask};
             use chrono::Duration;
             use chrono::Utc;
 
-            
             #[test]
             fn insert_task_test() {
                 let task = PepeTask { number: 10 };
@@ -112,7 +111,8 @@ macro_rules! test_queue {
                 let task1 = queue.insert_task(&task1).unwrap();
                 let _task2 = queue.insert_task(&task2).unwrap();
 
-                let found_task = queue.fetch_and_touch_task(COMMON_TYPE.to_string())
+                let found_task = queue
+                    .fetch_and_touch_task(COMMON_TYPE.to_string())
                     .unwrap()
                     .unwrap();
 
@@ -127,7 +127,9 @@ macro_rules! test_queue {
 
                 let task = queue.insert_task(&task).unwrap();
 
-                let found_task = queue.update_task_state(&task, FangTaskState::Finished).unwrap();
+                let found_task = queue
+                    .update_task_state(&task, FangTaskState::Finished)
+                    .unwrap();
 
                 let metadata = found_task.metadata.as_object().unwrap();
                 let number = metadata["number"].as_u64();
@@ -170,7 +172,8 @@ macro_rules! test_queue {
 
                 let task = queue.insert_task(&task).unwrap();
 
-                let found_task = queue.fetch_and_touch_task(COMMON_TYPE.to_string())
+                let found_task = queue
+                    .fetch_and_touch_task(COMMON_TYPE.to_string())
                     .unwrap()
                     .unwrap();
 
@@ -255,7 +258,7 @@ macro_rules! test_queue {
 
                 let task1 = queue.insert_task(&task1).unwrap();
                 let task2 = queue.insert_task(&task2).unwrap();
-                
+
                 let result = queue.remove_all_tasks().unwrap();
 
                 assert_eq!(2, result);
@@ -272,7 +275,7 @@ macro_rules! test_queue {
 
                 let task1 = queue.insert_task(&task1).unwrap();
                 let task2 = queue.insert_task(&task2).unwrap();
-                
+
                 assert!(queue.find_task_by_id(task1.id).is_some());
                 assert!(queue.find_task_by_id(task2.id).is_some());
 
