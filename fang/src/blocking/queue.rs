@@ -509,3 +509,6 @@ impl Queue {
         Ok(task)
     }
 }
+
+#[cfg(test)]
+queue_tests::test_queue!{postgres, crate::queue::Queue, crate::queue::Queue::test()}
