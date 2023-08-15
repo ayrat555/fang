@@ -14,7 +14,7 @@ build() {
 
   printf "+++\ntitle = \"README\"\ndate = $TIME\nupdated = $TIME\ndraft = false\nweight = 410\nsort_by = \"weight\"\ntemplate = \"docs/page.html\"\n\n[extra]\ntoc = true\ntop = false\n+++\n\n" > docs/content/docs/README.md
 
-  cat fang/README.md >> docs/content/docs/README.md
+  cat README.md >> docs/content/docs/README.md
 
   cd docs
   sudo snap install --edge zola
