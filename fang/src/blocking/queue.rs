@@ -507,8 +507,6 @@ mod queue_tests {
     use chrono::DateTime;
     use chrono::Duration;
     use chrono::Utc;
-    use diesel::connection::Connection;
-    use diesel::result::Error;
     use serde::{Deserialize, Serialize};
     use serial_test::serial;
 
@@ -633,25 +631,18 @@ mod queue_tests {
 
         queue.remove_all_tasks().unwrap();
 
-        let mut queue_pooled_connection = queue.connection_pool.get().unwrap();
+        let task = queue.insert_task(&task).unwrap();
 
-        queue_pooled_connection.test_transaction::<(), Error, _>(|conn| {
-            let task = Queue::insert_query(conn, &task, Utc::now()).unwrap();
+        let found_task = queue.update_task_state(&task, FangTaskState::Finished).unwrap();
 
-            let found_task =
-                Queue::update_task_state_query(conn, &task, FangTaskState::Finished).unwrap();
+        let metadata = found_task.metadata.as_object().unwrap();
+        let number = metadata["number"].as_u64();
+        let type_task = metadata["type"].as_str();
 
-            let metadata = found_task.metadata.as_object().unwrap();
-            let number = metadata["number"].as_u64();
-            let type_task = metadata["type"].as_str();
-
-            assert_eq!(found_task.id, task.id);
-            assert_eq!(found_task.state, FangTaskState::Finished);
-            assert_eq!(Some(10), number);
-            assert_eq!(Some("PepeTask"), type_task);
-
-            Ok(())
-        });
+        assert_eq!(found_task.id, task.id);
+        assert_eq!(found_task.state, FangTaskState::Finished);
+        assert_eq!(Some(10), number);
+        assert_eq!(Some("PepeTask"), type_task);
     }
 
     #[test]
