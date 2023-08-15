@@ -16,7 +16,7 @@ build() {
 
   cat README.md >> docs/content/docs/README.md
 
-  mkdir /templates
+  sudo mkdir /templates
   cd docs
   sudo snap install --edge zola
   zola build
