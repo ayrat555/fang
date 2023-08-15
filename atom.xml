@@ -5,18 +5,25 @@
     <link href="https://fang.badykov.com/atom.xml" rel="self" type="application/atom+xml"/>
     <link href="https://fang.badykov.com"/>
     <generator uri="https://www.getzola.org/">Zola</generator>
-    <updated>2023-03-18T10:19:38+00:00</updated>
+    <updated>2023-08-15T07:14:48+00:00</updated>
     <id>https://fang.badykov.com/atom.xml</id>
     <entry xml:lang="en">
         <title>CHANGELOG</title>
-        <published>2023-03-18T10:19:38+00:00</published>
-        <updated>2023-03-18T10:19:38+00:00</updated>
+        <published>2023-08-15T07:14:48+00:00</published>
+        <updated>2023-08-15T07:14:48+00:00</updated>
         <author>
           <name>Unknown</name>
         </author>
         <link rel="alternate" href="https://fang.badykov.com/docs/changelog/" type="text/html"/>
         <id>https://fang.badykov.com/docs/changelog/</id>
+        
         <content type="html">&lt;h1 id=&quot;changelog&quot;&gt;Changelog&lt;&#x2F;h1&gt;
+&lt;h2 id=&quot;0-10-4-2023-08-12-125&quot;&gt;0.10.4 (2023-08-12) - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;125&quot;&gt;#125&lt;&#x2F;a&gt;&lt;&#x2F;h2&gt;
+&lt;ul&gt;
+&lt;li&gt;reorganize repo in two crates &lt;code&gt;fang&lt;&#x2F;code&gt; and &lt;code&gt;fang-derive-error&lt;&#x2F;code&gt;&lt;&#x2F;li&gt;
+&lt;li&gt;added macro crate &lt;code&gt;fang-derive-error&lt;&#x2F;code&gt; that provides &lt;code&gt;ToFangError&lt;&#x2F;code&gt; derive macro.&lt;&#x2F;li&gt;
+&lt;li&gt;refactor &lt;code&gt;FangTaskState&lt;&#x2F;code&gt; enum and &lt;code&gt;Task&lt;&#x2F;code&gt; struct.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
 &lt;h2 id=&quot;0-10-3-2023-03-18&quot;&gt;0.10.3 (2023-03-18)&lt;&#x2F;h2&gt;
 &lt;ul&gt;
 &lt;li&gt;update &lt;code&gt;typed-builder&lt;&#x2F;code&gt; to 0.14 - &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;pull&#x2F;115&quot;&gt;#115&lt;&#x2F;a&gt;&lt;&#x2F;li&gt;
@@ -127,16 +134,18 @@
 &lt;li&gt;The first release on crates.io&lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
 </content>
+        
     </entry>
     <entry xml:lang="en">
         <title>README</title>
-        <published>2023-03-18T10:19:38+00:00</published>
-        <updated>2023-03-18T10:19:38+00:00</updated>
+        <published>2023-08-15T07:14:48+00:00</published>
+        <updated>2023-08-15T07:14:48+00:00</updated>
         <author>
           <name>Unknown</name>
         </author>
         <link rel="alternate" href="https://fang.badykov.com/docs/readme/" type="text/html"/>
         <id>https://fang.badykov.com/docs/readme/</id>
+        
         <content type="html">&lt;p align=&quot;center&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;raw.githubusercontent.com&#x2F;ayrat555&#x2F;fang&#x2F;master&#x2F;logo.png&quot; alt=&quot;fang&quot; height=&quot;300px&quot;&gt;&lt;&#x2F;p&gt;
 &lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;crates.io&#x2F;crates&#x2F;fang&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;img.shields.io&#x2F;crates&#x2F;v&#x2F;fang.svg&quot; alt=&quot;Crates.io&quot; &#x2F;&gt;&lt;&#x2F;a&gt; &lt;a href=&quot;https:&#x2F;&#x2F;docs.rs&#x2F;fang&#x2F;&quot;&gt;&lt;img src=&quot;https:&#x2F;&#x2F;img.shields.io&#x2F;badge&#x2F;docs-website-blue.svg&quot; alt=&quot;docs page&quot; &#x2F;&gt;&lt;&#x2F;a&gt; &lt;img src=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;actions&#x2F;workflows&#x2F;rust.yml&#x2F;badge.svg&quot; alt=&quot;test&quot; &#x2F;&gt; &lt;img src=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&#x2F;actions&#x2F;workflows&#x2F;style.yml&#x2F;badge.svg&quot; alt=&quot;style&quot; &#x2F;&gt;&lt;&#x2F;p&gt;
 &lt;h1 id=&quot;fang&quot;&gt;Fang&lt;&#x2F;h1&gt;
@@ -163,14 +172,18 @@ Tasks can be retried with a custom backoff mode&lt;&#x2F;li&gt;
 &lt;&#x2F;ol&gt;
 &lt;h4 id=&quot;the-blocking-feature&quot;&gt;the Blocking feature&lt;&#x2F;h4&gt;
 &lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span&gt;[dependencies]
-&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.10.3&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; , &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;features &lt;&#x2F;span&gt;&lt;span&gt;= [&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;blocking&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;default-features &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false &lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.10.4&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; , &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;features &lt;&#x2F;span&gt;&lt;span&gt;= [&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;blocking&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;default-features &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false &lt;&#x2F;span&gt;&lt;span&gt;}
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
 &lt;h4 id=&quot;the-asynk-feature&quot;&gt;the Asynk feature&lt;&#x2F;h4&gt;
 &lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span&gt;[dependencies]
-&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.10.3&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; , &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;features &lt;&#x2F;span&gt;&lt;span&gt;= [&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;asynk&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;default-features &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false &lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.10.4&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; , &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;features &lt;&#x2F;span&gt;&lt;span&gt;= [&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;asynk&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;default-features &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false &lt;&#x2F;span&gt;&lt;span&gt;}
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
-&lt;h4 id=&quot;both-features&quot;&gt;Both features&lt;&#x2F;h4&gt;
-&lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.10.3&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; }
+&lt;h4 id=&quot;the-asynk-feature-with-derive-macro&quot;&gt;the Asynk feature with derive macro&lt;&#x2F;h4&gt;
+&lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span&gt;[dependencies]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.10.4&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; , &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;features &lt;&#x2F;span&gt;&lt;span&gt;= [&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;asynk&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;, &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;derive-error&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; ], &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;default-features &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false &lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h4 id=&quot;all-features&quot;&gt;All features&lt;&#x2F;h4&gt;
+&lt;pre data-lang=&quot;toml&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-toml &quot;&gt;&lt;code class=&quot;language-toml&quot; data-lang=&quot;toml&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;fang &lt;&#x2F;span&gt;&lt;span&gt;= { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;version &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.10.4&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; }
 &lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
 &lt;p&gt;&lt;em&gt;Supports rustc 1.62+&lt;&#x2F;em&gt;&lt;&#x2F;p&gt;
 &lt;ol start=&quot;2&quot;&gt;
@@ -180,11 +193,35 @@ Tasks can be retried with a custom backoff mode&lt;&#x2F;li&gt;
 &lt;h3 id=&quot;defining-a-task&quot;&gt;Defining a task&lt;&#x2F;h3&gt;
 &lt;h4 id=&quot;blocking-feature&quot;&gt;Blocking feature&lt;&#x2F;h4&gt;
 &lt;p&gt;Every task should implement the &lt;code&gt;fang::Runnable&lt;&#x2F;code&gt; trait which is used by &lt;code&gt;fang&lt;&#x2F;code&gt; to execute it.&lt;&#x2F;p&gt;
-&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::Error;
+&lt;p&gt;If you have a &lt;code&gt;CustomError&lt;&#x2F;code&gt;, it is recommended to implement &lt;code&gt;From&amp;lt;FangError&amp;gt;&lt;&#x2F;code&gt;. So this way you can use &lt;a href=&quot;https:&#x2F;&#x2F;stackoverflow.com&#x2F;questions&#x2F;42917566&#x2F;what-is-this-question-mark-operator-about#42921174&quot;&gt;? operator&lt;&#x2F;a&gt; inside the &lt;code&gt;run&lt;&#x2F;code&gt; function available in &lt;code&gt;fang::Runnable&lt;&#x2F;code&gt; trait.&lt;&#x2F;p&gt;
+&lt;p&gt;You can easily implement it with the macro &lt;code&gt;ToFangError&lt;&#x2F;code&gt;. This macro is only available in the feature &lt;code&gt;derive-error&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;rust&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-rust &quot;&gt;&lt;code class=&quot;language-rust&quot; data-lang=&quot;rust&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::FangError;
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::Runnable;
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::typetag;
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::PgConnection;
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::serde::{Deserialize, Serialize};
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;fang::ToFangError;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;use &lt;&#x2F;span&gt;&lt;span&gt;std::fmt::Debug;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;derive&lt;&#x2F;span&gt;&lt;span&gt;(Debug, ToFangError)]
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;enum &lt;&#x2F;span&gt;&lt;span&gt;CustomError {
+&lt;&#x2F;span&gt;&lt;span&gt;  ErrorOne(String),
+&lt;&#x2F;span&gt;&lt;span&gt;  ErrorTwo(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u32&lt;&#x2F;span&gt;&lt;span&gt;),
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;my_func&lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;num &lt;&#x2F;span&gt;&lt;span&gt;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;u16&lt;&#x2F;span&gt;&lt;span&gt;) -&amp;gt; Result&amp;lt;(), CustomError&amp;gt; {
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;if&lt;&#x2F;span&gt;&lt;span&gt; num == &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0 &lt;&#x2F;span&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;    Err(CustomError::ErrorOne(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;is zero&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;to_string&lt;&#x2F;span&gt;&lt;span&gt;()))
+&lt;&#x2F;span&gt;&lt;span&gt;  }
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;if&lt;&#x2F;span&gt;&lt;span&gt; num &amp;gt; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;500 &lt;&#x2F;span&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;    Err(CustomError::ErrorTwo(num))
+&lt;&#x2F;span&gt;&lt;span&gt;  }
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;  Ok(())
+&lt;&#x2F;span&gt;&lt;span&gt;}
 &lt;&#x2F;span&gt;&lt;span&gt;
 &lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;derive&lt;&#x2F;span&gt;&lt;span&gt;(Serialize, Deserialize)]
 &lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;serde&lt;&#x2F;span&gt;&lt;span&gt;(crate = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;fang::serde&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;)]
@@ -194,8 +231,12 @@ Tasks can be retried with a custom backoff mode&lt;&#x2F;li&gt;
 &lt;&#x2F;span&gt;&lt;span&gt;
 &lt;&#x2F;span&gt;&lt;span&gt;#[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;typetag&lt;&#x2F;span&gt;&lt;span&gt;::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;serde&lt;&#x2F;span&gt;&lt;span&gt;]
 &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;impl &lt;&#x2F;span&gt;&lt;span&gt;Runnable &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;for &lt;&#x2F;span&gt;&lt;span&gt;MyTask {
-&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;run&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;_queue&lt;&#x2F;span&gt;&lt;span&gt;: &amp;amp;dyn Queueable) -&amp;gt; Result&amp;lt;(), Error&amp;gt; {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;fn &lt;&#x2F;span&gt;&lt;span style=&quot;color:#8fa1b3;&quot;&gt;run&lt;&#x2F;span&gt;&lt;span&gt;(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;_queue&lt;&#x2F;span&gt;&lt;span&gt;: &amp;amp;dyn Queueable) -&amp;gt; Result&amp;lt;(), FangError&amp;gt; {
 &lt;&#x2F;span&gt;&lt;span&gt;        println!(&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;the number is &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;{}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;, &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;.number);
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;my_func&lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;self&lt;&#x2F;span&gt;&lt;span&gt;.number)?; 
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; You can use ? operator because 
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;&#x2F;&#x2F; From&amp;lt;FangError&amp;gt; is implemented thanks to ToFangError derive macro.
 &lt;&#x2F;span&gt;&lt;span&gt;
 &lt;&#x2F;span&gt;&lt;span&gt;        Ok(())
 &lt;&#x2F;span&gt;&lt;span&gt;    }
@@ -468,6 +509,7 @@ Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&g
 &lt;&#x2F;li&gt;
 &lt;&#x2F;ul&gt;
 </content>
+        
     </entry>
     <entry xml:lang="en">
         <title>Fang 0.9</title>
@@ -478,6 +520,7 @@ Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&g
         </author>
         <link rel="alternate" href="https://fang.badykov.com/blog/fang-09-release/" type="text/html"/>
         <id>https://fang.badykov.com/blog/fang-09-release/</id>
+        
         <content type="html">&lt;h2 id=&quot;major-changes&quot;&gt;Major changes&lt;&#x2F;h2&gt;
 &lt;ul&gt;
 &lt;li&gt;Simplify the database schema&lt;&#x2F;li&gt;
@@ -605,6 +648,7 @@ Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&g
 &lt;p&gt;The project is available on &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&quot;&gt;GitHub&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
 &lt;p&gt;The new release and this post is written in collaboration between  &lt;a href=&quot;https:&#x2F;&#x2F;pxp9.github.io&#x2F;&quot;&gt;Pepe Márquez Romero&lt;&#x2F;a&gt; (&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;pxp9&quot;&gt;github&lt;&#x2F;a&gt;) and &lt;a href=&quot;https:&#x2F;&#x2F;www.badykov.com&#x2F;&quot;&gt;Ayrat Badykov&lt;&#x2F;a&gt; (&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&quot;&gt;github&lt;&#x2F;a&gt;).&lt;&#x2F;p&gt;
 </content>
+        
     </entry>
     <entry xml:lang="en">
         <title>Fang, async background processing for Rust</title>
@@ -615,6 +659,7 @@ Use &lt;code&gt;AsyncWorkerPool&lt;&#x2F;code&gt; to start workers.&lt;&#x2F;p&g
         </author>
         <link rel="alternate" href="https://fang.badykov.com/blog/async-processing/" type="text/html"/>
         <id>https://fang.badykov.com/blog/async-processing/</id>
+        
         <content type="html">&lt;p&gt;Even though the first stable version of Rust was released in 2015, there are still some holes in its ecosystem for solving common tasks. One of which is background processing.&lt;&#x2F;p&gt;
 &lt;p&gt;In software engineering background processing is a common approach for solving several problems:&lt;&#x2F;p&gt;
 &lt;ul&gt;
@@ -756,6 +801,7 @@ Async provides significantly reduced CPU and memory overhead, especially for wor
 &lt;p&gt;The project is available on &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&#x2F;fang&quot;&gt;GitHub&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
 &lt;p&gt;The async feature and this post is written in collaboration between &lt;a href=&quot;https:&#x2F;&#x2F;www.badykov.com&#x2F;&quot;&gt;Ayrat Badykov&lt;&#x2F;a&gt; (&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&quot;&gt;github&lt;&#x2F;a&gt;) and &lt;a href=&quot;https:&#x2F;&#x2F;pxp9.github.io&#x2F;&quot;&gt;Pepe Márquez Romero&lt;&#x2F;a&gt; (&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;pxp9&quot;&gt;github&lt;&#x2F;a&gt;)&lt;&#x2F;p&gt;
 </content>
+        
     </entry>
     <entry xml:lang="en">
         <title>Ayrat Badykov</title>
@@ -766,9 +812,11 @@ Async provides significantly reduced CPU and memory overhead, especially for wor
         </author>
         <link rel="alternate" href="https://fang.badykov.com/authors/ayrat-badykov/" type="text/html"/>
         <id>https://fang.badykov.com/authors/ayrat-badykov/</id>
+        
         <content type="html">&lt;p&gt;Co-creator of &lt;strong&gt;Fang&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
 &lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;ayrat555&quot;&gt;@ayrat555&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
 </content>
+        
     </entry>
     <entry xml:lang="en">
         <title>Pepe Márquez Romero</title>
@@ -779,8 +827,10 @@ Async provides significantly reduced CPU and memory overhead, especially for wor
         </author>
         <link rel="alternate" href="https://fang.badykov.com/authors/pepe-marquez/" type="text/html"/>
         <id>https://fang.badykov.com/authors/pepe-marquez/</id>
+        
         <content type="html">&lt;p&gt;Co-creator of &lt;strong&gt;Fang&lt;&#x2F;strong&gt;.&lt;&#x2F;p&gt;
 &lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;pxp9&quot;&gt;@pxp9&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
 </content>
+        
     </entry>
 </feed>
