@@ -4,7 +4,7 @@ set -e
 BRANCH="gh-pages"
 
 build() {
-  echo "Starting building!!..."
+  echo "Starting building..."
 
   TIME=$(date +"%Y-%m-%dT%H:%M:%S.00Z")
 
