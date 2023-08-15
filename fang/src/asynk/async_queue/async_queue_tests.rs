@@ -60,8 +60,7 @@ impl AsyncRunnable for AsyncTaskSchedule {
 ///
 /// Arguments:
 /// + `$mod`: Name for the module
-/// + `$q`: Fully qualified type that implements `AsyncQueueable`
-///   + Multiple values returned by `$e` must be able to be interacted with concurrently without interfering with each other.
+/// + `$q`: Type that implements `AsyncQueueable`
 macro_rules! test_asynk_queue {
     ($mod:ident, $q:ident) => {
         mod $mod {

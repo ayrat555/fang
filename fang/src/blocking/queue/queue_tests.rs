@@ -76,7 +76,7 @@ impl Runnable for ScheduledPepeTask {
 ///
 /// Arguments:
 /// + `$mod`: Name for the module
-/// + `$q`: Fully qualified type that implements `Queueable`
+/// + `$q`: Full path to type that implements `Queueable`
 /// + `$e`: An expression that returns a value of `$q` suitable for testing.
 ///   + Multiple values returned by `$e` must be able to be interacted with concurrently without interfering with each other.
 macro_rules! test_queue {
