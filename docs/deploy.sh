@@ -16,12 +16,7 @@ build() {
 
   cat README.md >> docs/content/docs/README.md
 
-
-  cp -R docs ../docs_backup
-  rm -r *
-  cp -R ../docs_backup ./docs
   cd docs
-
   sudo snap install --edge zola
   zola build
   mv public /tmp/public
@@ -38,7 +33,7 @@ deploy() {
   git config user.name "GitHub Actions"
   git config user.email "github-actions-bot@users.noreply.github.com"
 
-  rm -r docs/themes
+  rm -rf docs/themes
   git add .
   git commit -m "Deploy new version docs"
   git push --force "https://${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ${BRANCH}
