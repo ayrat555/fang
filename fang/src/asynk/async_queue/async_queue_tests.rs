@@ -66,9 +66,6 @@ macro_rules! test_asynk_queue {
         mod $mod {
             use super::FangTaskState;
             use crate::asynk::async_queue::AsyncQueueable;
-            use bb8_postgres::bb8::Pool;
-            use bb8_postgres::tokio_postgres::NoTls;
-            use bb8_postgres::PostgresConnectionManager;
             use chrono::Duration;
             use chrono::SubsecRound;
             use chrono::Utc;
@@ -79,11 +76,13 @@ macro_rules! test_asynk_queue {
 
             #[tokio::test]
             async fn insert_task_creates_new_task() {
-                let pool = pool().await;
-                let mut connection = pool.get().await.unwrap();
-                let transaction = connection.transaction().await.unwrap();
+                let mut test = if cfg!(feature = "asynk") {
+                    let transaction = get_transaction_postgres().await;
 
-                let mut test = <$q>::builder().transaction(transaction).build();
+                    <$q>::builder().transaction(transaction).build()
+                } else {
+                    unreachable!();
+                };
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
@@ -93,7 +92,10 @@ macro_rules! test_asynk_queue {
 
                 assert_eq!(Some(1), number);
                 assert_eq!(Some("AsyncTask"), type_task);
-                test.transaction.rollback().await.unwrap();
+
+                if cfg!(feature = "asynk") {
+                    test.transaction.rollback().await.unwrap();
+                }
             }
 
             #[tokio::test]
@@ -366,14 +368,31 @@ macro_rules! test_asynk_queue {
                 test.transaction.rollback().await.unwrap();
             }
 
-            async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
-                let pg_mgr = PostgresConnectionManager::new_from_stringlike(
+            #[cfg(feature = "asynk")]
+            async fn pool() -> bb8_postgres::bb8::Pool<
+                bb8_postgres::PostgresConnectionManager<bb8_postgres::tokio_postgres::NoTls>,
+            > {
+                let pg_mgr = bb8_postgres::PostgresConnectionManager::new_from_stringlike(
                     "postgres://postgres:postgres@localhost/fang",
-                    NoTls,
+                    bb8_postgres::tokio_postgres::NoTls,
                 )
                 .unwrap();
 
-                Pool::builder().build(pg_mgr).await.unwrap()
+                bb8_postgres::bb8::Pool::builder()
+                    .build(pg_mgr)
+                    .await
+                    .unwrap()
+            }
+
+            #[cfg(feature = "asynk")]
+            async fn get_transaction_postgres<'a>() -> crate::async_queue::Transaction<'a> {
+                let pool = Box::new(pool().await);
+                let connection = Box::leak::<'static>(pool).get().await.unwrap();
+
+                Box::leak::<'static>(Box::new(connection))
+                    .transaction()
+                    .await
+                    .unwrap()
             }
         }
     };

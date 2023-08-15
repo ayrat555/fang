@@ -223,44 +223,7 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
     async fn schedule_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
         let transaction = &mut self.transaction;
 
-        let metadata = serde_json::to_value(task)?;
-
-        let scheduled_at = match task.cron() {
-            Some(scheduled) => match scheduled {
-                CronPattern(cron_pattern) => {
-                    let schedule = Schedule::from_str(&cron_pattern)?;
-                    let mut iterator = schedule.upcoming(Utc);
-
-                    iterator
-                        .next()
-                        .ok_or(AsyncQueueError::CronError(CronError::NoTimestampsError))?
-                }
-                ScheduleOnce(datetime) => datetime,
-            },
-            None => {
-                return Err(AsyncQueueError::CronError(
-                    CronError::TaskNotSchedulableError,
-                ));
-            }
-        };
-
-        let task: Task = if !task.uniq() {
-            AsyncQueue::<NoTls>::insert_task_query(
-                transaction,
-                metadata,
-                &task.task_type(),
-                scheduled_at,
-            )
-            .await?
-        } else {
-            AsyncQueue::<NoTls>::insert_task_if_not_exist_query(
-                transaction,
-                metadata,
-                &task.task_type(),
-                scheduled_at,
-            )
-            .await?
-        };
+        let task: Task = AsyncQueue::<NoTls>::schedule_task_query(transaction, task).await?;
 
         Ok(task)
     }
@@ -630,6 +593,45 @@ where
             .scheduled_at(scheduled_at)
             .build()
     }
+
+    async fn schedule_task_query(
+        mut transaction: &mut Transaction<'_>,
+        task: &dyn AsyncRunnable,
+    ) -> Result<Task, AsyncQueueError> {
+        let metadata = serde_json::to_value(task)?;
+
+        let scheduled_at = match task.cron() {
+            Some(scheduled) => match scheduled {
+                CronPattern(cron_pattern) => {
+                    let schedule = Schedule::from_str(&cron_pattern)?;
+                    let mut iterator = schedule.upcoming(Utc);
+                    iterator
+                        .next()
+                        .ok_or(AsyncQueueError::CronError(CronError::NoTimestampsError))?
+                }
+                ScheduleOnce(datetime) => datetime,
+            },
+            None => {
+                return Err(AsyncQueueError::CronError(
+                    CronError::TaskNotSchedulableError,
+                ));
+            }
+        };
+
+        let task: Task = if !task.uniq() {
+            Self::insert_task_query(&mut transaction, metadata, &task.task_type(), scheduled_at)
+                .await?
+        } else {
+            Self::insert_task_if_not_exist_query(
+                &mut transaction,
+                metadata,
+                &task.task_type(),
+                scheduled_at,
+            )
+            .await?
+        };
+        Ok(task)
+    }
 }
 
 #[async_trait]
@@ -641,6 +643,7 @@ where
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
     async fn find_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError> {
+        self.check_if_connection()?;
         let mut connection = self.pool.as_ref().unwrap().get().await?;
         let mut transaction = connection.transaction().await?;
 
@@ -695,38 +698,9 @@ where
         self.check_if_connection()?;
         let mut connection = self.pool.as_ref().unwrap().get().await?;
         let mut transaction = connection.transaction().await?;
-        let metadata = serde_json::to_value(task)?;
 
-        let scheduled_at = match task.cron() {
-            Some(scheduled) => match scheduled {
-                CronPattern(cron_pattern) => {
-                    let schedule = Schedule::from_str(&cron_pattern)?;
-                    let mut iterator = schedule.upcoming(Utc);
-                    iterator
-                        .next()
-                        .ok_or(AsyncQueueError::CronError(CronError::NoTimestampsError))?
-                }
-                ScheduleOnce(datetime) => datetime,
-            },
-            None => {
-                return Err(AsyncQueueError::CronError(
-                    CronError::TaskNotSchedulableError,
-                ));
-            }
-        };
+        let task = Self::schedule_task_query(&mut transaction, task).await?;
 
-        let task: Task = if !task.uniq() {
-            Self::insert_task_query(&mut transaction, metadata, &task.task_type(), scheduled_at)
-                .await?
-        } else {
-            Self::insert_task_if_not_exist_query(
-                &mut transaction,
-                metadata,
-                &task.task_type(),
-                scheduled_at,
-            )
-            .await?
-        };
         transaction.commit().await?;
         Ok(task)
     }
