@@ -28,6 +28,9 @@ use uuid::Uuid;
 #[cfg(test)]
 use bb8_postgres::tokio_postgres::tls::NoTls;
 
+#[cfg(test)]
+use self::async_queue_tests::test_asynk_queue;
+
 const INSERT_TASK_QUERY: &str = include_str!("queries/insert_task.sql");
 const INSERT_TASK_UNIQ_QUERY: &str = include_str!("queries/insert_task_uniq.sql");
 const UPDATE_TASK_STATE_QUERY: &str = include_str!("queries/update_task_state.sql");
@@ -842,3 +845,6 @@ where
         Ok(task)
     }
 }
+
+#[cfg(test)]
+test_asynk_queue!(postgres, AsyncQueueTest);

@@ -2,12 +2,12 @@
 #![allow(clippy::unnecessary_unwrap)]
 
 use crate::queue::Queueable;
-use crate::queue::Task;
 use crate::runnable::Runnable;
 use crate::runnable::COMMON_TYPE;
 use crate::FangError;
 use crate::FangTaskState;
 use crate::Scheduled::*;
+use crate::Task;
 use crate::{RetentionMode, SleepParams};
 use log::error;
 use std::thread;

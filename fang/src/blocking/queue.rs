@@ -6,6 +6,7 @@ use crate::schema::fang_tasks;
 use crate::CronError;
 use crate::FangTaskState;
 use crate::Scheduled::*;
+use crate::Task;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
@@ -30,31 +31,6 @@ use dotenvy::dotenv;
 use std::env;
 
 pub type PoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
-
-#[derive(Queryable, Identifiable, Debug, Eq, PartialEq, Clone, TypedBuilder)]
-#[diesel(table_name = fang_tasks)]
-pub struct Task {
-    #[builder(setter(into))]
-    pub id: Uuid,
-    #[builder(setter(into))]
-    pub metadata: serde_json::Value,
-    #[builder(setter(into))]
-    pub error_message: Option<String>,
-    #[builder(setter(into))]
-    pub state: FangTaskState,
-    #[builder(setter(into))]
-    pub task_type: String,
-    #[builder(setter(into))]
-    pub uniq_hash: Option<String>,
-    #[builder(setter(into))]
-    pub retries: i32,
-    #[builder(setter(into))]
-    pub scheduled_at: DateTime<Utc>,
-    #[builder(setter(into))]
-    pub created_at: DateTime<Utc>,
-    #[builder(setter(into))]
-    pub updated_at: DateTime<Utc>,
-}
 
 #[derive(Insertable, Debug, Eq, PartialEq, Clone, TypedBuilder)]
 #[diesel(table_name = fang_tasks)]
