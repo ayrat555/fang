@@ -320,15 +320,17 @@ impl AsyncQueue<NoTls> {
         let check_query = format!("SELECT 0 FROM pg_database WHERE datname='{}';", db_name);
         let create_query = format!("CREATE DATABASE {} WITH TEMPLATE fang;", db_name);
         let delete_query = format!("DROP DATABASE {};", db_name);
-        
+
         {
             let conn = res.pool.as_mut().unwrap().get().await.unwrap();
-            let db_exists = conn.query(&check_query, &[]).await.unwrap().len() != 0;
+            let db_exists = conn.query(&check_query, &[]).await.unwrap().is_empty();
             if db_exists {
                 conn.execute(&delete_query, &[]).await.unwrap();
             }
             while let Err(e) = conn.execute(&create_query, &[]).await {
-                if e.as_db_error().unwrap().message() != "source database \"fang\" is being accessed by other users" {
+                if e.as_db_error().unwrap().message()
+                    != "source database \"fang\" is being accessed by other users"
+                {
                     panic!("{:?}", e);
                 }
             }
@@ -642,7 +644,7 @@ where
     }
 
     async fn schedule_task_query(
-        mut transaction: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_>,
         task: &dyn AsyncRunnable,
     ) -> Result<Task, AsyncQueueError> {
         let metadata = serde_json::to_value(task)?;
@@ -666,11 +668,10 @@ where
         };
 
         let task: Task = if !task.uniq() {
-            Self::insert_task_query(&mut transaction, metadata, &task.task_type(), scheduled_at)
-                .await?
+            Self::insert_task_query(transaction, metadata, &task.task_type(), scheduled_at).await?
         } else {
             Self::insert_task_if_not_exist_query(
-                &mut transaction,
+                transaction,
                 metadata,
                 &task.task_type(),
                 scheduled_at,
