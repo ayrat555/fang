@@ -180,27 +180,24 @@ static ASYNC_QUEUE_DB_TEST_COUNTER: Mutex<u32> = Mutex::const_new(0);
 impl AsyncQueue<NoTls> {
     /// Provides an AsyncQueue connected to its own DB
     pub async fn test() -> Self {
-        let mut new_number = ASYNC_QUEUE_DB_TEST_COUNTER.lock().await;
         const BASE_URI: &str = "postgres://postgres:postgres@localhost";
         let mut res = Self::builder()
             .max_pool_size(1_u32)
             .uri(format!("{}/fang", BASE_URI))
             .build();
 
+        let mut new_number = ASYNC_QUEUE_DB_TEST_COUNTER.lock().await;
         res.connect(NoTls).await.unwrap();
 
         let db_name = format!("async_queue_test_{}", *new_number);
         *new_number += 1;
 
-        let check_query = format!("SELECT 0 FROM pg_database WHERE datname='{}';", db_name);
         let create_query = format!("CREATE DATABASE {} WITH TEMPLATE fang;", db_name);
-        let delete_query = format!("DROP DATABASE {};", db_name);
+        let delete_query = format!("DROP DATABASE IF EXISTS {};", db_name);
 
         let conn = res.pool.as_mut().unwrap().get().await.unwrap();
-        let db_exists = !conn.query(&check_query, &[]).await.unwrap().is_empty();
-        if db_exists {
-            conn.execute(&delete_query, &[]).await.unwrap();
-        }
+        conn.execute(&delete_query, &[]).await.unwrap();
+
         while let Err(e) = conn.execute(&create_query, &[]).await {
             if e.as_db_error().unwrap().message()
                 != "source database \"fang\" is being accessed by other users"
