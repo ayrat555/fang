@@ -324,20 +324,20 @@ impl AsyncQueue<NoTls> {
         let create_query = format!("CREATE DATABASE {} WITH TEMPLATE fang;", db_name);
         let delete_query = format!("DROP DATABASE {};", db_name);
 
-        {
-            let conn = res.pool.as_mut().unwrap().get().await.unwrap();
-            let db_exists = conn.query(&check_query, &[]).await.unwrap().is_empty();
-            if db_exists {
-                conn.execute(&delete_query, &[]).await.unwrap();
-            }
-            while let Err(e) = conn.execute(&create_query, &[]).await {
-                if e.as_db_error().unwrap().message()
-                    != "source database \"fang\" is being accessed by other users"
-                {
-                    panic!("{:?}", e);
-                }
+        let conn = res.pool.as_mut().unwrap().get().await.unwrap();
+        let db_exists = conn.query(&check_query, &[]).await.unwrap().is_empty();
+        if db_exists {
+            conn.execute(&delete_query, &[]).await.unwrap();
+        }
+        while let Err(e) = conn.execute(&create_query, &[]).await {
+            if e.as_db_error().unwrap().message()
+                != "source database \"fang\" is being accessed by other users"
+            {
+                panic!("{:?}", e);
             }
         }
+
+        drop(conn);
 
         res.connected = false;
         res.pool = None;
