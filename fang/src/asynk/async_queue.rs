@@ -306,6 +306,7 @@ static ASYNC_QUEUE_DB_TEST_COUNTER: Mutex<u32> = Mutex::new(0);
 impl AsyncQueue<NoTls> {
     /// Provides an AsyncQueue connected to its own DB
     pub async fn test() -> Self {
+        let mut new_number = ASYNC_QUEUE_DB_TEST_COUNTER.lock().unwrap();
         const BASE_URI: &str = "postgres://postgres:postgres@localhost";
         let mut res = Self::builder()
             .max_pool_size(1_u32)
@@ -314,12 +315,8 @@ impl AsyncQueue<NoTls> {
 
         res.connect(NoTls).await.unwrap();
 
-        let db_name;
-        {
-            let mut new_number = ASYNC_QUEUE_DB_TEST_COUNTER.lock().unwrap();
-            db_name = format!("async_queue_test_{}", *new_number);
-            *new_number += 1;
-        }
+        let db_name = format!("async_queue_test_{}", *new_number);
+        *new_number += 1;
 
         let check_query = format!("SELECT 0 FROM pg_database WHERE datname='{}';", db_name);
         let create_query = format!("CREATE DATABASE {} WITH TEMPLATE fang;", db_name);
