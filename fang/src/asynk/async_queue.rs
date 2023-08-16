@@ -296,6 +296,53 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
     }
 }
 
+#[cfg(test)]
+use std::sync::Mutex;
+
+#[cfg(test)]
+static ASYNC_QUEUE_DB_TEST_COUNTER: Mutex<u32> = Mutex::new(0);
+
+#[cfg(test)]
+impl AsyncQueue<NoTls> {
+    pub async fn test() -> Self {
+        let mut new_number = ASYNC_QUEUE_DB_TEST_COUNTER.lock().unwrap();
+        const BASE_URI: &str = "postgres://postgres:postgres@localhost";
+        let mut res = Self::builder()
+            .max_pool_size(1_u32)
+            .uri(format!("{}/fang", BASE_URI))
+            .build();
+
+        res.connect(NoTls).await.unwrap();
+
+        let db_name = format!("async_queue_test_{}", *new_number);
+        *new_number += 1;
+
+        let check_query = format!("SELECT 0 FROM pg_database WHERE datname='{}';", db_name);
+        let create_query = format!("CREATE DATABASE {} WITH TEMPLATE fang;", db_name);
+        let delete_query = format!("DROP DATABASE {};", db_name);
+        
+        {
+            let conn = res.pool.as_mut().unwrap().get().await.unwrap();
+            let db_exists = conn.query(&check_query, &[]).await.unwrap().len() != 0;
+            if db_exists {
+                conn.execute(&delete_query, &[]).await.unwrap();
+            }
+            while let Err(e) = conn.execute(&create_query, &[]).await {
+                if e.as_db_error().unwrap().message() != "source database \"fang\" is being accessed by other users" {
+                    panic!("{:?}", e);
+                }
+            }
+        }
+
+        res.connected = false;
+        res.pool = None;
+        res.uri = format!("{}/{}", BASE_URI, db_name);
+        res.connect(NoTls).await.unwrap();
+
+        res
+    }
+}
+
 impl<Tls> AsyncQueue<Tls>
 where
     Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
@@ -821,4 +868,4 @@ where
 }
 
 #[cfg(test)]
-test_asynk_queue!(postgres, AsyncQueueTest);
+test_asynk_queue! {postgres, crate::AsyncQueue<bb8_postgres::tokio_postgres::tls::NoTls>, crate::AsyncQueue::<bb8_postgres::tokio_postgres::tls::NoTls>::test()}

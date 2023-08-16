@@ -62,7 +62,7 @@ impl AsyncRunnable for AsyncTaskSchedule {
 /// + `$mod`: Name for the module
 /// + `$q`: Type that implements `AsyncQueueable`
 macro_rules! test_asynk_queue {
-    ($mod:ident, $q:ident) => {
+    ($mod:ident, $q:ty, $e:expr) => {
         mod $mod {
             use super::FangTaskState;
             use crate::asynk::async_queue::AsyncQueueable;
@@ -72,17 +72,10 @@ macro_rules! test_asynk_queue {
             use $crate::async_queue::async_queue_tests::{
                 AsyncTask, AsyncTaskSchedule, AsyncUniqTask,
             };
-            use $crate::$q;
 
             #[tokio::test]
             async fn insert_task_creates_new_task() {
-                let mut test = if cfg!(feature = "asynk") {
-                    let transaction = get_transaction_postgres().await;
-
-                    <$q>::builder().transaction(transaction).build()
-                } else {
-                    unreachable!();
-                };
+                let mut test: $q = $e.await;
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
@@ -92,19 +85,11 @@ macro_rules! test_asynk_queue {
 
                 assert_eq!(Some(1), number);
                 assert_eq!(Some("AsyncTask"), type_task);
-
-                if cfg!(feature = "asynk") {
-                    test.transaction.rollback().await.unwrap();
-                }
             }
 
             #[tokio::test]
             async fn update_task_state_test() {
-                let pool = pool().await;
-                let mut connection = pool.get().await.unwrap();
-                let transaction = connection.transaction().await.unwrap();
-
-                let mut test = <$q>::builder().transaction(transaction).build();
+                let mut test: $q = $e.await;
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
@@ -123,17 +108,11 @@ macro_rules! test_asynk_queue {
 
                 assert_eq!(id, finished_task.id);
                 assert_eq!(FangTaskState::Finished, finished_task.state);
-
-                test.transaction.rollback().await.unwrap();
             }
 
             #[tokio::test]
             async fn failed_task_query_test() {
-                let pool = pool().await;
-                let mut connection = pool.get().await.unwrap();
-                let transaction = connection.transaction().await.unwrap();
-
-                let mut test = <$q>::builder().transaction(transaction).build();
+                let mut test: $q = $e.await;
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
@@ -150,17 +129,11 @@ macro_rules! test_asynk_queue {
                 assert_eq!(id, failed_task.id);
                 assert_eq!(Some("Some error"), failed_task.error_message.as_deref());
                 assert_eq!(FangTaskState::Failed, failed_task.state);
-
-                test.transaction.rollback().await.unwrap();
             }
 
             #[tokio::test]
             async fn remove_all_tasks_test() {
-                let pool = pool().await;
-                let mut connection = pool.get().await.unwrap();
-                let transaction = connection.transaction().await.unwrap();
-
-                let mut test = <$q>::builder().transaction(transaction).build();
+                let mut test: $q = $e.await;
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
@@ -182,17 +155,11 @@ macro_rules! test_asynk_queue {
 
                 let result = test.remove_all_tasks().await.unwrap();
                 assert_eq!(2, result);
-
-                test.transaction.rollback().await.unwrap();
             }
 
             #[tokio::test]
             async fn schedule_task_test() {
-                let pool = pool().await;
-                let mut connection = pool.get().await.unwrap();
-                let transaction = connection.transaction().await.unwrap();
-
-                let mut test = <$q>::builder().transaction(transaction).build();
+                let mut test: $q = $e.await;
 
                 let datetime = (Utc::now() + Duration::seconds(7)).round_subsecs(0);
 
@@ -214,11 +181,7 @@ macro_rules! test_asynk_queue {
 
             #[tokio::test]
             async fn remove_all_scheduled_tasks_test() {
-                let pool = pool().await;
-                let mut connection = pool.get().await.unwrap();
-                let transaction = connection.transaction().await.unwrap();
-
-                let mut test = <$q>::builder().transaction(transaction).build();
+                let mut test: $q = $e.await;
 
                 let datetime = (Utc::now() + Duration::seconds(7)).round_subsecs(0);
 
@@ -242,11 +205,7 @@ macro_rules! test_asynk_queue {
 
             #[tokio::test]
             async fn fetch_and_touch_test() {
-                let pool = pool().await;
-                let mut connection = pool.get().await.unwrap();
-                let transaction = connection.transaction().await.unwrap();
-
-                let mut test = <$q>::builder().transaction(transaction).build();
+                let mut test: $q = $e.await;
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
@@ -282,17 +241,11 @@ macro_rules! test_asynk_queue {
 
                 assert_eq!(Some(2), number);
                 assert_eq!(Some("AsyncTask"), type_task);
-
-                test.transaction.rollback().await.unwrap();
             }
 
             #[tokio::test]
             async fn remove_tasks_type_test() {
-                let pool = pool().await;
-                let mut connection = pool.get().await.unwrap();
-                let transaction = connection.transaction().await.unwrap();
-
-                let mut test = <$q>::builder().transaction(transaction).build();
+                let mut test: $q = $e.await;
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
@@ -317,17 +270,11 @@ macro_rules! test_asynk_queue {
 
                 let result = test.remove_tasks_type("common").await.unwrap();
                 assert_eq!(2, result);
-
-                test.transaction.rollback().await.unwrap();
             }
 
             #[tokio::test]
             async fn remove_tasks_by_metadata() {
-                let pool = pool().await;
-                let mut connection = pool.get().await.unwrap();
-                let transaction = connection.transaction().await.unwrap();
-
-                let mut test = <$q>::builder().transaction(transaction).build();
+                let mut test: $q = $e.await;
 
                 let task = test
                     .insert_task(&AsyncUniqTask { number: 1 })
@@ -364,35 +311,6 @@ macro_rules! test_asynk_queue {
                     .await
                     .unwrap();
                 assert_eq!(1, result);
-
-                test.transaction.rollback().await.unwrap();
-            }
-
-            #[cfg(feature = "asynk")]
-            async fn pool() -> bb8_postgres::bb8::Pool<
-                bb8_postgres::PostgresConnectionManager<bb8_postgres::tokio_postgres::NoTls>,
-            > {
-                let pg_mgr = bb8_postgres::PostgresConnectionManager::new_from_stringlike(
-                    "postgres://postgres:postgres@localhost/fang",
-                    bb8_postgres::tokio_postgres::NoTls,
-                )
-                .unwrap();
-
-                bb8_postgres::bb8::Pool::builder()
-                    .build(pg_mgr)
-                    .await
-                    .unwrap()
-            }
-
-            #[cfg(feature = "asynk")]
-            async fn get_transaction_postgres<'a>() -> crate::async_queue::Transaction<'a> {
-                let pool = Box::new(pool().await);
-                let connection = Box::leak::<'static>(pool).get().await.unwrap();
-
-                Box::leak::<'static>(Box::new(connection))
-                    .transaction()
-                    .await
-                    .unwrap()
             }
         }
     };
