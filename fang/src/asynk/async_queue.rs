@@ -323,7 +323,7 @@ impl AsyncQueue<NoTls> {
         let delete_query = format!("DROP DATABASE {};", db_name);
 
         let conn = res.pool.as_mut().unwrap().get().await.unwrap();
-        let db_exists = conn.query(&check_query, &[]).await.unwrap().is_empty();
+        let db_exists = !conn.query(&check_query, &[]).await.unwrap().is_empty();
         if db_exists {
             conn.execute(&delete_query, &[]).await.unwrap();
         }
