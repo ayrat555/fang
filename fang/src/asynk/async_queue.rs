@@ -297,16 +297,16 @@ impl AsyncQueueable for AsyncQueueTest<'_> {
 }
 
 #[cfg(test)]
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 
 #[cfg(test)]
-static ASYNC_QUEUE_DB_TEST_COUNTER: Mutex<u32> = Mutex::new(0);
+static ASYNC_QUEUE_DB_TEST_COUNTER: Mutex<u32> = Mutex::const_new(0);
 
 #[cfg(test)]
 impl AsyncQueue<NoTls> {
     /// Provides an AsyncQueue connected to its own DB
     pub async fn test() -> Self {
-        let mut new_number = ASYNC_QUEUE_DB_TEST_COUNTER.lock().unwrap();
+        let mut new_number = ASYNC_QUEUE_DB_TEST_COUNTER.lock().await;
         const BASE_URI: &str = "postgres://postgres:postgres@localhost";
         let mut res = Self::builder()
             .max_pool_size(1_u32)
