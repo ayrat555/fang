@@ -60,18 +60,20 @@ impl AsyncRunnable for AsyncTaskSchedule {
 ///
 /// Arguments:
 /// + `$mod`: Name for the module
-/// + `$q`: Type that implements `AsyncQueueable`
+/// + `$q`: Full path to type that implements `AsyncQueueable`
+/// + `$e`: An expression that returns a value of `$q` suitable for testing.
+///   + Multiple values returned by `$e` must be able to be interacted with concurrently without interfering with each other.
 macro_rules! test_asynk_queue {
     ($mod:ident, $q:ty, $e:expr) => {
         mod $mod {
-            use super::FangTaskState;
-            use crate::asynk::async_queue::AsyncQueueable;
             use chrono::Duration;
             use chrono::SubsecRound;
             use chrono::Utc;
             use $crate::async_queue::async_queue_tests::{
                 AsyncTask, AsyncTaskSchedule, AsyncUniqTask,
             };
+            use $crate::asynk::async_queue::AsyncQueueable;
+            use $crate::FangTaskState;
 
             #[tokio::test]
             async fn insert_task_creates_new_task() {

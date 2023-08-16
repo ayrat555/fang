@@ -304,6 +304,7 @@ static ASYNC_QUEUE_DB_TEST_COUNTER: Mutex<u32> = Mutex::new(0);
 
 #[cfg(test)]
 impl AsyncQueue<NoTls> {
+    /// Provides an AsyncQueue connected to its own DB
     pub async fn test() -> Self {
         const BASE_URI: &str = "postgres://postgres:postgres@localhost";
         let mut res = Self::builder()
