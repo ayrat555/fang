@@ -196,8 +196,11 @@ impl AsyncQueue<NoTls> {
         let delete_query = format!("DROP DATABASE IF EXISTS {};", db_name);
 
         let conn = res.pool.as_mut().unwrap().get().await.unwrap();
+
+        log::info!("Deleting database {db_name} ...");
         conn.execute(&delete_query, &[]).await.unwrap();
 
+        log::info!("Creating database {db_name} ...");
         while let Err(e) = conn.execute(&create_query, &[]).await {
             if e.as_db_error().unwrap().message()
                 != "source database \"fang\" is being accessed by other users"
@@ -205,6 +208,8 @@ impl AsyncQueue<NoTls> {
                 panic!("{:?}", e);
             }
         }
+
+        log::info!("Database {db_name} created !!");
 
         drop(conn);
 
