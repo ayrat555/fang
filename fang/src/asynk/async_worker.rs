@@ -244,7 +244,7 @@ impl<'a> AsyncWorkerTest<'a> {
 #[cfg(test)]
 mod async_worker_tests {
     use super::AsyncWorkerTest;
-    use crate::asynk::async_queue::AsyncQueueTest;
+    use crate::asynk::async_queue::AsyncQueue;
     use crate::asynk::async_queue::AsyncQueueable;
     use crate::asynk::async_worker::Task;
     use crate::asynk::AsyncRunnable;
@@ -253,9 +253,7 @@ mod async_worker_tests {
     use crate::RetentionMode;
     use crate::Scheduled;
     use async_trait::async_trait;
-    use bb8_postgres::bb8::Pool;
     use bb8_postgres::tokio_postgres::NoTls;
-    use bb8_postgres::PostgresConnectionManager;
     use chrono::Duration;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
@@ -361,11 +359,8 @@ mod async_worker_tests {
 
     #[tokio::test]
     async fn execute_and_finishes_task() {
-        let pool = pool().await;
-        let mut connection = pool.get().await.unwrap();
-        let transaction = connection.transaction().await.unwrap();
+        let mut test = AsyncQueue::<NoTls>::test().await;
 
-        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
         let actual_task = WorkerAsyncTask { number: 1 };
 
         let task = insert_task(&mut test, &actual_task).await;
@@ -380,16 +375,11 @@ mod async_worker_tests {
         let task_finished = test.find_task_by_id(id).await.unwrap();
         assert_eq!(id, task_finished.id);
         assert_eq!(FangTaskState::Finished, task_finished.state);
-        test.transaction.rollback().await.unwrap();
     }
 
     #[tokio::test]
     async fn schedule_task_test() {
-        let pool = pool().await;
-        let mut connection = pool.get().await.unwrap();
-        let transaction = connection.transaction().await.unwrap();
-
-        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+        let mut test = AsyncQueue::<NoTls>::test().await;
 
         let actual_task = WorkerAsyncTaskSchedule { number: 1 };
 
@@ -420,11 +410,7 @@ mod async_worker_tests {
 
     #[tokio::test]
     async fn retries_task_test() {
-        let pool = pool().await;
-        let mut connection = pool.get().await.unwrap();
-        let transaction = connection.transaction().await.unwrap();
-
-        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+        let mut test = AsyncQueue::<NoTls>::test().await;
 
         let actual_task = AsyncRetryTask {};
 
@@ -465,13 +451,9 @@ mod async_worker_tests {
 
     #[tokio::test]
     async fn saves_error_for_failed_task() {
-        let pool = pool().await;
-        let mut connection = pool.get().await.unwrap();
-        let transaction = connection.transaction().await.unwrap();
+        let mut test = AsyncQueue::<NoTls>::test().await;
 
-        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
         let failed_task = AsyncFailedTask { number: 1 };
-
         let task = insert_task(&mut test, &failed_task).await;
         let id = task.id;
 
@@ -489,16 +471,11 @@ mod async_worker_tests {
             "number 1 is wrong :(".to_string(),
             task_finished.error_message.unwrap()
         );
-        test.transaction.rollback().await.unwrap();
     }
 
     #[tokio::test]
     async fn executes_task_only_of_specific_type() {
-        let pool = pool().await;
-        let mut connection = pool.get().await.unwrap();
-        let transaction = connection.transaction().await.unwrap();
-
-        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+        let mut test = AsyncQueue::<NoTls>::test().await;
 
         let task1 = insert_task(&mut test, &AsyncTaskType1 {}).await;
         let task12 = insert_task(&mut test, &AsyncTaskType1 {}).await;
@@ -525,16 +502,11 @@ mod async_worker_tests {
         assert_eq!(FangTaskState::Finished, task1.state);
         assert_eq!(FangTaskState::Finished, task12.state);
         assert_eq!(FangTaskState::New, task2.state);
-        test.transaction.rollback().await.unwrap();
     }
 
     #[tokio::test]
     async fn remove_when_finished() {
-        let pool = pool().await;
-        let mut connection = pool.get().await.unwrap();
-        let transaction = connection.transaction().await.unwrap();
-
-        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
+        let mut test = AsyncQueue::<NoTls>::test().await;
 
         let task1 = insert_task(&mut test, &AsyncTaskType1 {}).await;
         let task12 = insert_task(&mut test, &AsyncTaskType1 {}).await;
@@ -562,19 +534,9 @@ mod async_worker_tests {
             .unwrap()
             .unwrap();
         assert_eq!(id2, task2.id);
-
-        test.transaction.rollback().await.unwrap();
     }
-    async fn insert_task(test: &mut AsyncQueueTest<'_>, task: &dyn AsyncRunnable) -> Task {
+
+    async fn insert_task(test: &mut AsyncQueue<NoTls>, task: &dyn AsyncRunnable) -> Task {
         test.insert_task(task).await.unwrap()
-    }
-    async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
-        let pg_mgr = PostgresConnectionManager::new_from_stringlike(
-            "postgres://postgres:postgres@localhost/fang",
-            NoTls,
-        )
-        .unwrap();
-
-        Pool::builder().build(pg_mgr).await.unwrap()
     }
 }
