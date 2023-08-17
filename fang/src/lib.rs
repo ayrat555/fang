@@ -206,27 +206,54 @@ pub use async_trait::async_trait;
 #[cfg(feature = "derive-error")]
 pub use fang_derive_error::ToFangError;
 
-#[cfg(feature = "migrations_postgres")]
+#[cfg(feature = "migrations")]
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+#[cfg(feature = "migrations")]
+use std::error::Error as SomeError;
+
+#[cfg(feature = "migrations_postgres")]
+use diesel::pg::Pg;
+
 #[cfg(feature = "migrations_postgres")]
 pub const MIGRATIONS_POSTGRES: EmbeddedMigrations =
     embed_migrations!("postgres_migrations/migrations");
 
 #[cfg(feature = "migrations_postgres")]
-use diesel::pg::Pg;
-#[cfg(feature = "migrations_postgres")]
-use std::error::Error as SomeError;
-
-#[cfg(feature = "migrations_postgres")]
 pub fn run_migrations_postgres(
     connection: &mut impl MigrationHarness<Pg>,
 ) -> Result<(), Box<dyn SomeError + Send + Sync + 'static>> {
-    // This will run the necessary migrations.
-    //
-    // See the documentation for `MigrationHarness` for
-    // all available methods.
-
     connection.run_pending_migrations(MIGRATIONS_POSTGRES)?;
+
+    Ok(())
+}
+
+#[cfg(feature = "migrations_mysql")]
+use diesel::mysql::Mysql;
+
+#[cfg(feature = "migrations_mysql")]
+pub const MIGRATIONS_MYSQL: EmbeddedMigrations = embed_migrations!("mysql_migrations/migrations");
+
+#[cfg(feature = "migrations_mysql")]
+pub fn run_migrations_mysql(
+    connection: &mut impl MigrationHarness<Mysql>,
+) -> Result<(), Box<dyn SomeError + Send + Sync + 'static>> {
+    connection.run_pending_migrations(MIGRATIONS_MYSQL)?;
+
+    Ok(())
+}
+
+#[cfg(feature = "migrations_sqlite")]
+use diesel::sqlite::Sqlite;
+
+#[cfg(feature = "migrations_sqlite")]
+pub const MIGRATIONS_SQLITE: EmbeddedMigrations = embed_migrations!("sqlite_migrations/migrations");
+
+#[cfg(feature = "migrations_sqlite")]
+pub fn run_migrations_sqlite(
+    connection: &mut impl MigrationHarness<Sqlite>,
+) -> Result<(), Box<dyn SomeError + Send + Sync + 'static>> {
+    connection.run_pending_migrations(MIGRATIONS_SQLITE)?;
 
     Ok(())
 }

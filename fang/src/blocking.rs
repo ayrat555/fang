@@ -1,7 +1,9 @@
 mod error;
+pub mod mysql_schema;
 pub mod postgres_schema;
 pub mod queue;
 pub mod runnable;
+pub mod sqlite_schema;
 pub mod worker;
 pub mod worker_pool;
 

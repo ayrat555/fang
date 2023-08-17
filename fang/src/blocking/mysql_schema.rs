@@ -17,13 +17,13 @@ diesel::table! {
         error_message -> Nullable<Text>,
         #[max_length = 11]
         state -> FangTasksStateEnum,
-        #[max_length = 80]
+        #[max_length = 255]
         task_type -> Varchar,
         #[max_length = 64]
         uniq_hash -> Nullable<Char>,
         retries -> Integer,
-        scheduled_at -> Datetime,
-        created_at -> Datetime,
-        updated_at -> Datetime,
+        scheduled_at -> Timestamp,
+        created_at -> Timestamp,
+        updated_at -> Timestamp,
     }
 }
