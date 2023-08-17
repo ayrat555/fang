@@ -21,7 +21,11 @@ async fn main() {
 
     let mut connection = PgConnection::establish(&database_url).unwrap();
 
+    log::info!("Running migrations");
+
     run_migrations_postgres(&mut connection).unwrap();
+
+    log::info!("Migrations done :D");
 
     drop(connection);
 
