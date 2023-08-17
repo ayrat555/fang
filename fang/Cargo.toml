@@ -16,9 +16,9 @@ doctest = false
 
 [features]
 default = ["blocking", "asynk", "derive-error"]
-blocking = ["diesel", "diesel-derive-enum", "dotenvy"]
-asynk = ["bb8-postgres",  "postgres-types", "tokio", "async-trait", "async-recursion"]
-derive-error = ["fang-derive-error"]
+blocking = ["dep:diesel", "dep:diesel-derive-enum", "dep:dotenvy"]
+asynk = ["dep:bb8-postgres", "dep:postgres-types", "dep:tokio", "dep:async-trait", "dep:async-recursion"]
+derive-error = ["dep:fang-derive-error"]
 
 [dev-dependencies]
 fang-derive-error = { version = "0.1.0"}
