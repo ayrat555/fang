@@ -394,7 +394,7 @@ Set sleep params with worker pools `TypeBuilder` in both modules.
 ### Running tests locally
 - Install diesel_cli.
 ```
-cargo install diesel_cli
+cargo install diesel_cli --no-default-features --features "postgres sqlite mysql"
 ```
 - Install docker on your machine.
 
