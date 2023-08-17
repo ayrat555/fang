@@ -53,7 +53,7 @@ fang = { version = "0.10.4" }
 
 *Supports rustc 1.62+*
 
-2. Create the `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/migrations/2022-08-20-151615_create_fang_tasks/up.sql).
+2. Create the `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/fang/postgres_migrations/migrations/2022-08-20-151615_create_fang_tasks/up.sql).
 
 ## Usage
 
@@ -400,12 +400,12 @@ cargo install diesel_cli
 
 - Run a Postgres docker container. (See in Makefile.)
 ```
-make db
+make db_postgres
 ```
 
 - Run the migrations
 ```
-make diesel
+make diesel_postgres
 ```
 
 - Run tests
