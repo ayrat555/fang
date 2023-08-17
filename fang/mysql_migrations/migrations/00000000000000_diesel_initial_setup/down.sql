@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS diesel_manage_updated_at(IN _tbl VARCHAR(255));
