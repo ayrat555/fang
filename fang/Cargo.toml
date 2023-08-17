@@ -15,10 +15,11 @@ rust-version = "1.62"
 doctest = false
 
 [features]
-default = ["blocking", "asynk", "derive-error"]
+default = ["blocking", "asynk", "derive-error", "migrations_postgres"]
 blocking = ["diesel", "diesel-derive-enum", "dotenvy"]
 asynk = ["bb8-postgres",  "postgres-types", "tokio", "async-trait", "async-recursion"]
 derive-error = ["fang-derive-error"]
+migrations_postgres = ["dep:diesel_migrations"]
 
 [dev-dependencies]
 fang-derive-error = { version = "0.1.0"}
@@ -73,4 +74,8 @@ optional = true
 
 [dependencies.async-recursion]
 version = "1"
+optional = true
+
+[dependencies.diesel_migrations]
+version = "2.1.0"
 optional = true

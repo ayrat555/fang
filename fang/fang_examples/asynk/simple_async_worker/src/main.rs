@@ -1,7 +1,11 @@
+use connection::Connection;
+use diesel::connection;
+use diesel::PgConnection;
 use dotenvy::dotenv;
 use fang::asynk::async_queue::AsyncQueue;
 use fang::asynk::async_queue::AsyncQueueable;
 use fang::asynk::async_worker_pool::AsyncWorkerPool;
+use fang::run_migrations_postgres;
 use fang::AsyncRunnable;
 use fang::NoTls;
 use simple_async_worker::MyFailingTask;
@@ -14,6 +18,12 @@ async fn main() {
     dotenv().ok();
     env_logger::init();
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+
+    let mut connection = PgConnection::establish(&database_url).unwrap();
+
+    run_migrations_postgres(&mut connection).unwrap();
+
+    drop(connection);
 
     log::info!("Starting...");
     let max_pool_size: u32 = 3;

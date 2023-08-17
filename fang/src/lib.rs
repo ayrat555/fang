@@ -205,3 +205,28 @@ pub use async_trait::async_trait;
 
 #[cfg(feature = "derive-error")]
 pub use fang_derive_error::ToFangError;
+
+#[cfg(feature = "migrations_postgres")]
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+#[cfg(feature = "migrations_postgres")]
+pub const MIGRATIONS_POSTGRES: EmbeddedMigrations =
+    embed_migrations!("postgres_migrations/migrations");
+
+#[cfg(feature = "migrations_postgres")]
+use diesel::pg::Pg;
+#[cfg(feature = "migrations_postgres")]
+use std::error::Error as SomeError;
+
+#[cfg(feature = "migrations_postgres")]
+pub fn run_migrations_postgres(
+    connection: &mut impl MigrationHarness<Pg>,
+) -> Result<(), Box<dyn SomeError + Send + Sync + 'static>> {
+    // This will run the necessary migrations.
+    //
+    // See the documentation for `MigrationHarness` for
+    // all available methods.
+
+    connection.run_pending_migrations(MIGRATIONS_POSTGRES)?;
+
+    Ok(())
+}
