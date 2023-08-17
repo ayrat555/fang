@@ -108,7 +108,7 @@ pub struct FangError {
 #[cfg_attr(feature = "asynk", postgres(name = "fang_task_state"))]
 #[cfg_attr(
     feature = "blocking",
-    ExistingTypePath = "crate::schema::sql_types::FangTaskState"
+    ExistingTypePath = "crate::postgres_schema::sql_types::FangTaskState"
 )]
 pub enum FangTaskState {
     /// The task is ready to be executed

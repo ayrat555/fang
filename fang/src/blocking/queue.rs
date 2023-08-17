@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod queue_tests;
 
+use crate::postgres_schema::fang_tasks;
 use crate::runnable::Runnable;
-use crate::schema::fang_tasks;
 use crate::CronError;
 use crate::FangTaskState;
 use crate::Scheduled::*;
