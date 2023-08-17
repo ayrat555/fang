@@ -60,7 +60,7 @@ jobs:
         run: diesel setup
 
       - name: Change working dir
-        working-directory: ./..
+        working-directory: ./../..
         run: pwd
 
       - name: Run tests
