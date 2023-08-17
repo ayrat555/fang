@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod async_queue_tests;
+
 use crate::asynk::async_runnable::AsyncRunnable;
 use crate::CronError;
 use crate::FangTaskState;
@@ -24,6 +27,9 @@ use uuid::Uuid;
 
 #[cfg(test)]
 use bb8_postgres::tokio_postgres::tls::NoTls;
+
+#[cfg(test)]
+use self::async_queue_tests::test_asynk_queue;
 
 const INSERT_TASK_QUERY: &str = include_str!("queries/insert_task.sql");
 const INSERT_TASK_UNIQ_QUERY: &str = include_str!("queries/insert_task_uniq.sql");
@@ -165,165 +171,54 @@ where
 }
 
 #[cfg(test)]
-#[derive(TypedBuilder)]
-pub struct AsyncQueueTest<'a> {
-    #[builder(setter(into))]
-    pub transaction: Transaction<'a>,
-}
+use tokio::sync::Mutex;
 
 #[cfg(test)]
-#[async_trait]
-impl AsyncQueueable for AsyncQueueTest<'_> {
-    async fn find_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError> {
-        let transaction = &mut self.transaction;
+static ASYNC_QUEUE_DB_TEST_COUNTER: Mutex<u32> = Mutex::const_new(0);
 
-        AsyncQueue::<NoTls>::find_task_by_id_query(transaction, id).await
-    }
+#[cfg(test)]
+impl AsyncQueue<NoTls> {
+    /// Provides an AsyncQueue connected to its own DB
+    pub async fn test() -> Self {
+        const BASE_URI: &str = "postgres://postgres:postgres@localhost";
+        let mut res = Self::builder()
+            .max_pool_size(1_u32)
+            .uri(format!("{}/fang", BASE_URI))
+            .build();
 
-    async fn fetch_and_touch_task(
-        &mut self,
-        task_type: Option<String>,
-    ) -> Result<Option<Task>, AsyncQueueError> {
-        let transaction = &mut self.transaction;
+        let mut new_number = ASYNC_QUEUE_DB_TEST_COUNTER.lock().await;
+        res.connect(NoTls).await.unwrap();
 
-        AsyncQueue::<NoTls>::fetch_and_touch_task_query(transaction, task_type).await
-    }
+        let db_name = format!("async_queue_test_{}", *new_number);
+        *new_number += 1;
 
-    async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
-        let transaction = &mut self.transaction;
+        let create_query = format!("CREATE DATABASE {} WITH TEMPLATE fang;", db_name);
+        let delete_query = format!("DROP DATABASE IF EXISTS {};", db_name);
 
-        let metadata = serde_json::to_value(task)?;
+        let conn = res.pool.as_mut().unwrap().get().await.unwrap();
 
-        let task: Task = if !task.uniq() {
-            AsyncQueue::<NoTls>::insert_task_query(
-                transaction,
-                metadata,
-                &task.task_type(),
-                Utc::now(),
-            )
-            .await?
-        } else {
-            AsyncQueue::<NoTls>::insert_task_if_not_exist_query(
-                transaction,
-                metadata,
-                &task.task_type(),
-                Utc::now(),
-            )
-            .await?
-        };
-        Ok(task)
-    }
+        log::info!("Deleting database {db_name} ...");
+        conn.execute(&delete_query, &[]).await.unwrap();
 
-    async fn schedule_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
-        let transaction = &mut self.transaction;
-
-        let metadata = serde_json::to_value(task)?;
-
-        let scheduled_at = match task.cron() {
-            Some(scheduled) => match scheduled {
-                CronPattern(cron_pattern) => {
-                    let schedule = Schedule::from_str(&cron_pattern)?;
-                    let mut iterator = schedule.upcoming(Utc);
-
-                    iterator
-                        .next()
-                        .ok_or(AsyncQueueError::CronError(CronError::NoTimestampsError))?
-                }
-                ScheduleOnce(datetime) => datetime,
-            },
-            None => {
-                return Err(AsyncQueueError::CronError(
-                    CronError::TaskNotSchedulableError,
-                ));
+        log::info!("Creating database {db_name} ...");
+        while let Err(e) = conn.execute(&create_query, &[]).await {
+            if e.as_db_error().unwrap().message()
+                != "source database \"fang\" is being accessed by other users"
+            {
+                panic!("{:?}", e);
             }
-        };
-
-        let task: Task = if !task.uniq() {
-            AsyncQueue::<NoTls>::insert_task_query(
-                transaction,
-                metadata,
-                &task.task_type(),
-                scheduled_at,
-            )
-            .await?
-        } else {
-            AsyncQueue::<NoTls>::insert_task_if_not_exist_query(
-                transaction,
-                metadata,
-                &task.task_type(),
-                scheduled_at,
-            )
-            .await?
-        };
-
-        Ok(task)
-    }
-    async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
-        let transaction = &mut self.transaction;
-
-        AsyncQueue::<NoTls>::remove_all_tasks_query(transaction).await
-    }
-
-    async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError> {
-        let transaction = &mut self.transaction;
-
-        AsyncQueue::<NoTls>::remove_all_scheduled_tasks_query(transaction).await
-    }
-
-    async fn remove_task(&mut self, id: Uuid) -> Result<u64, AsyncQueueError> {
-        let transaction = &mut self.transaction;
-
-        AsyncQueue::<NoTls>::remove_task_query(transaction, id).await
-    }
-
-    async fn remove_task_by_metadata(
-        &mut self,
-        task: &dyn AsyncRunnable,
-    ) -> Result<u64, AsyncQueueError> {
-        if task.uniq() {
-            let transaction = &mut self.transaction;
-
-            AsyncQueue::<NoTls>::remove_task_by_metadata_query(transaction, task).await
-        } else {
-            Err(AsyncQueueError::TaskNotUniqError)
         }
-    }
 
-    async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
-        let transaction = &mut self.transaction;
+        log::info!("Database {db_name} created !!");
 
-        AsyncQueue::<NoTls>::remove_tasks_type_query(transaction, task_type).await
-    }
+        drop(conn);
 
-    async fn update_task_state(
-        &mut self,
-        task: Task,
-        state: FangTaskState,
-    ) -> Result<Task, AsyncQueueError> {
-        let transaction = &mut self.transaction;
+        res.connected = false;
+        res.pool = None;
+        res.uri = format!("{}/{}", BASE_URI, db_name);
+        res.connect(NoTls).await.unwrap();
 
-        AsyncQueue::<NoTls>::update_task_state_query(transaction, task, state).await
-    }
-
-    async fn fail_task(
-        &mut self,
-        task: Task,
-        error_message: &str,
-    ) -> Result<Task, AsyncQueueError> {
-        let transaction = &mut self.transaction;
-
-        AsyncQueue::<NoTls>::fail_task_query(transaction, task, error_message).await
-    }
-
-    async fn schedule_retry(
-        &mut self,
-        task: &Task,
-        backoff_seconds: u32,
-        error: &str,
-    ) -> Result<Task, AsyncQueueError> {
-        let transaction = &mut self.transaction;
-
-        AsyncQueue::<NoTls>::schedule_retry_query(transaction, task, backoff_seconds, error).await
+        res
     }
 }
 
@@ -624,6 +519,44 @@ where
             .scheduled_at(scheduled_at)
             .build()
     }
+
+    async fn schedule_task_query(
+        transaction: &mut Transaction<'_>,
+        task: &dyn AsyncRunnable,
+    ) -> Result<Task, AsyncQueueError> {
+        let metadata = serde_json::to_value(task)?;
+
+        let scheduled_at = match task.cron() {
+            Some(scheduled) => match scheduled {
+                CronPattern(cron_pattern) => {
+                    let schedule = Schedule::from_str(&cron_pattern)?;
+                    let mut iterator = schedule.upcoming(Utc);
+                    iterator
+                        .next()
+                        .ok_or(AsyncQueueError::CronError(CronError::NoTimestampsError))?
+                }
+                ScheduleOnce(datetime) => datetime,
+            },
+            None => {
+                return Err(AsyncQueueError::CronError(
+                    CronError::TaskNotSchedulableError,
+                ));
+            }
+        };
+
+        let task: Task = if !task.uniq() {
+            Self::insert_task_query(transaction, metadata, &task.task_type(), scheduled_at).await?
+        } else {
+            Self::insert_task_if_not_exist_query(
+                transaction,
+                metadata,
+                &task.task_type(),
+                scheduled_at,
+            )
+            .await?
+        };
+        Ok(task)
+    }
 }
 
 #[async_trait]
@@ -635,6 +568,7 @@ where
     <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
 {
     async fn find_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError> {
+        self.check_if_connection()?;
         let mut connection = self.pool.as_ref().unwrap().get().await?;
         let mut transaction = connection.transaction().await?;
 
@@ -689,38 +623,9 @@ where
         self.check_if_connection()?;
         let mut connection = self.pool.as_ref().unwrap().get().await?;
         let mut transaction = connection.transaction().await?;
-        let metadata = serde_json::to_value(task)?;
 
-        let scheduled_at = match task.cron() {
-            Some(scheduled) => match scheduled {
-                CronPattern(cron_pattern) => {
-                    let schedule = Schedule::from_str(&cron_pattern)?;
-                    let mut iterator = schedule.upcoming(Utc);
-                    iterator
-                        .next()
-                        .ok_or(AsyncQueueError::CronError(CronError::NoTimestampsError))?
-                }
-                ScheduleOnce(datetime) => datetime,
-            },
-            None => {
-                return Err(AsyncQueueError::CronError(
-                    CronError::TaskNotSchedulableError,
-                ));
-            }
-        };
+        let task = Self::schedule_task_query(&mut transaction, task).await?;
 
-        let task: Task = if !task.uniq() {
-            Self::insert_task_query(&mut transaction, metadata, &task.task_type(), scheduled_at)
-                .await?
-        } else {
-            Self::insert_task_if_not_exist_query(
-                &mut transaction,
-                metadata,
-                &task.task_type(),
-                scheduled_at,
-            )
-            .await?
-        };
         transaction.commit().await?;
         Ok(task)
     }
@@ -841,367 +746,4 @@ where
 }
 
 #[cfg(test)]
-mod async_queue_tests {
-    use super::AsyncQueueTest;
-    use super::AsyncQueueable;
-    use super::FangTaskState;
-    use super::Task;
-    use crate::asynk::AsyncRunnable;
-    use crate::FangError;
-    use crate::Scheduled;
-    use async_trait::async_trait;
-    use bb8_postgres::bb8::Pool;
-    use bb8_postgres::tokio_postgres::NoTls;
-    use bb8_postgres::PostgresConnectionManager;
-    use chrono::DateTime;
-    use chrono::Duration;
-    use chrono::SubsecRound;
-    use chrono::Utc;
-    use serde::{Deserialize, Serialize};
-
-    #[derive(Serialize, Deserialize)]
-    struct AsyncTask {
-        pub number: u16,
-    }
-
-    #[typetag::serde]
-    #[async_trait]
-    impl AsyncRunnable for AsyncTask {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
-            Ok(())
-        }
-    }
-
-    #[derive(Serialize, Deserialize)]
-    struct AsyncUniqTask {
-        pub number: u16,
-    }
-
-    #[typetag::serde]
-    #[async_trait]
-    impl AsyncRunnable for AsyncUniqTask {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
-            Ok(())
-        }
-
-        fn uniq(&self) -> bool {
-            true
-        }
-    }
-
-    #[derive(Serialize, Deserialize)]
-    struct AsyncTaskSchedule {
-        pub number: u16,
-        pub datetime: String,
-    }
-
-    #[typetag::serde]
-    #[async_trait]
-    impl AsyncRunnable for AsyncTaskSchedule {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
-            Ok(())
-        }
-
-        fn cron(&self) -> Option<Scheduled> {
-            let datetime = self.datetime.parse::<DateTime<Utc>>().ok()?;
-            Some(Scheduled::ScheduleOnce(datetime))
-        }
-    }
-
-    #[tokio::test]
-    async fn insert_task_creates_new_task() {
-        let pool = pool().await;
-        let mut connection = pool.get().await.unwrap();
-        let transaction = connection.transaction().await.unwrap();
-
-        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
-
-        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
-
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-
-        assert_eq!(Some(1), number);
-        assert_eq!(Some("AsyncTask"), type_task);
-        test.transaction.rollback().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn update_task_state_test() {
-        let pool = pool().await;
-        let mut connection = pool.get().await.unwrap();
-        let transaction = connection.transaction().await.unwrap();
-
-        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
-
-        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
-
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-        let id = task.id;
-
-        assert_eq!(Some(1), number);
-        assert_eq!(Some("AsyncTask"), type_task);
-
-        let finished_task = test
-            .update_task_state(task, FangTaskState::Finished)
-            .await
-            .unwrap();
-
-        assert_eq!(id, finished_task.id);
-        assert_eq!(FangTaskState::Finished, finished_task.state);
-
-        test.transaction.rollback().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn failed_task_query_test() {
-        let pool = pool().await;
-        let mut connection = pool.get().await.unwrap();
-        let transaction = connection.transaction().await.unwrap();
-
-        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
-
-        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
-
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-        let id = task.id;
-
-        assert_eq!(Some(1), number);
-        assert_eq!(Some("AsyncTask"), type_task);
-
-        let failed_task = test.fail_task(task, "Some error").await.unwrap();
-
-        assert_eq!(id, failed_task.id);
-        assert_eq!(Some("Some error"), failed_task.error_message.as_deref());
-        assert_eq!(FangTaskState::Failed, failed_task.state);
-
-        test.transaction.rollback().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn remove_all_tasks_test() {
-        let pool = pool().await;
-        let mut connection = pool.get().await.unwrap();
-        let transaction = connection.transaction().await.unwrap();
-
-        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
-
-        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
-
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-
-        assert_eq!(Some(1), number);
-        assert_eq!(Some("AsyncTask"), type_task);
-
-        let task = insert_task(&mut test, &AsyncTask { number: 2 }).await;
-
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-
-        assert_eq!(Some(2), number);
-        assert_eq!(Some("AsyncTask"), type_task);
-
-        let result = test.remove_all_tasks().await.unwrap();
-        assert_eq!(2, result);
-
-        test.transaction.rollback().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn schedule_task_test() {
-        let pool = pool().await;
-        let mut connection = pool.get().await.unwrap();
-        let transaction = connection.transaction().await.unwrap();
-
-        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
-
-        let datetime = (Utc::now() + Duration::seconds(7)).round_subsecs(0);
-
-        let task = &AsyncTaskSchedule {
-            number: 1,
-            datetime: datetime.to_string(),
-        };
-
-        let task = test.schedule_task(task).await.unwrap();
-
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-
-        assert_eq!(Some(1), number);
-        assert_eq!(Some("AsyncTaskSchedule"), type_task);
-        assert_eq!(task.scheduled_at, datetime);
-    }
-
-    #[tokio::test]
-    async fn remove_all_scheduled_tasks_test() {
-        let pool = pool().await;
-        let mut connection = pool.get().await.unwrap();
-        let transaction = connection.transaction().await.unwrap();
-
-        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
-
-        let datetime = (Utc::now() + Duration::seconds(7)).round_subsecs(0);
-
-        let task1 = &AsyncTaskSchedule {
-            number: 1,
-            datetime: datetime.to_string(),
-        };
-
-        let task2 = &AsyncTaskSchedule {
-            number: 2,
-            datetime: datetime.to_string(),
-        };
-
-        test.schedule_task(task1).await.unwrap();
-        test.schedule_task(task2).await.unwrap();
-
-        let number = test.remove_all_scheduled_tasks().await.unwrap();
-
-        assert_eq!(2, number);
-    }
-
-    #[tokio::test]
-    async fn fetch_and_touch_test() {
-        let pool = pool().await;
-        let mut connection = pool.get().await.unwrap();
-        let transaction = connection.transaction().await.unwrap();
-
-        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
-
-        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
-
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-
-        assert_eq!(Some(1), number);
-        assert_eq!(Some("AsyncTask"), type_task);
-
-        let task = insert_task(&mut test, &AsyncTask { number: 2 }).await;
-
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-
-        assert_eq!(Some(2), number);
-        assert_eq!(Some("AsyncTask"), type_task);
-
-        let task = test.fetch_and_touch_task(None).await.unwrap().unwrap();
-
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-
-        assert_eq!(Some(1), number);
-        assert_eq!(Some("AsyncTask"), type_task);
-
-        let task = test.fetch_and_touch_task(None).await.unwrap().unwrap();
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-
-        assert_eq!(Some(2), number);
-        assert_eq!(Some("AsyncTask"), type_task);
-
-        test.transaction.rollback().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn remove_tasks_type_test() {
-        let pool = pool().await;
-        let mut connection = pool.get().await.unwrap();
-        let transaction = connection.transaction().await.unwrap();
-
-        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
-
-        let task = insert_task(&mut test, &AsyncTask { number: 1 }).await;
-
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-
-        assert_eq!(Some(1), number);
-        assert_eq!(Some("AsyncTask"), type_task);
-
-        let task = insert_task(&mut test, &AsyncTask { number: 2 }).await;
-
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-
-        assert_eq!(Some(2), number);
-        assert_eq!(Some("AsyncTask"), type_task);
-
-        let result = test.remove_tasks_type("mytype").await.unwrap();
-        assert_eq!(0, result);
-
-        let result = test.remove_tasks_type("common").await.unwrap();
-        assert_eq!(2, result);
-
-        test.transaction.rollback().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn remove_tasks_by_metadata() {
-        let pool = pool().await;
-        let mut connection = pool.get().await.unwrap();
-        let transaction = connection.transaction().await.unwrap();
-
-        let mut test = AsyncQueueTest::builder().transaction(transaction).build();
-
-        let task = insert_task(&mut test, &AsyncUniqTask { number: 1 }).await;
-
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-
-        assert_eq!(Some(1), number);
-        assert_eq!(Some("AsyncUniqTask"), type_task);
-
-        let task = insert_task(&mut test, &AsyncUniqTask { number: 2 }).await;
-
-        let metadata = task.metadata.as_object().unwrap();
-        let number = metadata["number"].as_u64();
-        let type_task = metadata["type"].as_str();
-
-        assert_eq!(Some(2), number);
-        assert_eq!(Some("AsyncUniqTask"), type_task);
-
-        let result = test
-            .remove_task_by_metadata(&AsyncUniqTask { number: 0 })
-            .await
-            .unwrap();
-        assert_eq!(0, result);
-
-        let result = test
-            .remove_task_by_metadata(&AsyncUniqTask { number: 1 })
-            .await
-            .unwrap();
-        assert_eq!(1, result);
-
-        test.transaction.rollback().await.unwrap();
-    }
-
-    async fn insert_task(test: &mut AsyncQueueTest<'_>, task: &dyn AsyncRunnable) -> Task {
-        test.insert_task(task).await.unwrap()
-    }
-
-    async fn pool() -> Pool<PostgresConnectionManager<NoTls>> {
-        let pg_mgr = PostgresConnectionManager::new_from_stringlike(
-            "postgres://postgres:postgres@localhost/fang",
-            NoTls,
-        )
-        .unwrap();
-
-        Pool::builder().build(pg_mgr).await.unwrap()
-    }
-}
+test_asynk_queue! {postgres, crate::AsyncQueue<bb8_postgres::tokio_postgres::tls::NoTls>, crate::AsyncQueue::<bb8_postgres::tokio_postgres::tls::NoTls>::test()}
