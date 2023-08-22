@@ -1,6 +1,3 @@
-#![allow(clippy::borrowed_box)]
-#![allow(clippy::unnecessary_unwrap)]
-
 use crate::queue::Queueable;
 use crate::runnable::Runnable;
 use crate::runnable::COMMON_TYPE;
@@ -34,24 +31,25 @@ impl<BQueue> Worker<BQueue>
 where
     BQueue: Queueable + Clone + Sync + Send + 'static,
 {
-    pub fn run(&self, task: Task) {
+    pub fn run(&self, task: &Task) -> Result<(), FangError> {
         let runnable: Box<dyn Runnable> = serde_json::from_value(task.metadata.clone()).unwrap();
         let result = runnable.run(&self.queue);
 
         match result {
-            Ok(_) => self.finalize_task(task, &result),
+            Ok(_) => self.finalize_task(task, &result)?,
             Err(ref error) => {
                 if task.retries < runnable.max_retries() {
                     let backoff_seconds = runnable.backoff(task.retries as u32);
 
                     self.queue
-                        .schedule_retry(&task, backoff_seconds, &error.description)
-                        .expect("Failed to retry");
+                        .schedule_retry(task, backoff_seconds, &error.description)?;
                 } else {
-                    self.finalize_task(task, &result);
+                    self.finalize_task(task, &result)?;
                 }
             }
         }
+
+        Ok(())
     }
 
     pub(crate) fn run_tasks(&mut self) -> Result<(), FangError> {
@@ -61,14 +59,15 @@ where
                     let actual_task: Box<dyn Runnable> =
                         serde_json::from_value(task.metadata.clone()).unwrap();
 
+                    self.maybe_reset_sleep_period();
+
+                    self.run(&task)?;
+
                     // check if task is scheduled or not
                     if let Some(CronPattern(_)) = actual_task.cron() {
                         // program task
                         self.queue.schedule_task(&*actual_task)?;
                     }
-
-                    self.maybe_reset_sleep_period();
-                    self.run(task);
                 }
                 Ok(None) => {
                     self.sleep();
@@ -91,14 +90,14 @@ where
                     let actual_task: Box<dyn Runnable> =
                         serde_json::from_value(task.metadata.clone()).unwrap();
 
+                    self.maybe_reset_sleep_period();
+
+                    self.run(&task)?;
                     // check if task is scheduled or not
                     if let Some(CronPattern(_)) = actual_task.cron() {
                         // program task
                         self.queue.schedule_task(&*actual_task)?;
                     }
-
-                    self.maybe_reset_sleep_period();
-                    self.run(task);
                 }
                 Ok(None) => {
                     return Ok(());
@@ -122,31 +121,31 @@ where
         thread::sleep(self.sleep_params.sleep_period);
     }
 
-    fn finalize_task(&self, task: Task, result: &Result<(), FangError>) {
+    fn finalize_task(&self, task: &Task, result: &Result<(), FangError>) -> Result<(), FangError> {
         match self.retention_mode {
             RetentionMode::KeepAll => {
                 match result {
                     Ok(_) => self
                         .queue
-                        .update_task_state(&task, FangTaskState::Finished)
-                        .unwrap(),
-                    Err(error) => self.queue.fail_task(&task, &error.description).unwrap(),
+                        .update_task_state(task, FangTaskState::Finished)?,
+                    Err(error) => self.queue.fail_task(task, &error.description)?,
                 };
             }
 
             RetentionMode::RemoveAll => {
-                self.queue.remove_task(task.id).unwrap();
+                self.queue.remove_task(task.id)?;
             }
 
             RetentionMode::RemoveFinished => match result {
                 Ok(_) => {
-                    self.queue.remove_task(task.id).unwrap();
+                    self.queue.remove_task(task.id)?;
                 }
                 Err(error) => {
-                    self.queue.fail_task(&task, &error.description).unwrap();
+                    self.queue.fail_task(task, &error.description)?;
                 }
             },
         }
+        Ok(())
     }
 }
 
@@ -279,7 +278,7 @@ mod worker_tests {
         assert_eq!(FangTaskState::New, task.state);
 
         // this operation commits and thats why need to commit this test
-        worker.run(task.clone());
+        worker.run(&task).unwrap();
 
         let found_task = Queue::find_task_by_id_query(&mut pooled_connection, task.id).unwrap();
 
@@ -347,7 +346,7 @@ mod worker_tests {
 
         assert_eq!(FangTaskState::New, task.state);
 
-        worker.run(task.clone());
+        worker.run(&task).unwrap();
 
         let found_task = Queue::find_task_by_id_query(&mut pooled_connection, task.id).unwrap();
 
@@ -381,7 +380,7 @@ mod worker_tests {
 
         assert_eq!(FangTaskState::New, task.state);
 
-        worker.run(task.clone());
+        worker.run(&task).unwrap();
 
         std::thread::sleep(std::time::Duration::from_millis(1000));
 

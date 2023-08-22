@@ -104,7 +104,7 @@ macro_rules! test_asynk_queue {
                 assert_eq!(Some("AsyncTask"), type_task);
 
                 let finished_task = test
-                    .update_task_state(task, FangTaskState::Finished)
+                    .update_task_state(&task, FangTaskState::Finished)
                     .await
                     .unwrap();
 
@@ -126,7 +126,7 @@ macro_rules! test_asynk_queue {
                 assert_eq!(Some(1), number);
                 assert_eq!(Some("AsyncTask"), type_task);
 
-                let failed_task = test.fail_task(task, "Some error").await.unwrap();
+                let failed_task = test.fail_task(&task, "Some error").await.unwrap();
 
                 assert_eq!(id, failed_task.id);
                 assert_eq!(Some("Some error"), failed_task.error_message.as_deref());

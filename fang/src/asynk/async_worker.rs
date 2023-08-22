@@ -29,7 +29,7 @@ impl<AQueue> AsyncWorker<AQueue>
 where
     AQueue: AsyncQueueable + Clone + Sync + 'static,
 {
-    async fn run(&mut self, task: Task, runnable: Box<dyn AsyncRunnable>) -> Result<(), FangError> {
+    async fn run(&mut self, task: &Task, runnable: &dyn AsyncRunnable) -> Result<(), FangError> {
         let result = runnable.run(&mut self.queue).await;
 
         match result {
@@ -40,7 +40,7 @@ where
                     let backoff_seconds = runnable.backoff(task.retries as u32);
 
                     self.queue
-                        .schedule_retry(&task, backoff_seconds, &error.description)
+                        .schedule_retry(task, backoff_seconds, &error.description)
                         .await?;
                 } else {
                     self.finalize_task(task, &result).await?;
@@ -53,7 +53,7 @@ where
 
     async fn finalize_task(
         &mut self,
-        task: Task,
+        task: &Task,
         result: &Result<(), FangError>,
     ) -> Result<(), FangError> {
         match self.retention_mode {
@@ -101,14 +101,18 @@ where
                     let actual_task: Box<dyn AsyncRunnable> =
                         serde_json::from_value(task.metadata.clone()).unwrap();
 
+                    let cron = actual_task.cron();
+
+                    self.sleep_params.maybe_reset_sleep_period();
+
+                    // run scheduled task
+                    self.run(&task, &*actual_task).await?;
+
                     // check if task is scheduled or not
-                    if let Some(CronPattern(_)) = actual_task.cron() {
+                    if let Some(CronPattern(_)) = cron {
                         // program task
                         self.queue.schedule_task(&*actual_task).await?;
                     }
-                    self.sleep_params.maybe_reset_sleep_period();
-                    // run scheduled task
-                    self.run(task, actual_task).await?;
                 }
                 Ok(None) => {
                     self.sleep().await;
@@ -174,11 +178,11 @@ impl<'a> AsyncWorkerTest<'a> {
             RetentionMode::KeepAll => match result {
                 Ok(_) => {
                     self.queue
-                        .update_task_state(task, FangTaskState::Finished)
+                        .update_task_state(&task, FangTaskState::Finished)
                         .await?;
                 }
                 Err(error) => {
-                    self.queue.fail_task(task, &error.description).await?;
+                    self.queue.fail_task(&task, &error.description).await?;
                 }
             },
             RetentionMode::RemoveAll => match result {
@@ -194,7 +198,7 @@ impl<'a> AsyncWorkerTest<'a> {
                     self.queue.remove_task(task.id).await?;
                 }
                 Err(error) => {
-                    self.queue.fail_task(task, &error.description).await?;
+                    self.queue.fail_task(&task, &error.description).await?;
                 }
             },
         };
