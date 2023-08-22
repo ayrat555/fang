@@ -1,0 +1,2 @@
+[print_schema]
+file = "../src/blocking/postgres_schema.rs"

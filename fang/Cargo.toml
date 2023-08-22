@@ -15,13 +15,22 @@ rust-version = "1.62"
 doctest = false
 
 [features]
-default = ["blocking", "asynk", "derive-error"]
+default = ["blocking", "asynk", "derive-error", "postgres", "mysql" , "sqlite", "migrations_postgres", "migrations_sqlite" , "migrations_mysql"]
 blocking = ["dep:diesel", "dep:diesel-derive-enum", "dep:dotenvy"]
 asynk = ["dep:bb8-postgres", "dep:postgres-types", "dep:tokio", "dep:async-trait", "dep:async-recursion"]
 derive-error = ["dep:fang-derive-error"]
+postgres = ["diesel?/postgres" , "diesel?/serde_json", "diesel?/chrono" , "diesel?/uuid" , "diesel?/r2d2"]
+sqlite = ["diesel?/sqlite" , "diesel?/serde_json", "diesel?/chrono" , "diesel?/uuid" , "diesel?/r2d2"]
+mysql = ["diesel?/mysql" , "diesel?/serde_json", "diesel?/chrono" , "diesel?/uuid" , "diesel?/r2d2"]
+migrations_postgres = ["migrations"]
+migrations_sqlite = ["migrations"]
+migrations_mysql = ["migrations"]
+migrations = ["dep:diesel_migrations"]
+
 
 [dev-dependencies]
 fang-derive-error = { version = "0.1.0"}
+diesel_migrations = { version = "2.1" , features = ["postgres", "sqlite" , "mysql"]}
 
 [dependencies]
 cron = "0.12"
@@ -40,8 +49,8 @@ fang-derive-error = { version = "0.1.0" , optional = true}
 
 [dependencies.diesel]
 version = "2.1"
-features = ["postgres", "serde_json", "chrono", "uuid", "r2d2"]
 optional = true
+default-features = false
 
 [dependencies.diesel-derive-enum]
 version = "2.1"
@@ -74,3 +83,8 @@ optional = true
 [dependencies.async-recursion]
 version = "1"
 optional = true
+
+[dependencies.diesel_migrations]
+version = "2.1.0"
+optional = true
+default-features = false

@@ -55,12 +55,12 @@ jobs:
           command: install
           args: diesel_cli --no-default-features --features "postgres"
 
-      - name: Setup db
-        working-directory: ./fang
+      - name: Setup Postgres db
+        working-directory: ./fang/postgres_migrations
         run: diesel setup
 
       - name: Change working dir
-        working-directory: ./..
+        working-directory: ./../..
         run: pwd
 
       - name: Run tests
