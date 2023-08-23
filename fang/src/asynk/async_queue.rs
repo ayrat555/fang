@@ -120,13 +120,16 @@ pub trait AsyncQueueable: Send {
     /// See the `FangTaskState` enum for possible states.
     async fn update_task_state(
         &mut self,
-        task: Task,
+        task: &Task,
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError>;
 
     /// Update the state of a task to `FangTaskState::Failed` and set an error_message.
-    async fn fail_task(&mut self, task: Task, error_message: &str)
-        -> Result<Task, AsyncQueueError>;
+    async fn fail_task(
+        &mut self,
+        task: &Task,
+        error_message: &str,
+    ) -> Result<Task, AsyncQueueError>;
 
     /// Schedule a task.
     async fn schedule_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
@@ -313,7 +316,7 @@ where
 
     async fn fail_task_query(
         transaction: &mut Transaction<'_>,
-        task: Task,
+        task: &Task,
         error_message: &str,
     ) -> Result<Task, AsyncQueueError> {
         let updated_at = Utc::now();
@@ -368,7 +371,7 @@ where
         };
         let result_task = if let Some(some_task) = task {
             Some(
-                Self::update_task_state_query(transaction, some_task, FangTaskState::InProgress)
+                Self::update_task_state_query(transaction, &some_task, FangTaskState::InProgress)
                     .await?,
             )
         } else {
@@ -392,7 +395,7 @@ where
 
     async fn update_task_state_query(
         transaction: &mut Transaction<'_>,
-        task: Task,
+        task: &Task,
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError> {
         let updated_at = Utc::now();
@@ -699,7 +702,7 @@ where
 
     async fn update_task_state(
         &mut self,
-        task: Task,
+        task: &Task,
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
@@ -714,7 +717,7 @@ where
 
     async fn fail_task(
         &mut self,
-        task: Task,
+        task: &Task,
         error_message: &str,
     ) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
