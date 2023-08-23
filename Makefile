@@ -20,9 +20,6 @@ db_mysql:
 db_sqlite:
 	sqlite3 fang.db "VACUUM;"
 
-clippy:
-	cargo clippy --verbose --all-targets --all-features -- -D warnings
-
 diesel_postgres:
 	cd fang/postgres_migrations && \
 	diesel migration run \
@@ -46,6 +43,9 @@ stop_postgres:
 
 stop_sqlite:
 	rm fang.db
+
+clippy:
+	cargo clippy --verbose --all-targets --all-features -- -D warnings
 
 tests:
 	DATABASE_URL=postgres://postgres:postgres@localhost/fang cargo test --all-features -- --color always --nocapture
