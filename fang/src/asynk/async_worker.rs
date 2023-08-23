@@ -302,7 +302,7 @@ mod async_worker_tests {
     impl AsyncRunnable for WorkerAsyncTaskScheduled {
         async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
             log::info!("WorkerAsyncTaskScheduled has been run");
-            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(2050)).await;
             Ok(())
         }
         fn cron(&self) -> Option<Scheduled> {
@@ -579,7 +579,7 @@ mod async_worker_tests {
 
         let _id1 = _task_1.id;
 
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(1020)).await;
 
         let mut worker = AsyncWorkerTest::builder()
             .queue(&mut test as &mut dyn AsyncQueueable)

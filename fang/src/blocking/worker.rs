@@ -267,7 +267,7 @@ mod worker_tests {
     impl Runnable for TaskScheduled {
         fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
             log::info!("WorkerAsyncTaskScheduled has been run");
-            std::thread::sleep(std::time::Duration::from_secs(2));
+            std::thread::sleep(std::time::Duration::from_millis(2050));
             Ok(())
         }
 
@@ -445,7 +445,7 @@ mod worker_tests {
 
         let _task_1 = queue.schedule_task(&task).unwrap();
 
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        std::thread::sleep(std::time::Duration::from_millis(1020));
 
         let mut worker = Worker::<Queue>::builder()
             .queue(queue)
