@@ -1,3 +1,8 @@
+.PHONY: db_postgres db_mysql db_sqlite \
+	diesel_postgres diesel_mysql diesel_sqlite \
+	stop_postgres stop_mysql stop_sqlite \
+	clippy tests ignored doc
+
 db_postgres:
 	docker run --rm -d --name postgres -p 5432:5432 \
 		-e POSTGRES_DB=fang \
