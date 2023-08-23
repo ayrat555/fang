@@ -1,10 +1,9 @@
 db_postgres:
 	docker run --rm -d --name postgres -p 5432:5432 \
 		-e POSTGRES_DB=fang \
-		-e POSTGRES_USER=postgres \
-		-e POSTGRES_PASSWORD=postgres \
+		-e POSTGRES_USER=fang \
+		-e POSTGRES_PASSWORD=fang \
 		postgres:latest
-
 
 db_mysql:
 	docker run --rm -d --name mysql -p 3306:3306 \
@@ -22,7 +21,7 @@ clippy:
 diesel_postgres:
 	cd fang/postgres_migrations && \
 	diesel migration run \
-		--database-url postgres://postgres:postgres@localhost/fang \
+		--database-url postgres://fang:fang@localhost/fang \
 
 diesel_mysql:
 	cd fang/mysql_migrations && \
