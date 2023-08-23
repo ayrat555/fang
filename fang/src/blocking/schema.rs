@@ -16,7 +16,6 @@ diesel::table! {
         error_message -> Nullable<Text>,
         state -> FangTaskState,
         task_type -> Varchar,
-        #[max_length = 64]
         uniq_hash -> Nullable<Bpchar>,
         retries -> Int4,
         scheduled_at -> Timestamptz,
