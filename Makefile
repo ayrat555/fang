@@ -1,17 +1,17 @@
 db_postgres:
 	docker run --rm -d --name postgres -p 5432:5432 \
-  -e POSTGRES_DB=fang \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  postgres:latest
+		-e POSTGRES_DB=fang \
+		-e POSTGRES_USER=postgres \
+		-e POSTGRES_PASSWORD=postgres \
+		postgres:latest
 
 # login is root fang
 db_mysql:
 	docker run --rm -d --name mysql -p 3306:3306 \
-  	-e MYSQL_DATABASE=fang \
-  	-e MYSQL_ROOT_PASSWORD=fang \
-	-e TZ=UTC \
-  	mysql:latest
+		-e MYSQL_DATABASE=fang \
+		-e MYSQL_ROOT_PASSWORD=fang \
+		-e TZ=UTC \
+		mysql:latest
 
 db_sqlite:
 	sqlite3 fang.db "VACUUM;"
