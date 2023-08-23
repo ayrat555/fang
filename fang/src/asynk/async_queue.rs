@@ -183,7 +183,7 @@ static ASYNC_QUEUE_DB_TEST_COUNTER: Mutex<u32> = Mutex::const_new(0);
 impl AsyncQueue<NoTls> {
     /// Provides an AsyncQueue connected to its own DB
     pub async fn test() -> Self {
-        const BASE_URI: &str = "postgres://postgres:postgres@localhost";
+        const BASE_URI: &str = "postgres://fang:fang@localhost";
         let mut res = Self::builder()
             .max_pool_size(1_u32)
             .uri(format!("{}/fang", BASE_URI))
