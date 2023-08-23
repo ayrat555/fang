@@ -586,7 +586,7 @@ mod async_worker_tests {
             .task_type("type1".to_string())
             .build();
 
-        let n = worker.run_tasks_until_none().await.unwrap();
+        let _n = worker.run_tasks_until_none().await.unwrap();
 
         //assert_eq!(n, 1u32);
 
