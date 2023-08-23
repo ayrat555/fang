@@ -20,13 +20,19 @@ clippy:
 	cargo clippy --verbose --all-targets --all-features -- -D warnings
 
 diesel_sqlite:
-	cd fang/sqlite_migrations && DATABASE_URL=sqlite://../../fang.db diesel migration run
+	diesel migration run \
+		--database-url sqlite://../../fang.db \
+		--migration-dir fang/sqlite_migrations
 
 diesel_postgres:
-	cd fang/postgres_migrations && DATABASE_URL=postgres://postgres:postgres@localhost/fang diesel migration run
+	diesel migration run \
+		--database-url postgres://postgres:postgres@localhost/fang \
+		--migration-dir fang/postgres_migrations
 
 diesel_mysql:
-	cd fang/mysql_migrations && DATABASE_URL=mysql://root:fang@127.0.0.1/fang diesel migration run
+	diesel migration run \
+		--database-url mysql://root:fang@127.0.0.1/fang \
+		--migration-dir fang/mysql_migrations
 
 stop_mysql: 
 	docker kill mysql
