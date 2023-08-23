@@ -83,7 +83,9 @@ where
     }
 
     #[cfg(test)]
-    pub fn run_tasks_until_none(&mut self) -> Result<(), FangError> {
+    pub fn run_tasks_until_none(&mut self) -> Result<u32, FangError> {
+        let mut number_of_task_run = 0u32;
+
         loop {
             match self.queue.fetch_and_touch_task(self.task_type.clone()) {
                 Ok(Some(task)) => {
@@ -93,6 +95,7 @@ where
                     self.maybe_reset_sleep_period();
 
                     self.run(&task)?;
+                    number_of_task_run += 1;
                     // check if task is scheduled or not
                     if let Some(CronPattern(_)) = actual_task.cron() {
                         // program task
@@ -100,7 +103,7 @@ where
                     }
                 }
                 Ok(None) => {
-                    return Ok(());
+                    return Ok(number_of_task_run);
                 }
                 Err(error) => {
                     error!("Failed to fetch a task {:?}", error);
@@ -159,6 +162,7 @@ mod worker_tests {
     use crate::typetag;
     use crate::FangError;
     use crate::FangTaskState;
+    use crate::Scheduled;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
 
@@ -253,6 +257,27 @@ mod worker_tests {
 
         fn task_type(&self) -> String {
             "type2".to_string()
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct TaskScheduled {}
+
+    #[typetag::serde]
+    impl Runnable for TaskScheduled {
+        fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
+            log::info!("WorkerAsyncTaskScheduled has been run");
+            std::thread::sleep(std::time::Duration::from_secs(2));
+            Ok(())
+        }
+
+        fn task_type(&self) -> String {
+            "type2".to_string()
+        }
+
+        fn cron(&self) -> Option<Scheduled> {
+            let cron = "0/1 * * * * * *".to_string();
+            Some(Scheduled::CronPattern(cron))
         }
     }
 
@@ -406,5 +431,36 @@ mod worker_tests {
         );
 
         Queue::remove_tasks_of_type_query(&mut pooled_connection, "Retry_task").unwrap();
+    }
+
+    #[test]
+    #[ignore]
+
+    fn no_schedule_until_run() {
+        let task = TaskScheduled {};
+
+        let pool = Queue::connection_pool(5);
+
+        let queue = Queue::builder().connection_pool(pool).build();
+
+        let _task_1 = queue.schedule_task(&task).unwrap();
+
+        std::thread::sleep(std::time::Duration::from_secs(1));
+
+        let mut worker = Worker::<Queue>::builder()
+            .queue(queue)
+            .task_type(task.task_type())
+            .build();
+
+        let n = worker.run_tasks_until_none().unwrap();
+
+        assert_eq!(n, 1u32);
+
+        let task = worker.queue.fetch_and_touch_task(task.task_type()).unwrap();
+        assert_eq!(None, task);
+
+        let mut pooled_connection = worker.queue.connection_pool.get().unwrap();
+
+        Queue::remove_tasks_of_type_query(&mut pooled_connection, "type2").unwrap();
     }
 }
