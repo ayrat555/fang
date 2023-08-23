@@ -568,7 +568,7 @@ mod async_worker_tests {
         test.insert_task(task).await.unwrap()
     }
 
-    #[tokio::test()]
+    #[tokio::test]
     async fn no_schedule_until_run() {
         let mut test = AsyncQueue::<NoTls>::test().await;
 
