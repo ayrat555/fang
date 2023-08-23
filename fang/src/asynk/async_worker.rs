@@ -145,8 +145,8 @@ pub struct AsyncWorkerTest<'a> {
 impl<'a> AsyncWorkerTest<'a> {
     pub async fn run(
         &mut self,
-        task: Task,
-        runnable: Box<dyn AsyncRunnable>,
+        task: &Task,
+        runnable: &dyn AsyncRunnable,
     ) -> Result<(), FangError> {
         let result = runnable.run(self.queue).await;
 
@@ -158,7 +158,7 @@ impl<'a> AsyncWorkerTest<'a> {
                     let backoff_seconds = runnable.backoff(task.retries as u32);
 
                     self.queue
-                        .schedule_retry(&task, backoff_seconds, &error.description)
+                        .schedule_retry(task, backoff_seconds, &error.description)
                         .await?;
                 } else {
                     self.finalize_task(task, &result).await?;
@@ -171,18 +171,18 @@ impl<'a> AsyncWorkerTest<'a> {
 
     async fn finalize_task(
         &mut self,
-        task: Task,
+        task: &Task,
         result: &Result<(), FangError>,
     ) -> Result<(), FangError> {
         match self.retention_mode {
             RetentionMode::KeepAll => match result {
                 Ok(_) => {
                     self.queue
-                        .update_task_state(&task, FangTaskState::Finished)
+                        .update_task_state(task, FangTaskState::Finished)
                         .await?;
                 }
                 Err(error) => {
-                    self.queue.fail_task(&task, &error.description).await?;
+                    self.queue.fail_task(task, &error.description).await?;
                 }
             },
             RetentionMode::RemoveAll => match result {
@@ -198,7 +198,7 @@ impl<'a> AsyncWorkerTest<'a> {
                     self.queue.remove_task(task.id).await?;
                 }
                 Err(error) => {
-                    self.queue.fail_task(&task, &error.description).await?;
+                    self.queue.fail_task(task, &error.description).await?;
                 }
             },
         };
@@ -212,7 +212,8 @@ impl<'a> AsyncWorkerTest<'a> {
         tokio::time::sleep(self.sleep_params.sleep_period).await;
     }
 
-    pub async fn run_tasks_until_none(&mut self) -> Result<(), FangError> {
+    pub async fn run_tasks_until_none(&mut self) -> Result<u32, FangError> {
+        let mut number_runned = 0u32;
         loop {
             match self
                 .queue
@@ -223,17 +224,19 @@ impl<'a> AsyncWorkerTest<'a> {
                     let actual_task: Box<dyn AsyncRunnable> =
                         serde_json::from_value(task.metadata.clone()).unwrap();
 
+                    self.sleep_params.maybe_reset_sleep_period();
+                    // run scheduled task
+                    self.run(&task, &*actual_task).await?;
+                    number_runned += 1;
+
                     // check if task is scheduled or not
                     if let Some(CronPattern(_)) = actual_task.cron() {
                         // program task
                         self.queue.schedule_task(&*actual_task).await?;
                     }
-                    self.sleep_params.maybe_reset_sleep_period();
-                    // run scheduled task
-                    self.run(task, actual_task).await?;
                 }
                 Ok(None) => {
-                    return Ok(());
+                    return Ok(number_runned);
                 }
                 Err(error) => {
                     error!("Failed to fetch a task {:?}", error);
@@ -288,6 +291,27 @@ mod async_worker_tests {
         }
         fn cron(&self) -> Option<Scheduled> {
             Some(Scheduled::ScheduleOnce(Utc::now() + Duration::seconds(1)))
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct WorkerAsyncTaskScheduled {}
+
+    #[typetag::serde]
+    #[async_trait]
+    impl AsyncRunnable for WorkerAsyncTaskScheduled {
+        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+            log::info!("WorkerAsyncTaskScheduled has been run");
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            Ok(())
+        }
+        fn cron(&self) -> Option<Scheduled> {
+            let cron = "0/1 * * * * * *".to_string();
+            Some(Scheduled::CronPattern(cron))
+        }
+
+        fn task_type(&self) -> String {
+            "type1".to_string()
         }
     }
 
@@ -375,7 +399,7 @@ mod async_worker_tests {
             .retention_mode(RetentionMode::KeepAll)
             .build();
 
-        worker.run(task, Box::new(actual_task)).await.unwrap();
+        worker.run(&task, &actual_task).await.unwrap();
         let task_finished = test.find_task_by_id(id).await.unwrap();
         assert_eq!(id, task_finished.id);
         assert_eq!(FangTaskState::Finished, task_finished.state);
@@ -466,7 +490,7 @@ mod async_worker_tests {
             .retention_mode(RetentionMode::KeepAll)
             .build();
 
-        worker.run(task, Box::new(failed_task)).await.unwrap();
+        worker.run(&task, &failed_task).await.unwrap();
         let task_finished = test.find_task_by_id(id).await.unwrap();
 
         assert_eq!(id, task_finished.id);
@@ -542,5 +566,34 @@ mod async_worker_tests {
 
     async fn insert_task(test: &mut AsyncQueue<NoTls>, task: &dyn AsyncRunnable) -> Task {
         test.insert_task(task).await.unwrap()
+    }
+
+    #[tokio::test()]
+    async fn no_schedule_until_run() {
+        let mut test = AsyncQueue::<NoTls>::test().await;
+
+        let _task_1 = test
+            .schedule_task(&WorkerAsyncTaskScheduled {})
+            .await
+            .unwrap();
+
+        let _id1 = _task_1.id;
+
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+        let mut worker = AsyncWorkerTest::builder()
+            .queue(&mut test as &mut dyn AsyncQueueable)
+            .task_type("type1".to_string())
+            .build();
+
+        let n = worker.run_tasks_until_none().await.unwrap();
+
+        assert_eq!(n, 1u32);
+
+        let task = test
+            .fetch_and_touch_task(Some("type1".to_string()))
+            .await
+            .unwrap();
+        assert_eq!(None, task);
     }
 }
