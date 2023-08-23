@@ -272,7 +272,7 @@ mod worker_tests {
         }
 
         fn task_type(&self) -> String {
-            "type2".to_string()
+            "type_scheduled".to_string()
         }
 
         fn cron(&self) -> Option<Scheduled> {
@@ -461,6 +461,6 @@ mod worker_tests {
 
         let mut pooled_connection = worker.queue.connection_pool.get().unwrap();
 
-        Queue::remove_tasks_of_type_query(&mut pooled_connection, "type2").unwrap();
+        Queue::remove_tasks_of_type_query(&mut pooled_connection, "type_scheduled").unwrap();
     }
 }
