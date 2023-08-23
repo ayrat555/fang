@@ -48,10 +48,10 @@ clippy:
 	cargo clippy --verbose --all-targets --all-features -- -D warnings
 
 tests:
-	DATABASE_URL=postgres://postgres:postgres@localhost/fang cargo test --all-features -- --color always --nocapture
+	cargo test --all-features -- --color always --nocapture
 
 ignored:
-	DATABASE_URL=postgres://postgres:postgres@localhost/fang cargo test --all-features -- --color always --nocapture --ignored
+	cargo test --all-features -- --color always --nocapture --ignored
 
 doc:
 	cargo doc --open
