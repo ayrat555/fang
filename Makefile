@@ -28,12 +28,16 @@ DIESEL_TARGETS = diesel_postgres diesel_mysql diesel_sqlite
 CLEAN_TARGETS = clean_postgres clean_mysql clean_sqlite
 STOP_TARGETS = stop_postgres stop_mysql stop_sqlite
 
+.DEFAULT_GOAL = default
+
+default: db tests ignored stop
+
 .PHONY: db $(DB_TARGETS) \
 	$(WAIT_TARGETS) \
 	diesel $(DIESEL_TARGETS) \
 	clean $(CLEAN_TARGETS)
 	stop $(STOP_TARGETS) \
-	clippy tests ignored doc
+	default clippy tests ignored doc
 
 .SILENT: $(DB_TARGETS) $(WAIT_TARGETS) $(DIESEL_TARGETS) $(CLEAN_TARGETS) $(STOP_TARGETS)
 
