@@ -24,8 +24,8 @@ DATABASE_URL=$(POSTGRES_URL)
 POSTGRES_URL=postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(HOST)/$(POSTGRES_DB)
 MYSQL_URL=mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(HOST)/$(MYSQL_DB)
 
-BOLD=\033[1m
-END_BOLD=\033[0m
+BOLD='\033[1m'
+END_BOLD='\033[0m'
 
 DB_TARGETS=db_postgres db_mysql db_sqlite
 WAIT_TARGETS=wait_for_postgres wait_for_mysql wait_for_sqlite
