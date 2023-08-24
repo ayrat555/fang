@@ -408,26 +408,28 @@ cargo install diesel_cli --no-default-features --features "postgres sqlite mysql
 - Setup databases for testing.
 
 ```sh
-make db
+make -j db
 ```
 
 - Run tests. `make db` does not need to be run in between each test cycle.
 
 ```sh
-make tests
+make -j tests
 ```
 
 - Run dirty/long tests.
 
 ```sh
-make ignored
+make -j ignored
 ```
 
 - Take down databases.
 
 ```sh
-make stop
+make -j stop
 ```
+
+The `-j` flag in the above examples is not necessary but highly recommended.
 
 ## Authors
 

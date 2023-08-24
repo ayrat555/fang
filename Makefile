@@ -48,6 +48,8 @@ default: db tests ignored stop
 
 .FORCE:
 
+.NOTPARALLEL: default
+
 .env: .FORCE
 	printf '' > .env
 	echo "DATABASE_URL=$(DATABASE_URL)" >> .env
