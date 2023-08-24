@@ -127,4 +127,4 @@ ignored:
 	$(MAKE) clean
 
 doc:
-	cargo doc --open
+	cargo doc --package fang --open
