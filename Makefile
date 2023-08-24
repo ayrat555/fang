@@ -78,21 +78,21 @@ diesel: $(DIESEL_TARGETS)
 
 diesel_postgres: wait_for_postgres
 	@echo -e $(BOLD)Running Diesel migrations on Postgres database...$(END_BOLD)
-	cd fang/postgres_migrations && \
 	diesel migration run \
-		--database-url postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@127.0.0.1/$(POSTGRES_DB)
+		--database-url postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@127.0.0.1/$(POSTGRES_DB) \
+		--migration-dir fang/postgres_migrations/migrations
 
 diesel_mysql: wait_for_mysql
 	@echo -e $(BOLD)Running Diesel migrations on MySQL database...$(END_BOLD)
-	cd fang/mysql_migrations && \
 	diesel migration run \
-		--database-url mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@127.0.0.1/$(MYSQL_DB)
+		--database-url mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@127.0.0.1/$(MYSQL_DB) \
+		--migration-dir fang/mysql_migrations/migrations
 
 diesel_sqlite: wait_for_sqlite
 	@echo -e $(BOLD)Running Diesel migrations on SQLite database...$(END_BOLD)
-	cd fang/sqlite_migrations && \
 	diesel migration run \
-		--database-url sqlite://../../$(SQLITE_FILE)
+		--database-url sqlite://$(SQLITE_FILE) \
+		--migration-dir fang/sqlite_migrations/migrations
 
 clean: $(CLEAN_TARGETS)
 
