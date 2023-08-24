@@ -405,7 +405,13 @@ cargo install diesel_cli --no-default-features --features "postgres sqlite mysql
 
 - Install docker on your machine.
 
-- Run tests
+- Setup databases for testing.
+
+```sh
+make db
+```
+
+- Run tests. `make db` does not need to be run in between each test cycle.
 
 ```sh
 make tests
@@ -415,6 +421,12 @@ make tests
 
 ```sh
 make ignored
+```
+
+- Take down databases.
+
+```sh
+make stop
 ```
 
 ## Authors
