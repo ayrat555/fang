@@ -24,16 +24,16 @@ DATABASE_URL=$(POSTGRES_URL)
 POSTGRES_URL=postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(HOST)/$(POSTGRES_DB)
 MYSQL_URL=mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(HOST)/$(MYSQL_DB)
 
-BOLD = '\033[1m'
-END_BOLD = '\033[0m'
+BOLD=\033[1m
+END_BOLD=\033[0m
 
-DB_TARGETS = db_postgres db_mysql db_sqlite
-WAIT_TARGETS = wait_for_postgres wait_for_mysql wait_for_sqlite
-DIESEL_TARGETS = diesel_postgres diesel_mysql diesel_sqlite
-CLEAN_TARGETS = clean_postgres clean_mysql clean_sqlite
-STOP_TARGETS = stop_postgres stop_mysql stop_sqlite
+DB_TARGETS=db_postgres db_mysql db_sqlite
+WAIT_TARGETS=wait_for_postgres wait_for_mysql wait_for_sqlite
+DIESEL_TARGETS=diesel_postgres diesel_mysql diesel_sqlite
+CLEAN_TARGETS=clean_postgres clean_mysql clean_sqlite
+STOP_TARGETS=stop_postgres stop_mysql stop_sqlite
 
-.DEFAULT_GOAL = default
+.DEFAULT_GOAL=default
 
 default: db tests ignored stop
 
