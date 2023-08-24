@@ -399,40 +399,22 @@ Set sleep params with worker pools `TypeBuilder` in both modules.
 
 - Install diesel_cli.
 
-```
+```sh
 cargo install diesel_cli --no-default-features --features "postgres sqlite mysql"
 ```
 
 - Install docker on your machine.
 
-- Run a Postgres docker container. (See in Makefile.)
-
-```
-make db_postgres
-```
-
-- Run the migrations
-
-```
-make diesel_postgres
-```
-
 - Run tests
 
-```
+```sh
 make tests
 ```
 
-- Run dirty//long tests, DB must be recreated afterwards.
+- Run dirty/long tests.
 
-```
+```sh
 make ignored
-```
-
-- Kill the docker container
-
-```
-make stop
 ```
 
 ## Authors
