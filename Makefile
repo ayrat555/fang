@@ -19,7 +19,10 @@ SQLITE_DIESEL_DIR=fang/sqlite_migrations
 SQLITE_MIGRATIONS=$(SQLITE_DIESEL_DIR)/migrations
 SQLITE_CONFIG=$(SQLITE_DIESEL_DIR)/diesel.toml
 
-DATABASE_URL=postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@127.0.0.1/$(POSTGRES_DB)
+HOST=127.0.0.1
+DATABASE_URL=$(POSTGRES_URL)
+POSTGRES_URL=postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(HOST)/$(POSTGRES_DB)
+MYSQL_URL=mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(HOST)/$(MYSQL_DB)
 
 BOLD = '\033[1m'
 END_BOLD = '\033[0m'
@@ -39,13 +42,18 @@ default: db tests ignored stop
 	diesel $(DIESEL_TARGETS) \
 	clean $(CLEAN_TARGETS)
 	stop $(STOP_TARGETS) \
-	default clippy tests ignored doc
+	default clippy tests ignored doc .FORCE
 
-.SILENT: $(DB_TARGETS) $(WAIT_TARGETS) $(DIESEL_TARGETS) $(CLEAN_TARGETS) $(STOP_TARGETS)
+.SILENT: .env $(DB_TARGETS) $(WAIT_TARGETS) $(DIESEL_TARGETS) $(CLEAN_TARGETS) $(STOP_TARGETS)
 
-.env:
+.FORCE:
+
+.env: .FORCE
 	printf '' > .env
 	echo "DATABASE_URL=$(DATABASE_URL)" >> .env
+	echo "POSTGRES_URL=$(POSTGRES_URL)" >> .env
+	echo "MYSQL_URL=$(MYSQL_URL)" >> .env
+	echo "SQLITE_FILE=$(SQLITE_FILE)" >> .env
 
 db: $(DB_TARGETS)
 
@@ -98,14 +106,14 @@ diesel: $(DIESEL_TARGETS)
 diesel_postgres: wait_for_postgres
 	@echo -e $(BOLD)Running Diesel migrations on Postgres database...$(END_BOLD)
 	diesel migration run \
-		--database-url postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@127.0.0.1/$(POSTGRES_DB) \
+		--database-url $(POSTGRES_URL) \
 		--migration-dir $(POSTGRES_MIGRATIONS) \
 		--config-file $(POSTGRES_CONFIG)
 
 diesel_mysql: wait_for_mysql
 	@echo -e $(BOLD)Running Diesel migrations on MySQL database...$(END_BOLD)
 	diesel migration run \
-		--database-url mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@127.0.0.1/$(MYSQL_DB) \
+		--database-url $(MYSQL_URL) \
 		--migration-dir $(MYSQL_MIGRATIONS) \
 		--config-file $(MYSQL_CONFIG)
 
