@@ -8,50 +8,53 @@ Background task processing library for Rust. It uses Postgres DB as a task queue
 
 ## Key Features
 
- Here are some of the fang's key features:
+Here are some of the fang's key features:
 
- - Async and threaded workers.
-   Workers can be started in threads (threaded workers) or `tokio` tasks (async workers)
- - Scheduled tasks.
-   Tasks can be scheduled at any time in the future
- - Periodic (CRON) tasks.
-   Tasks can be scheduled using cron expressions
- - Unique tasks.
-   Tasks are not duplicated in the queue if they are unique
- - Single-purpose workers.
-   Tasks are stored in a single table but workers can execute only tasks of the specific type
- - Retries.
-   Tasks can be retried with a custom backoff mode
+- Async and threaded workers.
+  Workers can be started in threads (threaded workers) or `tokio` tasks (async workers)
+- Scheduled tasks.
+  Tasks can be scheduled at any time in the future
+- Periodic (CRON) tasks.
+  Tasks can be scheduled using cron expressions
+- Unique tasks.
+  Tasks are not duplicated in the queue if they are unique
+- Single-purpose workers.
+  Tasks are stored in a single table but workers can execute only tasks of the specific type
+- Retries.
+  Tasks can be retried with a custom backoff mode
 
 ## Installation
 
 1. Add this to your Cargo.toml
 
-
 #### the Blocking feature
+
 ```toml
 [dependencies]
 fang = { version = "0.10.4" , features = ["blocking"], default-features = false }
 ```
 
 #### the Asynk feature
+
 ```toml
 [dependencies]
 fang = { version = "0.10.4" , features = ["asynk"], default-features = false }
 ```
 
 #### the Asynk feature with derive macro
+
 ```toml
 [dependencies]
 fang = { version = "0.10.4" , features = ["asynk", "derive-error" ], default-features = false }
 ```
 
 #### All features
+
 ```toml
 fang = { version = "0.10.4" }
 ```
 
-*Supports rustc 1.62+*
+_Supports rustc 1.62+_
 
 2. Create the `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/fang/postgres_migrations/migrations/2022-08-20-151615_create_fang_tasks/up.sql).
 
@@ -60,10 +63,10 @@ fang = { version = "0.10.4" }
 ### Defining a task
 
 #### Blocking feature
+
 Every task should implement the `fang::Runnable` trait which is used by `fang` to execute it.
 
 If you have a `CustomError`, it is recommended to implement `From<FangError>`. So this way you can use [? operator](https://stackoverflow.com/questions/42917566/what-is-this-question-mark-operator-about#42921174) inside the `run` function available in `fang::Runnable` trait.
-
 
 You can easily implement it with the macro `ToFangError`. This macro is only available in the feature `derive-error`.
 
@@ -107,8 +110,8 @@ impl Runnable for MyTask {
     fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
         println!("the number is {}", self.number);
 
-        my_func(self.number)?; 
-        // You can use ? operator because 
+        my_func(self.number)?;
+        // You can use ? operator because
         // From<FangError> is implemented thanks to ToFangError derive macro.
 
         Ok(())
@@ -150,11 +153,12 @@ As you can see from the example above, the trait implementation has `#[typetag::
 
 The second parameter of the `run` function is a struct that implements `fang::Queueable`. You can re-use it to manipulate the task queue, for example, to add a new job during the current job's execution. If you don't need it, just ignore it.
 
-
 #### Asynk feature
+
 Every task should implement `fang::AsyncRunnable` trait which is used by `fang` to execute it.
 
 Be careful not to call two implementations of the AsyncRunnable trait with the same name, because it will cause a failure in the `typetag` crate.
+
 ```rust
 use fang::AsyncRunnable;
 use fang::asynk::async_queue::AsyncQueueable;
@@ -218,10 +222,10 @@ If your timezone is UTC + 2 and you want to schedule at 11:00:
  let expression = "0 0 9 * * * *";
 ```
 
-
 ### Enqueuing a task
 
 #### the Blocking feature
+
 To enqueue a task use `Queue::enqueue_task`
 
 ```rust
@@ -238,9 +242,11 @@ use fang::Queue;
 ```
 
 #### the Asynk feature
+
 To enqueue a task use `AsyncQueueable::insert_task`.
 
-For Postgres backend.
+For Postgres backend:
+
 ```rust
 use fang::asynk::async_queue::AsyncQueue;
 use fang::NoTls;
@@ -260,7 +266,8 @@ let mut queue = AsyncQueue::builder()
 queue.connect(NoTls).await.unwrap();
 
 ```
-As an easy example, we are using NoTls type. If for some reason you would like to encrypt Postgres requests, you can use [openssl](https://docs.rs/postgres-openssl/latest/postgres_openssl/)  or [native-tls](https://docs.rs/postgres-native-tls/latest/postgres_native_tls/).
+
+As an easy example, we are using NoTls type. If for some reason you would like to encrypt Postgres requests, you can use [openssl](https://docs.rs/postgres-openssl/latest/postgres_openssl/) or [native-tls](https://docs.rs/postgres-native-tls/latest/postgres_native_tls/).
 
 ```rust
 // AsyncTask from the first example
@@ -274,10 +281,10 @@ let task_returned = queue
 ### Starting workers
 
 #### the Blocking feature
+
 Every worker runs in a separate thread. In case of panic, they are always restarted.
 
 Use `WorkerPool` to start workers. Use `WorkerPool::builder` to create your worker pool and run tasks.
-
 
 ```rust
 use fang::WorkerPool;
@@ -296,6 +303,7 @@ worker_pool.start();
 ```
 
 #### the Asynk feature
+
 Every worker runs in a separate `tokio` task. In case of panic, they are always restarted.
 Use `AsyncWorkerPool` to start workers.
 
@@ -314,7 +322,6 @@ let mut pool: AsyncWorkerPool<AsyncQueue<NoTls>> = AsyncWorkerPool::builder()
 
 pool.start().await;
 ```
-
 
 Check out:
 
@@ -370,8 +377,8 @@ pub struct SleepParams {
 
 If there are no tasks in the DB, a worker sleeps for `sleep_period` and each time this value increases by `sleep_step` until it reaches `max_sleep_period`. `min_sleep_period` is the initial value for `sleep_period`. All values are in seconds.
 
-
 Use `set_sleep_params` to set it:
+
 ```rust
 let sleep_params = SleepParams {
     sleep_period: Duration::from_secs(2),
@@ -392,33 +399,41 @@ Set sleep params with worker pools `TypeBuilder` in both modules.
 5. Create a new Pull Request
 
 ### Running tests locally
+
 - Install diesel_cli.
+
 ```
 cargo install diesel_cli --no-default-features --features "postgres sqlite mysql"
 ```
+
 - Install docker on your machine.
 
 - Run a Postgres docker container. (See in Makefile.)
+
 ```
 make db_postgres
 ```
 
 - Run the migrations
+
 ```
 make diesel_postgres
 ```
 
 - Run tests
+
 ```
 make tests
 ```
 
 - Run dirty//long tests, DB must be recreated afterwards.
+
 ```
 make ignored
 ```
 
 - Kill the docker container
+
 ```
 make stop
 ```
@@ -428,7 +443,6 @@ make stop
 - Ayrat Badykov (@ayrat555)
 
 - Pepe Márquez (@pxp9)
-
 
 [s1]: https://img.shields.io/crates/v/fang.svg
 [docs-badge]: https://img.shields.io/badge/docs-website-blue.svg
