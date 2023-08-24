@@ -2,16 +2,22 @@ POSTGRES_CONTAINER=postgres
 POSTGRES_DB=fang
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
-POSTGRES_MIGRATIONS=fang/postgres_migrations/migrations
+POSTGRES_DIESEL_DIR=fang/postgres_migrations
+POSTGRES_MIGRATIONS=$(POSTGRES_DIESEL_DIR)/migrations
+POSTGRES_CONFIG=$(POSTGRES_DIESEL_DIR)/diesel.toml
 
 MYSQL_CONTAINER=mysql
 MYSQL_DB=fang
 MYSQL_USER=root
 MYSQL_PASSWORD=mysql
-MYSQL_MIGRATIONS=fang/mysql_migrations/migrations
+MYSQL_DIESEL_DIR=fang/mysql_migrations
+MYSQL_MIGRATIONS=$(MYSQL_DIESEL_DIR)/migrations
+MYSQL_CONFIG=$(MYSQL_DIESEL_DIR)/diesel.toml
 
 SQLITE_FILE=fang.db
-SQLITE_MIGRATIONS=fang/sqlite_migrations/migrations
+SQLITE_DIESEL_DIR=fang/sqlite_migrations
+SQLITE_MIGRATIONS=$(SQLITE_DIESEL_DIR)/migrations
+SQLITE_CONFIG=$(SQLITE_DIESEL_DIR)/diesel.toml
 
 BOLD = '\033[1m'
 END_BOLD = '\033[0m'
@@ -83,19 +89,22 @@ diesel_postgres: wait_for_postgres
 	@echo -e $(BOLD)Running Diesel migrations on Postgres database...$(END_BOLD)
 	diesel migration run \
 		--database-url postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@127.0.0.1/$(POSTGRES_DB) \
-		--migration-dir $(POSTGRES_MIGRATIONS)
+		--migration-dir $(POSTGRES_MIGRATIONS) \
+		--config-file $(POSTGRES_CONFIG)
 
 diesel_mysql: wait_for_mysql
 	@echo -e $(BOLD)Running Diesel migrations on MySQL database...$(END_BOLD)
 	diesel migration run \
 		--database-url mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@127.0.0.1/$(MYSQL_DB) \
-		--migration-dir $(MYSQL_MIGRATIONS)
+		--migration-dir $(MYSQL_MIGRATIONS) \
+		--config-file $(MYSQL_CONFIG)
 
 diesel_sqlite: wait_for_sqlite
 	@echo -e $(BOLD)Running Diesel migrations on SQLite database...$(END_BOLD)
 	diesel migration run \
 		--database-url sqlite://$(SQLITE_FILE) \
-		--migration-dir $(SQLITE_MIGRATIONS)
+		--migration-dir $(SQLITE_MIGRATIONS) \
+		--config-file $(SQLITE_CONFIG)
 
 clean: $(CLEAN_TARGETS)
 
