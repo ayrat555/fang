@@ -1,3 +1,15 @@
+POSTGRES_CONTAINER=postgres
+POSTGRES_DB=fang
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+
+MYSQL_CONTAINER=mysql
+MYSQL_DB=fang
+MYSQL_USER=root
+MYSQL_PASSWORD=mysql
+
+SQLITE_FILE=fang.db
+
 BOLD = '\033[1m'
 END_BOLD = '\033[0m'
 
@@ -20,44 +32,44 @@ db: $(DB_TARGETS)
 
 db_postgres:
 	@echo -e $(BOLD)Setting up Postgres database...$(END_BOLD)
-	docker run --rm -d --name postgres -p 5432:5432 \
-		-e POSTGRES_DB=fang \
-		-e POSTGRES_USER=postgres \
-		-e POSTGRES_PASSWORD=postgres \
+	docker run --rm -d --name $(POSTGRES_CONTAINER) -p 5432:5432 \
+		-e POSTGRES_DB=$(POSTGRES_DB) \
+		-e POSTGRES_USER=$(POSTGRES_USER) \
+		-e POSTGRES_PASSWORD=$(POSTGRES_PASSWORD) \
 		postgres:latest
 	$(MAKE) diesel_postgres
 
 db_mysql:
 	@echo -e $(BOLD)Setting up MySQL database...$(END_BOLD)
-	docker run --rm -d --name mysql -p 3306:3306 \
-		-e MYSQL_DATABASE=fang \
-		-e MYSQL_ROOT_PASSWORD=mysql \
+	docker run --rm -d --name $(MYSQL_CONTAINER) -p 3306:3306 \
+		-e MYSQL_DATABASE=$(MYSQL_DB) \
+		-e MYSQL_ROOT_PASSWORD=$(MYSQL_PASSWORD) \
 		-e TZ=UTC \
 		mysql:latest
 	$(MAKE) diesel_mysql
 
 db_sqlite:
 	@echo -e $(BOLD)Setting up SQLite database...$(END_BOLD)
-	sqlite3 fang.db "VACUUM;"
+	sqlite3 $(SQLITE_FILE) "VACUUM;"
 	$(MAKE) diesel_sqlite
 
 wait_for_postgres:
 	@echo -e $(BOLD)Waiting for Postgres server to be up and running...$(END_BOLD)
-	while ! docker exec postgres psql -U postgres --command='' 2> /dev/null; \
+	while ! docker exec $(POSTGRES_CONTAINER) psql -U $(POSTGRES_USER) --command='' 2> /dev/null; \
 	do \
 		sleep 1; \
 	done
 
 wait_for_mysql:
 	@echo -e $(BOLD)Waiting for MySQL server to be up and running...$(END_BOLD)
-	while ! docker exec mysql mysql --user=root --password=mysql --execute='' 2> /dev/null; \
+	while ! docker exec $(MYSQL_CONTAINER) mysql --user=$(MYSQL_USER) --password=$(MYSQL_PASSWORD) --execute='' 2> /dev/null; \
 	do \
 		sleep 1; \
 	done
 
 wait_for_sqlite:
 	@echo -e $(BOLD)Waiting for SQLite DB file to be created...$(END_BOLD)
-	while [ ! -f fang.db ]; \
+	while [ ! -f $(SQLITE_FILE) ]; \
 	do \
 		sleep 1; \
 	done
@@ -68,31 +80,34 @@ diesel_postgres: wait_for_postgres
 	@echo -e $(BOLD)Running Diesel migrations on Postgres database...$(END_BOLD)
 	cd fang/postgres_migrations && \
 	diesel migration run \
-		--database-url postgres://postgres:postgres@127.0.0.1/fang
+		--database-url postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@127.0.0.1/$(POSTGRES_DB)
 
 diesel_mysql: wait_for_mysql
 	@echo -e $(BOLD)Running Diesel migrations on MySQL database...$(END_BOLD)
 	cd fang/mysql_migrations && \
 	diesel migration run \
-		--database-url mysql://root:mysql@127.0.0.1/fang
+		--database-url mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@127.0.0.1/$(MYSQL_DB)
 
 diesel_sqlite: wait_for_sqlite
 	@echo -e $(BOLD)Running Diesel migrations on SQLite database...$(END_BOLD)
 	cd fang/sqlite_migrations && \
 	diesel migration run \
-		--database-url sqlite://../../fang.db
+		--database-url sqlite://../../$(SQLITE_FILE)
 
 clean: $(CLEAN_TARGETS)
 
 clean_postgres: wait_for_postgres
 	@echo -e $(BOLD)Cleaning Postgres database...$(END_BOLD)
-	docker exec postgres dropdb -U postgres fang
-	docker exec postgres psql -U postgres --command="CREATE DATABASE fang;"
+	docker exec $(POSTGRES_CONTAINER) dropdb -U $(POSTGRES_USER) $(POSTGRES_DB)
+	docker exec $(POSTGRES_CONTAINER) psql -U $(POSTGRES_USER) --command="CREATE DATABASE $(POSTGRES_DB);"
 	$(MAKE) diesel_postgres
 
 clean_mysql: wait_for_mysql
 	@echo -e $(BOLD)Cleaning MySQL database...$(END_BOLD)
-	docker exec mysql mysql --user=root --password=mysql --execute="DROP DATABASE fang; CREATE DATABASE fang;"
+	docker exec $(MYSQL_CONTAINER) mysql \
+		--user=$(MYSQL_USER) \
+		--password=$(MYSQL_PASSWORD) \
+		--execute="DROP DATABASE $(MYSQL_DB); CREATE DATABASE $(MYSQL_DB);"
 	$(MAKE) diesel_mysql
 
 clean_sqlite: wait_for_sqlite
@@ -103,15 +118,15 @@ stop: $(STOP_TARGETS)
 
 stop_postgres:
 	@echo -e $(BOLD)Stopping Postgres database...$(END_BOLD)
-	docker kill postgres
+	docker kill $(POSTGRES_CONTAINER)
 
 stop_mysql:
 	@echo -e $(BOLD)Stopping MySQL database...$(END_BOLD)
-	docker kill mysql
+	docker kill $(MYSQL_CONTAINER)
 
 stop_sqlite:
 	@echo -e $(BOLD)Stopping SQLite database...$(END_BOLD)
-	rm fang.db
+	rm $(SQLITE_FILE)
 
 clippy:
 	cargo clippy --verbose --all-targets --all-features -- -D warnings
