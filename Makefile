@@ -19,6 +19,8 @@ SQLITE_DIESEL_DIR=fang/sqlite_migrations
 SQLITE_MIGRATIONS=$(SQLITE_DIESEL_DIR)/migrations
 SQLITE_CONFIG=$(SQLITE_DIESEL_DIR)/diesel.toml
 
+DATABASE_URL=postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@127.0.0.1/$(POSTGRES_DB)
+
 BOLD = '\033[1m'
 END_BOLD = '\033[0m'
 
@@ -40,6 +42,10 @@ default: db tests ignored stop
 	default clippy tests ignored doc
 
 .SILENT: $(DB_TARGETS) $(WAIT_TARGETS) $(DIESEL_TARGETS) $(CLEAN_TARGETS) $(STOP_TARGETS)
+
+.env:
+	printf '' > .env
+	echo "DATABASE_URL=$(DATABASE_URL)" >> .env
 
 db: $(DB_TARGETS)
 
@@ -147,12 +153,12 @@ stop_sqlite:
 clippy:
 	cargo clippy --verbose --all-targets --all-features -- -D warnings
 
-tests:
+tests: .env
 	@echo -e $(BOLD)Running tests...$(END_BOLD)
 	cargo test --all-features -- --color always --nocapture
 	$(MAKE) clean
 
-ignored:
+ignored: .env
 	@echo -e $(BOLD)Running ignored tests...$(END_BOLD)
 	cargo test --all-features -- --color always --nocapture --ignored
 	$(MAKE) clean
