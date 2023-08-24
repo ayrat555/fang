@@ -82,21 +82,20 @@ use std::fmt::Debug;
 
 #[derive(Debug, ToFangError)]
 enum CustomError {
-  ErrorOne(String),
-  ErrorTwo(u32),
+    ErrorOne(String),
+    ErrorTwo(u32),
 }
 
 fn my_func(num : u16) -> Result<(), CustomError> {
+    if num == 0 {
+        Err(CustomError::ErrorOne("is zero".to_string()))
+    }
 
-  if num == 0 {
-    Err(CustomError::ErrorOne("is zero".to_string()))
-  }
+    if num > 500 {
+        Err(CustomError::ErrorTwo(num))
+    }
 
-  if num > 500 {
-    Err(CustomError::ErrorTwo(num))
-  }
-
-  Ok(())
+    Ok(())
 }
 
 #[derive(Serialize, Deserialize)]
@@ -120,13 +119,13 @@ impl Runnable for MyTask {
     // If `uniq` is set to true and the task is already in the storage, it won't be inserted again
     // The existing record will be returned for for any insertions operaiton
     fn uniq(&self) -> bool {
-      true
+        true
     }
 
     // This will be useful if you want to filter tasks.
     // the default value is `common`
     fn task_type(&self) -> String {
-      "my_task".to_string()
+        "my_task".to_string()
     }
 
     // This will be useful if you would like to schedule tasks.
@@ -139,12 +138,12 @@ impl Runnable for MyTask {
     // the maximum number of retries. Set it to 0 to make it not retriable
     // the default value is 20
     fn max_retries(&self) -> i32 {
-      20
+        20
     }
 
     // backoff mode for retries
     fn backoff(&self, attempt: u32) -> u32 {
-      u32::pow(2, attempt)
+        u32::pow(2, attempt)
     }
 }
 ```
@@ -168,7 +167,7 @@ use fang::async_trait;
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "fang::serde")]
 struct AsyncTask {
-  pub number: u16,
+    pub number: u16,
 }
 
 #[typetag::serde]
@@ -187,7 +186,7 @@ impl AsyncRunnable for AsyncTask {
     // If `uniq` is set to true and the task is already in the storage, it won't be inserted again
     // The existing record will be returned for for any insertions operaiton
     fn uniq(&self) -> bool {
-      true
+        true
     }
 
     // This will be useful if you would like to schedule tasks.
@@ -200,12 +199,12 @@ impl AsyncRunnable for AsyncTask {
     // the maximum number of retries. Set it to 0 to make it not retriable
     // the default value is 20
     fn max_retries(&self) -> i32 {
-      20
+        20
     }
 
     // backoff mode for retries
     fn backoff(&self, attempt: u32) -> u32 {
-      u32::pow(2, attempt)
+        u32::pow(2, attempt)
     }
 }
 ```
@@ -219,7 +218,7 @@ Example:
 If your timezone is UTC + 2 and you want to schedule at 11:00:
 
 ```rust
- let expression = "0 0 9 * * * *";
+let expression = "0 0 9 * * * *";
 ```
 
 ### Enqueuing a task
@@ -235,10 +234,9 @@ use fang::Queue;
 
 // create a fang queue
 
- let queue = Queue::builder().connection_pool(pool).build();
+let queue = Queue::builder().connection_pool(pool).build();
 
- let task_inserted = queue.insert_task(&MyTask::new(1)).unwrap();
-
+let task_inserted = queue.insert_task(&MyTask::new(1)).unwrap();
 ```
 
 #### the Asynk feature
@@ -264,7 +262,6 @@ let mut queue = AsyncQueue::builder()
 
 // Always connect first in order to perform any operation
 queue.connect(NoTls).await.unwrap();
-
 ```
 
 As an easy example, we are using NoTls type. If for some reason you would like to encrypt Postgres requests, you can use [openssl](https://docs.rs/postgres-openssl/latest/postgres_openssl/) or [native-tls](https://docs.rs/postgres-native-tls/latest/postgres_native_tls/).
@@ -273,9 +270,9 @@ As an easy example, we are using NoTls type. If for some reason you would like t
 // AsyncTask from the first example
 let task = AsyncTask { 8 };
 let task_returned = queue
-  .insert_task(&task as &dyn AsyncRunnable)
-  .await
-  .unwrap();
+    .insert_task(&task as &dyn AsyncRunnable)
+    .await
+    .unwrap();
 ```
 
 ### Starting workers
@@ -295,7 +292,7 @@ use fang::Queue;
 let mut worker_pool = WorkerPool::<Queue>::builder()
     .queue(queue)
     .number_of_workers(3_u32)
-     // if you want to run tasks of the specific kind
+    // if you want to run tasks of the specific kind
     .task_type("my_task_type")
     .build();
 
@@ -316,7 +313,7 @@ use fang::asynk::async_worker_pool::AsyncWorkerPool;
 let mut pool: AsyncWorkerPool<AsyncQueue<NoTls>> = AsyncWorkerPool::builder()
         .number_of_workers(max_pool_size)
         .queue(queue.clone())
-         // if you want to run tasks of the specific kind
+        // if you want to run tasks of the specific kind
         .task_type("my_task_type")
         .build();
 
