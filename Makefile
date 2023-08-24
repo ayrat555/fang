@@ -1,3 +1,6 @@
+BOLD = '\033[1m'
+END_BOLD = '\033[0m'
+
 DB_TARGETS = db_postgres db_mysql db_sqlite
 WAIT_TARGETS = wait_for_postgres wait_for_mysql wait_for_sqlite
 DIESEL_TARGETS = diesel_postgres diesel_mysql diesel_sqlite
@@ -16,7 +19,7 @@ STOP_TARGETS = stop_postgres stop_mysql stop_sqlite
 db: $(DB_TARGETS)
 
 db_postgres:
-	@echo Setting up Postgres database...
+	@echo -e $(BOLD)Setting up Postgres database...$(END_BOLD)
 	docker run --rm -d --name postgres -p 5432:5432 \
 		-e POSTGRES_DB=fang \
 		-e POSTGRES_USER=postgres \
@@ -25,7 +28,7 @@ db_postgres:
 	$(MAKE) diesel_postgres
 
 db_mysql:
-	@echo Setting up MySQL database...
+	@echo -e $(BOLD)Setting up MySQL database...$(END_BOLD)
 	docker run --rm -d --name mysql -p 3306:3306 \
 		-e MYSQL_DATABASE=fang \
 		-e MYSQL_ROOT_PASSWORD=mysql \
@@ -34,26 +37,26 @@ db_mysql:
 	$(MAKE) diesel_mysql
 
 db_sqlite:
-	@echo Setting up SQLite database...
+	@echo -e $(BOLD)Setting up SQLite database...$(END_BOLD)
 	sqlite3 fang.db "VACUUM;"
 	$(MAKE) diesel_sqlite
 
 wait_for_postgres:
-	@echo Waiting for Postgres server to be up and running...
+	@echo -e $(BOLD)Waiting for Postgres server to be up and running...$(END_BOLD)
 	while ! docker exec postgres psql -U postgres --command='' 2> /dev/null; \
 	do \
 		sleep 1; \
 	done
 
 wait_for_mysql:
-	@echo Waiting for MySQL server to be up and running...
+	@echo -e $(BOLD)Waiting for MySQL server to be up and running...$(END_BOLD)
 	while ! docker exec mysql mysql --user=root --password=mysql --execute='' 2> /dev/null; \
 	do \
 		sleep 1; \
 	done
 
 wait_for_sqlite:
-	@echo Waiting for SQLite DB file to be created...
+	@echo -e $(BOLD)Waiting for SQLite DB file to be created...$(END_BOLD)
 	while [ ! -f fang.db ]; \
 	do \
 		sleep 1; \
@@ -62,19 +65,19 @@ wait_for_sqlite:
 diesel: $(DIESEL_TARGETS)
 
 diesel_postgres: wait_for_postgres
-	@echo Running Diesel migrations on Postgres database...
+	@echo -e $(BOLD)Running Diesel migrations on Postgres database...$(END_BOLD)
 	cd fang/postgres_migrations && \
 	diesel migration run \
 		--database-url postgres://postgres:postgres@127.0.0.1/fang
 
 diesel_mysql: wait_for_mysql
-	@echo Running Diesel migrations on MySQL database...
+	@echo -e $(BOLD)Running Diesel migrations on MySQL database...$(END_BOLD)
 	cd fang/mysql_migrations && \
 	diesel migration run \
 		--database-url mysql://root:mysql@127.0.0.1/fang
 
 diesel_sqlite: wait_for_sqlite
-	@echo Running Diesel migrations on SQLite database...
+	@echo -e $(BOLD)Running Diesel migrations on SQLite database...$(END_BOLD)
 	cd fang/sqlite_migrations && \
 	diesel migration run \
 		--database-url sqlite://../../fang.db
@@ -82,42 +85,44 @@ diesel_sqlite: wait_for_sqlite
 clean: $(CLEAN_TARGETS)
 
 clean_postgres: wait_for_postgres
-	@echo Cleaning Postgres database...
+	@echo -e $(BOLD)Cleaning Postgres database...$(END_BOLD)
 	docker exec postgres dropdb -U postgres fang
 	docker exec postgres psql -U postgres --command="CREATE DATABASE fang;"
 	$(MAKE) diesel_postgres
 
 clean_mysql: wait_for_mysql
-	@echo Cleaning MySQL database...
+	@echo -e $(BOLD)Cleaning MySQL database...$(END_BOLD)
 	docker exec mysql mysql --user=root --password=mysql --execute="DROP DATABASE fang; CREATE DATABASE fang;"
 	$(MAKE) diesel_mysql
 
 clean_sqlite: wait_for_sqlite
-	@echo Cleaning SQLite database...
+	@echo -e $(BOLD)Cleaning SQLite database...$(END_BOLD)
 	$(MAKE) stop_sqlite db_sqlite
 
 stop: $(STOP_TARGETS)
 
 stop_postgres:
-	@echo Stopping Postgres database...
+	@echo -e $(BOLD)Stopping Postgres database...$(END_BOLD)
 	docker kill postgres
 
 stop_mysql:
-	@echo Stopping MySQL database...
+	@echo -e $(BOLD)Stopping MySQL database...$(END_BOLD)
 	docker kill mysql
 
 stop_sqlite:
-	@echo Stopping SQLite database...
+	@echo -e $(BOLD)Stopping SQLite database...$(END_BOLD)
 	rm fang.db
 
 clippy:
 	cargo clippy --verbose --all-targets --all-features -- -D warnings
 
 tests:
+	@echo -e $(BOLD)Running tests...$(END_BOLD)
 	cargo test --all-features -- --color always --nocapture
 	$(MAKE) clean
 
 ignored:
+	@echo -e $(BOLD)Running ignored tests...$(END_BOLD)
 	cargo test --all-features -- --color always --nocapture --ignored
 	$(MAKE) clean
 
