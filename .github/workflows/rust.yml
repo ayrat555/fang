@@ -57,7 +57,7 @@ jobs:
 
       - name: Setup Postgres db
         working-directory: ./fang/postgres_migrations
-        run: diesel setup
+        run: diesel setup --database-url=postgres://postgres:postgres@localhost/fang
 
       - name: Change working dir
         working-directory: ./../..
