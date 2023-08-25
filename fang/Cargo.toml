@@ -16,7 +16,7 @@ doctest = false
 
 [features]
 default = ["blocking", "asynk", "derive-error", "postgres", "mysql" , "sqlite", "migrations_postgres", "migrations_sqlite" , "migrations_mysql"]
-blocking = ["dep:diesel", "dep:diesel-derive-enum", "dep:dotenvy"]
+blocking = ["dep:diesel", "dep:diesel-derive-enum", "dep:dotenvy", "diesel?/chrono" , "diesel?/serde_json"]
 asynk = ["dep:bb8-postgres", "dep:postgres-types", "dep:tokio", "dep:async-trait", "dep:async-recursion"]
 derive-error = ["dep:fang-derive-error"]
 postgres = ["diesel?/postgres" , "diesel?/serde_json", "diesel?/chrono" , "diesel?/uuid" , "diesel?/r2d2"]
