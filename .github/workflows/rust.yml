@@ -7,6 +7,9 @@ on:
     # Check if it works with current dependencies (weekly on Wednesday 2:32 UTC)
     - cron: '32 2 * * 3'
 
+env :
+  DATABASE_URL : postgres://postgres:postgres@localhost/fang
+
 jobs:
   test:
     name: Test
@@ -57,7 +60,7 @@ jobs:
 
       - name: Setup Postgres db
         working-directory: ./fang/postgres_migrations
-        run: diesel setup --database-url=postgres://postgres:postgres@localhost/fang
+        run: diesel setup
 
       - name: Change working dir
         working-directory: ./../..
