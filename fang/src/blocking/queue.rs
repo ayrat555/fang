@@ -36,6 +36,8 @@ pub type PoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
 #[diesel(table_name = fang_tasks)]
 pub struct NewTask {
     #[builder(setter(into))]
+    id: Vec<u8>,
+    #[builder(setter(into))]
     metadata: serde_json::Value,
     #[builder(setter(into))]
     task_type: String,
@@ -85,14 +87,14 @@ pub trait Queueable {
     fn remove_tasks_of_type(&self, task_type: &str) -> Result<usize, QueueError>;
 
     /// Remove a task by its id.
-    fn remove_task(&self, id: Uuid) -> Result<usize, QueueError>;
+    fn remove_task(&self, id: &[u8]) -> Result<usize, QueueError>;
 
     /// To use this function task has to be uniq. uniq() has to return true.
     /// If task is not uniq this function will not do anything.
     /// Remove a task by its metadata (struct fields values)
     fn remove_task_by_metadata(&self, task: &dyn Runnable) -> Result<usize, QueueError>;
 
-    fn find_task_by_id(&self, id: Uuid) -> Option<Task>;
+    fn find_task_by_id(&self, id: &[u8]) -> Option<Task>;
 
     /// Update the state field of the specified task
     /// See the `FangTaskState` enum for possible states.
@@ -175,7 +177,7 @@ impl Queueable for Queue {
         Self::remove_tasks_of_type_query(&mut connection, task_type)
     }
 
-    fn remove_task(&self, id: Uuid) -> Result<usize, QueueError> {
+    fn remove_task(&self, id: &[u8]) -> Result<usize, QueueError> {
         let mut connection = self.get_connection()?;
 
         Self::remove_task_query(&mut connection, id)
@@ -205,7 +207,7 @@ impl Queueable for Queue {
         Self::fail_task_query(&mut connection, task, error)
     }
 
-    fn find_task_by_id(&self, id: Uuid) -> Option<Task> {
+    fn find_task_by_id(&self, id: &[u8]) -> Option<Task> {
         let mut connection = self.get_connection().unwrap();
 
         Self::find_task_by_id_query(&mut connection, id)
@@ -285,7 +287,11 @@ impl Queue {
         scheduled_at: DateTime<Utc>,
     ) -> Result<Task, QueueError> {
         if !params.uniq() {
+            let uuid = Uuid::new_v4();
+            let id: Vec<u8> = uuid.to_bytes_le().to_vec();
+
             let new_task = NewTask::builder()
+                .id(id)
                 .scheduled_at(scheduled_at)
                 .uniq_hash(None)
                 .task_type(params.task_type())
@@ -303,7 +309,11 @@ impl Queue {
             match Self::find_task_by_uniq_hash_query(connection, &uniq_hash) {
                 Some(task) => Ok(task),
                 None => {
+                    let uuid = Uuid::new_v4();
+                    let id: Vec<u8> = uuid.to_bytes_le().to_vec();
+
                     let new_task = NewTask::builder()
+                        .id(id)
                         .scheduled_at(scheduled_at)
                         .uniq_hash(Some(uniq_hash))
                         .task_type(params.task_type())
@@ -344,7 +354,7 @@ impl Queue {
         })
     }
 
-    pub fn find_task_by_id_query(connection: &mut PgConnection, id: Uuid) -> Option<Task> {
+    pub fn find_task_by_id_query(connection: &mut PgConnection, id: &[u8]) -> Option<Task> {
         fang_tasks::table
             .filter(fang_tasks::id.eq(id))
             .first::<Task>(connection)
@@ -385,7 +395,10 @@ impl Queue {
         Ok(diesel::delete(query).execute(connection)?)
     }
 
-    pub fn remove_task_query(connection: &mut PgConnection, id: Uuid) -> Result<usize, QueueError> {
+    pub fn remove_task_query(
+        connection: &mut PgConnection,
+        id: &[u8],
+    ) -> Result<usize, QueueError> {
         let query = fang_tasks::table.filter(fang_tasks::id.eq(id));
 
         Ok(diesel::delete(query).execute(connection)?)

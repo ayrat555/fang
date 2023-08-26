@@ -1,1 +1,1 @@
-SELECT * FROM fang_tasks  WHERE task_type = $1 AND state in ('new', 'retried') AND $2 >= scheduled_at  ORDER BY created_at ASC, scheduled_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED
+SELECT id , metadata::text , error_message, state::text , task_type , uniq_hash, retries , scheduled_at::text , created_at::text , updated_at::text FROM fang_tasks  WHERE task_type = $1 AND state in ('new', 'retried') AND $2::timestamptz >= scheduled_at  ORDER BY created_at ASC, scheduled_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED

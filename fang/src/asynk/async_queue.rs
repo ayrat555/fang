@@ -7,26 +7,22 @@ use crate::FangTaskState;
 use crate::Scheduled::*;
 use crate::Task;
 use async_trait::async_trait;
-use bb8_postgres::bb8::Pool;
-use bb8_postgres::bb8::RunError;
-use bb8_postgres::tokio_postgres::row::Row;
-use bb8_postgres::tokio_postgres::tls::{MakeTlsConnect, TlsConnect};
-use bb8_postgres::tokio_postgres::Socket;
-use bb8_postgres::tokio_postgres::Transaction;
-use bb8_postgres::PostgresConnectionManager;
+
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 use cron::Schedule;
-use postgres_types::ToSql;
 use sha2::{Digest, Sha256};
+use sqlx::any::install_default_drivers;
+use sqlx::pool::PoolOptions;
+use sqlx::types::Uuid;
+use sqlx::Acquire;
+use sqlx::Any;
+use sqlx::AnyPool;
+use sqlx::Transaction;
 use std::str::FromStr;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
-use uuid::Uuid;
-
-#[cfg(test)]
-use bb8_postgres::tokio_postgres::tls::NoTls;
 
 #[cfg(test)]
 use self::async_queue_tests::test_asynk_queue;
@@ -51,9 +47,7 @@ pub const DEFAULT_TASK_TYPE: &str = "common";
 #[derive(Debug, Error)]
 pub enum AsyncQueueError {
     #[error(transparent)]
-    PoolError(#[from] RunError<bb8_postgres::tokio_postgres::Error>),
-    #[error(transparent)]
-    PgError(#[from] bb8_postgres::tokio_postgres::Error),
+    SqlXError(#[from] sqlx::Error),
     #[error(transparent)]
     SerdeError(#[from] serde_json::Error),
     #[error(transparent)]
@@ -102,7 +96,7 @@ pub trait AsyncQueueable: Send {
     async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError>;
 
     /// Remove a task by its id.
-    async fn remove_task(&mut self, id: Uuid) -> Result<u64, AsyncQueueError>;
+    async fn remove_task(&mut self, id: &[u8]) -> Result<u64, AsyncQueueError>;
 
     /// Remove a task by its metadata (struct fields values)
     async fn remove_task_by_metadata(
@@ -114,7 +108,7 @@ pub trait AsyncQueueable: Send {
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError>;
 
     /// Retrieve a task from storage by its `id`.
-    async fn find_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError>;
+    async fn find_task_by_id(&mut self, id: &[u8]) -> Result<Task, AsyncQueueError>;
 
     /// Update the state field of the specified task
     /// See the `FangTaskState` enum for possible states.
@@ -156,15 +150,9 @@ pub trait AsyncQueueable: Send {
 ///
 
 #[derive(TypedBuilder, Debug, Clone)]
-pub struct AsyncQueue<Tls>
-where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
-    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
-    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
-    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
-{
+pub struct AsyncQueue {
     #[builder(default=None, setter(skip))]
-    pool: Option<Pool<PostgresConnectionManager<Tls>>>,
+    pool: Option<AnyPool>,
     #[builder(setter(into))]
     uri: String,
     #[builder(setter(into))]
@@ -180,7 +168,10 @@ use tokio::sync::Mutex;
 static ASYNC_QUEUE_DB_TEST_COUNTER: Mutex<u32> = Mutex::const_new(0);
 
 #[cfg(test)]
-impl AsyncQueue<NoTls> {
+use sqlx::Executor;
+
+#[cfg(test)]
+impl AsyncQueue {
     /// Provides an AsyncQueue connected to its own DB
     pub async fn test() -> Self {
         const BASE_URI: &str = "postgres://postgres:postgres@localhost";
@@ -190,22 +181,22 @@ impl AsyncQueue<NoTls> {
             .build();
 
         let mut new_number = ASYNC_QUEUE_DB_TEST_COUNTER.lock().await;
-        res.connect(NoTls).await.unwrap();
+        res.connect().await.unwrap();
 
         let db_name = format!("async_queue_test_{}", *new_number);
         *new_number += 1;
 
-        let create_query = format!("CREATE DATABASE {} WITH TEMPLATE fang;", db_name);
-        let delete_query = format!("DROP DATABASE IF EXISTS {};", db_name);
+        let create_query: &str = &format!("CREATE DATABASE {} WITH TEMPLATE fang;", db_name);
+        let delete_query: &str = &format!("DROP DATABASE IF EXISTS {};", db_name);
 
-        let conn = res.pool.as_mut().unwrap().get().await.unwrap();
+        let mut conn = res.pool.as_mut().unwrap().acquire().await.unwrap();
 
         log::info!("Deleting database {db_name} ...");
-        conn.execute(&delete_query, &[]).await.unwrap();
+        conn.execute(delete_query).await.unwrap();
 
         log::info!("Creating database {db_name} ...");
-        while let Err(e) = conn.execute(&create_query, &[]).await {
-            if e.as_db_error().unwrap().message()
+        while let Err(e) = conn.execute(create_query).await {
+            if e.as_database_error().unwrap().message()
                 != "source database \"fang\" is being accessed by other users"
             {
                 panic!("{:?}", e);
@@ -219,19 +210,13 @@ impl AsyncQueue<NoTls> {
         res.connected = false;
         res.pool = None;
         res.uri = format!("{}/{}", BASE_URI, db_name);
-        res.connect(NoTls).await.unwrap();
+        res.connect().await.unwrap();
 
         res
     }
 }
 
-impl<Tls> AsyncQueue<Tls>
-where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
-    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
-    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
-    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
-{
+impl AsyncQueue {
     /// Check if the connection with db is established
     pub fn check_if_connection(&self) -> Result<(), AsyncQueueError> {
         if self.connected {
@@ -242,12 +227,12 @@ where
     }
 
     /// Connect to the db if not connected
-    pub async fn connect(&mut self, tls: Tls) -> Result<(), AsyncQueueError> {
-        let manager = PostgresConnectionManager::new_from_stringlike(self.uri.clone(), tls)?;
+    pub async fn connect(&mut self) -> Result<(), AsyncQueueError> {
+        install_default_drivers();
 
-        let pool = Pool::builder()
-            .max_size(self.max_pool_size)
-            .build(manager)
+        let pool: AnyPool = PoolOptions::new()
+            .max_connections(self.max_pool_size)
+            .connect(&self.uri)
             .await?;
 
         self.pool = Some(pool);
@@ -256,108 +241,129 @@ where
     }
 
     async fn remove_all_tasks_query(
-        transaction: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_, Any>,
     ) -> Result<u64, AsyncQueueError> {
-        Self::execute_query(transaction, REMOVE_ALL_TASK_QUERY, &[], None).await
+        Ok(sqlx::query(REMOVE_ALL_TASK_QUERY)
+            .execute(transaction.acquire().await?)
+            .await?
+            .rows_affected())
     }
 
     async fn remove_all_scheduled_tasks_query(
-        transaction: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_, Any>,
     ) -> Result<u64, AsyncQueueError> {
-        Self::execute_query(
-            transaction,
-            REMOVE_ALL_SCHEDULED_TASK_QUERY,
-            &[&Utc::now()],
-            None,
-        )
-        .await
+        let now = Utc::now();
+        let now_str = now.to_rfc3339();
+
+        Ok(sqlx::query(REMOVE_ALL_SCHEDULED_TASK_QUERY)
+            .bind(now_str)
+            .execute(transaction.acquire().await?)
+            .await?
+            .rows_affected())
     }
 
     async fn remove_task_query(
-        transaction: &mut Transaction<'_>,
-        id: Uuid,
+        transaction: &mut Transaction<'_, Any>,
+        id: &[u8],
     ) -> Result<u64, AsyncQueueError> {
-        Self::execute_query(transaction, REMOVE_TASK_QUERY, &[&id], Some(1)).await
+        let result = sqlx::query(REMOVE_TASK_QUERY)
+            .bind(id)
+            .execute(transaction.acquire().await?)
+            .await?
+            .rows_affected();
+
+        if result != 1 {
+            Err(AsyncQueueError::ResultError {
+                expected: 1,
+                found: result,
+            })
+        } else {
+            Ok(result)
+        }
     }
 
     async fn remove_task_by_metadata_query(
-        transaction: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_, Any>,
         task: &dyn AsyncRunnable,
     ) -> Result<u64, AsyncQueueError> {
         let metadata = serde_json::to_value(task)?;
 
         let uniq_hash = Self::calculate_hash(metadata.to_string());
 
-        Self::execute_query(
-            transaction,
-            REMOVE_TASK_BY_METADATA_QUERY,
-            &[&uniq_hash],
-            None,
-        )
-        .await
+        Ok(sqlx::query(REMOVE_TASK_BY_METADATA_QUERY)
+            .bind(uniq_hash)
+            .execute(transaction.acquire().await?)
+            .await?
+            .rows_affected())
     }
 
     async fn remove_tasks_type_query(
-        transaction: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_, Any>,
         task_type: &str,
     ) -> Result<u64, AsyncQueueError> {
-        Self::execute_query(transaction, REMOVE_TASKS_TYPE_QUERY, &[&task_type], None).await
+        Ok(sqlx::query(REMOVE_TASKS_TYPE_QUERY)
+            .bind(task_type)
+            .execute(transaction.acquire().await?)
+            .await?
+            .rows_affected())
     }
 
     async fn find_task_by_id_query(
-        transaction: &mut Transaction<'_>,
-        id: Uuid,
+        transaction: &mut Transaction<'_, Any>,
+        id: &[u8],
     ) -> Result<Task, AsyncQueueError> {
-        let row: Row = transaction.query_one(FIND_TASK_BY_ID_QUERY, &[&id]).await?;
+        let task: Task = sqlx::query_as(FIND_TASK_BY_ID_QUERY)
+            .bind(id)
+            .fetch_one(transaction.acquire().await?)
+            .await?;
 
-        let task = Self::row_to_task(row);
         Ok(task)
     }
 
     async fn fail_task_query(
-        transaction: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_, Any>,
         task: &Task,
         error_message: &str,
     ) -> Result<Task, AsyncQueueError> {
-        let updated_at = Utc::now();
+        let updated_at = Utc::now().to_rfc3339();
 
-        let row: Row = transaction
-            .query_one(
-                FAIL_TASK_QUERY,
-                &[
-                    &FangTaskState::Failed,
-                    &error_message,
-                    &updated_at,
-                    &task.id,
-                ],
-            )
+        let failed_task: Task = sqlx::query_as(FAIL_TASK_QUERY)
+            .bind(<&str>::from(FangTaskState::Failed))
+            .bind(error_message)
+            .bind(updated_at)
+            .bind(&task.id)
+            .fetch_one(transaction.acquire().await?)
             .await?;
-        let failed_task = Self::row_to_task(row);
+
         Ok(failed_task)
     }
 
     async fn schedule_retry_query(
-        transaction: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_, Any>,
         task: &Task,
         backoff_seconds: u32,
         error: &str,
     ) -> Result<Task, AsyncQueueError> {
         let now = Utc::now();
+        let now_str = now.to_rfc3339();
         let scheduled_at = now + Duration::seconds(backoff_seconds as i64);
+        let scheduled_at_str = scheduled_at.to_rfc3339();
         let retries = task.retries + 1;
 
-        let row: Row = transaction
-            .query_one(
-                RETRY_TASK_QUERY,
-                &[&error, &retries, &scheduled_at, &now, &task.id],
-            )
+        let failed_task: Task = sqlx::query_as(RETRY_TASK_QUERY)
+            .bind(error)
+            .bind(retries)
+            .bind(scheduled_at_str)
+            .bind(now_str)
+            .bind(&task.id)
+            .fetch_one(transaction.acquire().await?)
             .await?;
-        let failed_task = Self::row_to_task(row);
+
         Ok(failed_task)
     }
 
     async fn fetch_and_touch_task_query(
-        transaction: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_, Any>,
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError> {
         let task_type = match task_type {
@@ -381,85 +387,90 @@ where
     }
 
     async fn get_task_type_query(
-        transaction: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_, Any>,
         task_type: &str,
     ) -> Result<Task, AsyncQueueError> {
-        let row: Row = transaction
-            .query_one(FETCH_TASK_TYPE_QUERY, &[&task_type, &Utc::now()])
-            .await?;
+        let now = Utc::now();
+        let now_str = now.to_rfc3339();
 
-        let task = Self::row_to_task(row);
+        let task: Task = sqlx::query_as(FETCH_TASK_TYPE_QUERY)
+            .bind(task_type)
+            .bind(now_str)
+            .fetch_one(transaction.acquire().await?)
+            .await?;
 
         Ok(task)
     }
 
     async fn update_task_state_query(
-        transaction: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_, Any>,
         task: &Task,
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError> {
         let updated_at = Utc::now();
+        let updated_at_str = updated_at.to_rfc3339();
 
-        let row: Row = transaction
-            .query_one(UPDATE_TASK_STATE_QUERY, &[&state, &updated_at, &task.id])
+        let state_str: &str = state.into();
+
+        let task: Task = sqlx::query_as(UPDATE_TASK_STATE_QUERY)
+            .bind(state_str)
+            .bind(updated_at_str)
+            .bind(&task.id)
+            .fetch_one(transaction.acquire().await?)
             .await?;
-        let task = Self::row_to_task(row);
+
         Ok(task)
     }
 
     async fn insert_task_query(
-        transaction: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_, Any>,
         metadata: serde_json::Value,
         task_type: &str,
         scheduled_at: DateTime<Utc>,
     ) -> Result<Task, AsyncQueueError> {
-        let row: Row = transaction
-            .query_one(INSERT_TASK_QUERY, &[&metadata, &task_type, &scheduled_at])
+        let uuid = Uuid::new_v4();
+        let bytes: &[u8] = &uuid.to_bytes_le();
+
+        let metadata_str = metadata.to_string();
+        let scheduled_at_str = scheduled_at.to_rfc3339();
+
+        let task: Task = sqlx::query_as(INSERT_TASK_QUERY)
+            .bind(bytes)
+            .bind(metadata_str)
+            .bind(task_type)
+            .bind(scheduled_at_str)
+            .fetch_one(transaction.acquire().await?)
             .await?;
-        let task = Self::row_to_task(row);
         Ok(task)
     }
 
     async fn insert_task_uniq_query(
-        transaction: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_, Any>,
         metadata: serde_json::Value,
         task_type: &str,
         scheduled_at: DateTime<Utc>,
     ) -> Result<Task, AsyncQueueError> {
+        let uuid = Uuid::new_v4();
+        let bytes: &[u8] = &uuid.to_bytes_le();
+
         let uniq_hash = Self::calculate_hash(metadata.to_string());
 
-        let row: Row = transaction
-            .query_one(
-                INSERT_TASK_UNIQ_QUERY,
-                &[&metadata, &task_type, &uniq_hash, &scheduled_at],
-            )
-            .await?;
+        let metadata_str = metadata.to_string();
+        let scheduled_at_str = scheduled_at.to_rfc3339();
 
-        let task = Self::row_to_task(row);
+        let task: Task = sqlx::query_as(INSERT_TASK_UNIQ_QUERY)
+            .bind(bytes)
+            .bind(metadata_str)
+            .bind(task_type)
+            .bind(uniq_hash)
+            .bind(scheduled_at_str)
+            .fetch_one(transaction.acquire().await?)
+            .await?;
         Ok(task)
     }
 
-    async fn execute_query(
-        transaction: &mut Transaction<'_>,
-        query: &str,
-        params: &[&(dyn ToSql + Sync)],
-        expected_result_count: Option<u64>,
-    ) -> Result<u64, AsyncQueueError> {
-        let result = transaction.execute(query, params).await?;
-
-        if let Some(expected_result) = expected_result_count {
-            if result != expected_result {
-                return Err(AsyncQueueError::ResultError {
-                    expected: expected_result,
-                    found: result,
-                });
-            }
-        }
-        Ok(result)
-    }
-
     async fn insert_task_if_not_exist_query(
-        transaction: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_, Any>,
         metadata: serde_json::Value,
         task_type: &str,
         scheduled_at: DateTime<Utc>,
@@ -480,51 +491,20 @@ where
     }
 
     async fn find_task_by_uniq_hash_query(
-        transaction: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_, Any>,
         metadata: &serde_json::Value,
     ) -> Option<Task> {
         let uniq_hash = Self::calculate_hash(metadata.to_string());
 
-        let result = transaction
-            .query_one(FIND_TASK_BY_UNIQ_HASH_QUERY, &[&uniq_hash])
-            .await;
-
-        match result {
-            Ok(row) => Some(Self::row_to_task(row)),
-            Err(_) => None,
-        }
-    }
-
-    fn row_to_task(row: Row) -> Task {
-        let id: Uuid = row.get("id");
-        let metadata: serde_json::Value = row.get("metadata");
-
-        let error_message: Option<String> = row.try_get("error_message").ok();
-
-        let uniq_hash: Option<String> = row.try_get("uniq_hash").ok();
-        let state: FangTaskState = row.get("state");
-        let task_type: String = row.get("task_type");
-        let retries: i32 = row.get("retries");
-        let created_at: DateTime<Utc> = row.get("created_at");
-        let updated_at: DateTime<Utc> = row.get("updated_at");
-        let scheduled_at: DateTime<Utc> = row.get("scheduled_at");
-
-        Task::builder()
-            .id(id)
-            .metadata(metadata)
-            .error_message(error_message)
-            .state(state)
-            .uniq_hash(uniq_hash)
-            .task_type(task_type)
-            .retries(retries)
-            .created_at(created_at)
-            .updated_at(updated_at)
-            .scheduled_at(scheduled_at)
-            .build()
+        sqlx::query_as(FIND_TASK_BY_UNIQ_HASH_QUERY)
+            .bind(uniq_hash)
+            .fetch_one(transaction.acquire().await.ok()?)
+            .await
+            .ok()
     }
 
     async fn schedule_task_query(
-        transaction: &mut Transaction<'_>,
+        transaction: &mut Transaction<'_, Any>,
         task: &dyn AsyncRunnable,
     ) -> Result<Task, AsyncQueueError> {
         let metadata = serde_json::to_value(task)?;
@@ -563,17 +543,10 @@ where
 }
 
 #[async_trait]
-impl<Tls> AsyncQueueable for AsyncQueue<Tls>
-where
-    Tls: MakeTlsConnect<Socket> + Clone + Send + Sync + 'static,
-    <Tls as MakeTlsConnect<Socket>>::Stream: Send + Sync,
-    <Tls as MakeTlsConnect<Socket>>::TlsConnect: Send,
-    <<Tls as MakeTlsConnect<Socket>>::TlsConnect as TlsConnect<Socket>>::Future: Send,
-{
-    async fn find_task_by_id(&mut self, id: Uuid) -> Result<Task, AsyncQueueError> {
+impl AsyncQueueable for AsyncQueue {
+    async fn find_task_by_id(&mut self, id: &[u8]) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut connection = self.pool.as_ref().unwrap().get().await?;
-        let mut transaction = connection.transaction().await?;
+        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
         let task = Self::find_task_by_id_query(&mut transaction, id).await?;
 
@@ -587,8 +560,7 @@ where
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut connection = self.pool.as_ref().unwrap().get().await?;
-        let mut transaction = connection.transaction().await?;
+        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
         let task = Self::fetch_and_touch_task_query(&mut transaction, task_type).await?;
 
@@ -599,12 +571,10 @@ where
 
     async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut connection = self.pool.as_ref().unwrap().get().await?;
-        let mut transaction = connection.transaction().await?;
-
+        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
         let metadata = serde_json::to_value(task)?;
 
-        let task: Task = if !task.uniq() {
+        let task = if !task.uniq() {
             Self::insert_task_query(&mut transaction, metadata, &task.task_type(), Utc::now())
                 .await?
         } else {
@@ -624,19 +594,18 @@ where
 
     async fn schedule_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut connection = self.pool.as_ref().unwrap().get().await?;
-        let mut transaction = connection.transaction().await?;
+        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
         let task = Self::schedule_task_query(&mut transaction, task).await?;
 
         transaction.commit().await?;
+
         Ok(task)
     }
 
     async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut connection = self.pool.as_ref().unwrap().get().await?;
-        let mut transaction = connection.transaction().await?;
+        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
         let result = Self::remove_all_tasks_query(&mut transaction).await?;
 
@@ -647,8 +616,7 @@ where
 
     async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut connection = self.pool.as_ref().unwrap().get().await?;
-        let mut transaction = connection.transaction().await?;
+        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
         let result = Self::remove_all_scheduled_tasks_query(&mut transaction).await?;
 
@@ -657,10 +625,9 @@ where
         Ok(result)
     }
 
-    async fn remove_task(&mut self, id: Uuid) -> Result<u64, AsyncQueueError> {
+    async fn remove_task(&mut self, id: &[u8]) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut connection = self.pool.as_ref().unwrap().get().await?;
-        let mut transaction = connection.transaction().await?;
+        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
         let result = Self::remove_task_query(&mut transaction, id).await?;
 
@@ -675,8 +642,7 @@ where
     ) -> Result<u64, AsyncQueueError> {
         if task.uniq() {
             self.check_if_connection()?;
-            let mut connection = self.pool.as_ref().unwrap().get().await?;
-            let mut transaction = connection.transaction().await?;
+            let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
             let result = Self::remove_task_by_metadata_query(&mut transaction, task).await?;
 
@@ -690,8 +656,7 @@ where
 
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut connection = self.pool.as_ref().unwrap().get().await?;
-        let mut transaction = connection.transaction().await?;
+        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
         let result = Self::remove_tasks_type_query(&mut transaction, task_type).await?;
 
@@ -706,10 +671,10 @@ where
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut connection = self.pool.as_ref().unwrap().get().await?;
-        let mut transaction = connection.transaction().await?;
+        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
         let task = Self::update_task_state_query(&mut transaction, task, state).await?;
+
         transaction.commit().await?;
 
         Ok(task)
@@ -721,10 +686,10 @@ where
         error_message: &str,
     ) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut connection = self.pool.as_ref().unwrap().get().await?;
-        let mut transaction = connection.transaction().await?;
+        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
         let task = Self::fail_task_query(&mut transaction, task, error_message).await?;
+
         transaction.commit().await?;
 
         Ok(task)
@@ -737,16 +702,17 @@ where
         error: &str,
     ) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut connection = self.pool.as_ref().unwrap().get().await?;
-        let mut transaction = connection.transaction().await?;
 
-        let task =
+        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
+
+        let failed_task =
             Self::schedule_retry_query(&mut transaction, task, backoff_seconds, error).await?;
+
         transaction.commit().await?;
 
-        Ok(task)
+        Ok(failed_task)
     }
 }
 
 #[cfg(test)]
-test_asynk_queue! {postgres, crate::AsyncQueue<bb8_postgres::tokio_postgres::tls::NoTls>, crate::AsyncQueue::<bb8_postgres::tokio_postgres::tls::NoTls>::test()}
+test_asynk_queue! {postgres, crate::AsyncQueue, crate::AsyncQueue::test()}

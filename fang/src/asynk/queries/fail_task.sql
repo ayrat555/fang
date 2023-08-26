@@ -1,1 +1,1 @@
-UPDATE "fang_tasks" SET "state" = $1 , "error_message" = $2 , "updated_at" = $3 WHERE id = $4 RETURNING *
+UPDATE "fang_tasks" SET "state" = $1::fang_task_state , "error_message" = $2 , "updated_at" = $3::timestamptz WHERE id = $4 RETURNING id , metadata::text , error_message, state::text , task_type , uniq_hash, retries , scheduled_at::text , created_at::text , updated_at::text

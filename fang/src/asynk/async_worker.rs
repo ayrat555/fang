@@ -68,11 +68,11 @@ where
                 }
             },
             RetentionMode::RemoveAll => {
-                self.queue.remove_task(task.id).await?;
+                self.queue.remove_task(&task.id).await?;
             }
             RetentionMode::RemoveFinished => match result {
                 Ok(_) => {
-                    self.queue.remove_task(task.id).await?;
+                    self.queue.remove_task(&task.id).await?;
                 }
                 Err(error) => {
                     self.queue.fail_task(task, &error.description).await?;
@@ -187,15 +187,15 @@ impl<'a> AsyncWorkerTest<'a> {
             },
             RetentionMode::RemoveAll => match result {
                 Ok(_) => {
-                    self.queue.remove_task(task.id).await?;
+                    self.queue.remove_task(&task.id).await?;
                 }
                 Err(_error) => {
-                    self.queue.remove_task(task.id).await?;
+                    self.queue.remove_task(&task.id).await?;
                 }
             },
             RetentionMode::RemoveFinished => match result {
                 Ok(_) => {
-                    self.queue.remove_task(task.id).await?;
+                    self.queue.remove_task(&task.id).await?;
                 }
                 Err(error) => {
                     self.queue.fail_task(task, &error.description).await?;
@@ -260,7 +260,6 @@ mod async_worker_tests {
     use crate::RetentionMode;
     use crate::Scheduled;
     use async_trait::async_trait;
-    use bb8_postgres::tokio_postgres::NoTls;
     use chrono::Duration;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
@@ -387,12 +386,12 @@ mod async_worker_tests {
 
     #[tokio::test]
     async fn execute_and_finishes_task() {
-        let mut test = AsyncQueue::<NoTls>::test().await;
+        let mut test = AsyncQueue::test().await;
 
         let actual_task = WorkerAsyncTask { number: 1 };
 
         let task = insert_task(&mut test, &actual_task).await;
-        let id = task.id;
+        let id: &[u8] = &task.id;
 
         let mut worker = AsyncWorkerTest::builder()
             .queue(&mut test as &mut dyn AsyncQueueable)
@@ -407,7 +406,7 @@ mod async_worker_tests {
 
     #[tokio::test]
     async fn schedule_task_test() {
-        let mut test = AsyncQueue::<NoTls>::test().await;
+        let mut test = AsyncQueue::test().await;
 
         let actual_task = WorkerAsyncTaskSchedule { number: 1 };
 
@@ -422,7 +421,7 @@ mod async_worker_tests {
 
         worker.run_tasks_until_none().await.unwrap();
 
-        let task = worker.queue.find_task_by_id(id).await.unwrap();
+        let task = worker.queue.find_task_by_id(&id).await.unwrap();
 
         assert_eq!(id, task.id);
         assert_eq!(FangTaskState::New, task.state);
@@ -431,14 +430,14 @@ mod async_worker_tests {
 
         worker.run_tasks_until_none().await.unwrap();
 
-        let task = test.find_task_by_id(id).await.unwrap();
+        let task = test.find_task_by_id(&id).await.unwrap();
         assert_eq!(id, task.id);
         assert_eq!(FangTaskState::Finished, task.state);
     }
 
     #[tokio::test]
     async fn retries_task_test() {
-        let mut test = AsyncQueue::<NoTls>::test().await;
+        let mut test = AsyncQueue::test().await;
 
         let actual_task = AsyncRetryTask {};
 
@@ -453,7 +452,7 @@ mod async_worker_tests {
 
         worker.run_tasks_until_none().await.unwrap();
 
-        let task = worker.queue.find_task_by_id(id).await.unwrap();
+        let task = worker.queue.find_task_by_id(&id).await.unwrap();
 
         assert_eq!(id, task.id);
         assert_eq!(FangTaskState::Retried, task.state);
@@ -462,7 +461,7 @@ mod async_worker_tests {
         tokio::time::sleep(core::time::Duration::from_secs(5)).await;
         worker.run_tasks_until_none().await.unwrap();
 
-        let task = worker.queue.find_task_by_id(id).await.unwrap();
+        let task = worker.queue.find_task_by_id(&id).await.unwrap();
 
         assert_eq!(id, task.id);
         assert_eq!(FangTaskState::Retried, task.state);
@@ -471,7 +470,7 @@ mod async_worker_tests {
         tokio::time::sleep(core::time::Duration::from_secs(10)).await;
         worker.run_tasks_until_none().await.unwrap();
 
-        let task = test.find_task_by_id(id).await.unwrap();
+        let task = test.find_task_by_id(&id).await.unwrap();
         assert_eq!(id, task.id);
         assert_eq!(FangTaskState::Failed, task.state);
         assert_eq!("Failed".to_string(), task.error_message.unwrap());
@@ -479,11 +478,11 @@ mod async_worker_tests {
 
     #[tokio::test]
     async fn saves_error_for_failed_task() {
-        let mut test = AsyncQueue::<NoTls>::test().await;
+        let mut test = AsyncQueue::test().await;
 
         let failed_task = AsyncFailedTask { number: 1 };
         let task = insert_task(&mut test, &failed_task).await;
-        let id = task.id;
+        let id: &[u8] = &task.id;
 
         let mut worker = AsyncWorkerTest::builder()
             .queue(&mut test as &mut dyn AsyncQueueable)
@@ -503,7 +502,7 @@ mod async_worker_tests {
 
     #[tokio::test]
     async fn executes_task_only_of_specific_type() {
-        let mut test = AsyncQueue::<NoTls>::test().await;
+        let mut test = AsyncQueue::test().await;
 
         let task1 = insert_task(&mut test, &AsyncTaskType1 {}).await;
         let task12 = insert_task(&mut test, &AsyncTaskType1 {}).await;
@@ -520,9 +519,9 @@ mod async_worker_tests {
             .build();
 
         worker.run_tasks_until_none().await.unwrap();
-        let task1 = test.find_task_by_id(id1).await.unwrap();
-        let task12 = test.find_task_by_id(id12).await.unwrap();
-        let task2 = test.find_task_by_id(id2).await.unwrap();
+        let task1 = test.find_task_by_id(&id1).await.unwrap();
+        let task12 = test.find_task_by_id(&id12).await.unwrap();
+        let task2 = test.find_task_by_id(&id2).await.unwrap();
 
         assert_eq!(id1, task1.id);
         assert_eq!(id12, task12.id);
@@ -534,7 +533,7 @@ mod async_worker_tests {
 
     #[tokio::test]
     async fn remove_when_finished() {
-        let mut test = AsyncQueue::<NoTls>::test().await;
+        let mut test = AsyncQueue::test().await;
 
         let task1 = insert_task(&mut test, &AsyncTaskType1 {}).await;
         let task12 = insert_task(&mut test, &AsyncTaskType1 {}).await;
@@ -564,13 +563,13 @@ mod async_worker_tests {
         assert_eq!(id2, task2.id);
     }
 
-    async fn insert_task(test: &mut AsyncQueue<NoTls>, task: &dyn AsyncRunnable) -> Task {
+    async fn insert_task(test: &mut AsyncQueue, task: &dyn AsyncRunnable) -> Task {
         test.insert_task(task).await.unwrap()
     }
 
     #[tokio::test]
     async fn no_schedule_until_run() {
-        let mut test = AsyncQueue::<NoTls>::test().await;
+        let mut test = AsyncQueue::test().await;
 
         let _task_1 = test
             .schedule_task(&WorkerAsyncTaskScheduled {})

@@ -98,7 +98,7 @@ macro_rules! test_asynk_queue {
                 let metadata = task.metadata.as_object().unwrap();
                 let number = metadata["number"].as_u64();
                 let type_task = metadata["type"].as_str();
-                let id = task.id;
+                let id: &[u8] = &task.id;
 
                 assert_eq!(Some(1), number);
                 assert_eq!(Some("AsyncTask"), type_task);
@@ -121,7 +121,7 @@ macro_rules! test_asynk_queue {
                 let metadata = task.metadata.as_object().unwrap();
                 let number = metadata["number"].as_u64();
                 let type_task = metadata["type"].as_str();
-                let id = task.id;
+                let id: &[u8] = &task.id;
 
                 assert_eq!(Some(1), number);
                 assert_eq!(Some("AsyncTask"), type_task);
@@ -251,7 +251,9 @@ macro_rules! test_asynk_queue {
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
-                let metadata = task.metadata.as_object().unwrap();
+                println!("{:?}", task.metadata);
+
+                let metadata = task.metadata.as_object().expect("metadata F");
                 let number = metadata["number"].as_u64();
                 let type_task = metadata["type"].as_str();
 
@@ -260,14 +262,22 @@ macro_rules! test_asynk_queue {
 
                 let task = test.insert_task(&AsyncTask { number: 2 }).await.unwrap();
 
-                let metadata = task.metadata.as_object().unwrap();
+                let metadata = task
+                    .metadata
+                    .as_object()
+                    .expect("borrado mi amigo salio mal");
+
                 let number = metadata["number"].as_u64();
                 let type_task = metadata["type"].as_str();
 
                 assert_eq!(Some(2), number);
                 assert_eq!(Some("AsyncTask"), type_task);
 
-                let result = test.remove_tasks_type("mytype").await.unwrap();
+                let result = test
+                    .remove_tasks_type("mytype")
+                    .await
+                    .expect("el numero salio bad");
+
                 assert_eq!(0, result);
 
                 let result = test.remove_tasks_type("common").await.unwrap();

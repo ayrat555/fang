@@ -1,1 +1,1 @@
-DELETE FROM "fang_tasks" WHERE scheduled_at > $1
+DELETE FROM "fang_tasks" WHERE scheduled_at > $1::timestamptz
