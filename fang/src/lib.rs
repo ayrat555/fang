@@ -181,7 +181,7 @@ impl<'a> FromRow<'a, AnyRow> for Task {
         let id: Vec<u8> = row.get("id");
 
         let raw: &str = row.get("metadata"); // will work if database cast json to string
-        let raw = raw.replace("\\", "");
+        let raw = raw.replace('\\', "");
 
         let mut chars = raw.chars();
         chars.next();
