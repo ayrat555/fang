@@ -524,10 +524,12 @@ impl AsyncQueue {
             None => DEFAULT_TASK_TYPE.to_string(),
         };
 
-        let task = match Self::get_task_type_query(transaction, backend, &task_type).await {
-            Ok(some_task) => Some(some_task),
-            Err(_) => None,
-        };
+        let task = Self::get_task_type_query(transaction, backend, &task_type)
+            .await
+            .ok();
+
+        println!("{task:?}");
+
         let result_task = if let Some(some_task) = task {
             Some(
                 Self::update_task_state_query(
