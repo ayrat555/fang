@@ -4,3 +4,4 @@ src/schema.rs
 docs/content/docs/CHANGELOG.md
 docs/content/docs/README.md
 fang.db
+tests_sqlite/

@@ -4,8 +4,8 @@
 -- docker exec -ti mysql mysql -u root -pfang -P 3360 fang -e "$(catn fang/mysql_migrations/migrations/2023-08-17-102017_create_fang_tasks/up.sql)"
 
 CREATE TABLE fang_tasks (
-    id TEXT CHECK (LENGTH(id) = 36) NOT NULL PRIMARY KEY, -- UUID generated inside the language
-    -- why uuid is a text ? https://stackoverflow.com/questions/17277735/using-uuids-in-sqlite
+    id BLOB NOT NULL PRIMARY KEY, -- UUID generated inside the language
+    -- why uuid is a blob ? https://stackoverflow.com/questions/17277735/using-uuids-in-sqlite
     metadata TEXT NOT NULL, 
     -- why metadata is text ? https://stackoverflow.com/questions/16603621/how-to-store-json-object-in-sqlite-database#16603687
     error_message TEXT,
@@ -16,10 +16,10 @@ CREATE TABLE fang_tasks (
     retries INTEGER NOT NULL DEFAULT 0,
     -- The datetime() function returns the date and time as text in this formats: YYYY-MM-DD HH:MM:SS. 
     -- https://www.sqlite.org/lang_datefunc.html
-    scheduled_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    scheduled_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP || '.000000+00'),
     -- why timestamps are texts ? https://www.sqlite.org/datatype3.html
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP || '.000000+00'),
+    updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP || '.000000+00')
 );
 
 CREATE INDEX fang_tasks_state_index ON fang_tasks(state);

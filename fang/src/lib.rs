@@ -2,8 +2,11 @@
 
 #[cfg(feature = "blocking")]
 use diesel::{Identifiable, Queryable};
+#[cfg(feature = "asynk-sqlx")]
 use sqlx::any::AnyRow;
+#[cfg(feature = "asynk-sqlx")]
 use sqlx::FromRow;
+#[cfg(feature = "asynk-sqlx")]
 use sqlx::Row;
 use std::time::Duration;
 use thiserror::Error;
@@ -175,7 +178,7 @@ pub struct Task {
     pub updated_at: DateTime<Utc>,
 }
 
-#[cfg(feature = "asynk")]
+#[cfg(feature = "asynk-sqlx")]
 impl<'a> FromRow<'a, AnyRow> for Task {
     fn from_row(row: &'a AnyRow) -> Result<Self, sqlx::Error> {
         let id: Vec<u8> = row.get("id");
@@ -183,15 +186,12 @@ impl<'a> FromRow<'a, AnyRow> for Task {
         let raw: &str = row.get("metadata"); // will work if database cast json to string
         let raw = raw.replace('\\', "");
 
-        let mut chars = raw.chars();
-        chars.next();
-        chars.next_back();
-        let raw = chars.as_str();
-
-        let metadata: serde_json::Value = serde_json::from_str(raw).unwrap();
+        // -- SELECT metadata->>'type' FROM fang_tasks ; this works because jsonb casting
+        let metadata: serde_json::Value = serde_json::from_str(&raw).unwrap();
 
         // This should be changed when issue https://github.com/launchbadge/sqlx/issues/2416 is fixed
-        let error_message: Option<String> = row.try_get("error_message").ok();
+        // Fixed in pxp9's fork
+        let error_message: Option<String> = row.get("error_message");
 
         let state_str: &str = row.get("state"); // will work if database cast json to string
 
@@ -200,11 +200,14 @@ impl<'a> FromRow<'a, AnyRow> for Task {
         let task_type: String = row.get("task_type");
 
         // This should be changed when issue https://github.com/launchbadge/sqlx/issues/2416 is fixed
-        let uniq_hash: Option<String> = row.try_get("uniq_hash").ok();
+        // Fixed in pxp9's fork
+        let uniq_hash: Option<String> = row.get("uniq_hash");
 
         let retries: i32 = row.get("retries");
 
         let scheduled_at_str: &str = row.get("scheduled_at");
+
+        println!("{}", scheduled_at_str);
 
         let scheduled_at: DateTime<Utc> = DateTime::parse_from_str(scheduled_at_str, "%F %T%.f%#z")
             .unwrap()
@@ -276,10 +279,6 @@ pub use asynk::*;
 
 #[cfg(feature = "asynk")]
 #[doc(hidden)]
-pub use bb8_postgres::tokio_postgres::tls::NoTls;
-
-#[cfg(feature = "asynk")]
-#[doc(hidden)]
 pub use async_trait::async_trait;
 
 #[cfg(feature = "derive-error")]
@@ -291,14 +290,14 @@ use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 #[cfg(feature = "migrations")]
 use std::error::Error as SomeError;
 
-#[cfg(feature = "migrations_postgres")]
+#[cfg(feature = "migrations-postgres")]
 use diesel::pg::Pg;
 
-#[cfg(feature = "migrations_postgres")]
+#[cfg(feature = "migrations-postgres")]
 pub const MIGRATIONS_POSTGRES: EmbeddedMigrations =
     embed_migrations!("postgres_migrations/migrations");
 
-#[cfg(feature = "migrations_postgres")]
+#[cfg(feature = "migrations-postgres")]
 pub fn run_migrations_postgres(
     connection: &mut impl MigrationHarness<Pg>,
 ) -> Result<(), Box<dyn SomeError + Send + Sync + 'static>> {
@@ -307,13 +306,13 @@ pub fn run_migrations_postgres(
     Ok(())
 }
 
-#[cfg(feature = "migrations_mysql")]
+#[cfg(feature = "migrations-mysql")]
 use diesel::mysql::Mysql;
 
-#[cfg(feature = "migrations_mysql")]
+#[cfg(feature = "migrations-mysql")]
 pub const MIGRATIONS_MYSQL: EmbeddedMigrations = embed_migrations!("mysql_migrations/migrations");
 
-#[cfg(feature = "migrations_mysql")]
+#[cfg(feature = "migrations-mysql")]
 pub fn run_migrations_mysql(
     connection: &mut impl MigrationHarness<Mysql>,
 ) -> Result<(), Box<dyn SomeError + Send + Sync + 'static>> {
@@ -322,13 +321,13 @@ pub fn run_migrations_mysql(
     Ok(())
 }
 
-#[cfg(feature = "migrations_sqlite")]
+#[cfg(feature = "migrations-sqlite")]
 use diesel::sqlite::Sqlite;
 
-#[cfg(feature = "migrations_sqlite")]
+#[cfg(feature = "migrations-sqlite")]
 pub const MIGRATIONS_SQLITE: EmbeddedMigrations = embed_migrations!("sqlite_migrations/migrations");
 
-#[cfg(feature = "migrations_sqlite")]
+#[cfg(feature = "migrations-sqlite")]
 pub fn run_migrations_sqlite(
     connection: &mut impl MigrationHarness<Sqlite>,
 ) -> Result<(), Box<dyn SomeError + Send + Sync + 'static>> {

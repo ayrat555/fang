@@ -386,7 +386,7 @@ mod async_worker_tests {
 
     #[tokio::test]
     async fn execute_and_finishes_task() {
-        let mut test = AsyncQueue::test().await;
+        let mut test = AsyncQueue::test_postgres().await;
 
         let actual_task = WorkerAsyncTask { number: 1 };
 
@@ -406,7 +406,7 @@ mod async_worker_tests {
 
     #[tokio::test]
     async fn schedule_task_test() {
-        let mut test = AsyncQueue::test().await;
+        let mut test = AsyncQueue::test_postgres().await;
 
         let actual_task = WorkerAsyncTaskSchedule { number: 1 };
 
@@ -437,7 +437,7 @@ mod async_worker_tests {
 
     #[tokio::test]
     async fn retries_task_test() {
-        let mut test = AsyncQueue::test().await;
+        let mut test = AsyncQueue::test_postgres().await;
 
         let actual_task = AsyncRetryTask {};
 
@@ -478,7 +478,7 @@ mod async_worker_tests {
 
     #[tokio::test]
     async fn saves_error_for_failed_task() {
-        let mut test = AsyncQueue::test().await;
+        let mut test = AsyncQueue::test_postgres().await;
 
         let failed_task = AsyncFailedTask { number: 1 };
         let task = insert_task(&mut test, &failed_task).await;
@@ -502,7 +502,7 @@ mod async_worker_tests {
 
     #[tokio::test]
     async fn executes_task_only_of_specific_type() {
-        let mut test = AsyncQueue::test().await;
+        let mut test = AsyncQueue::test_postgres().await;
 
         let task1 = insert_task(&mut test, &AsyncTaskType1 {}).await;
         let task12 = insert_task(&mut test, &AsyncTaskType1 {}).await;
@@ -533,7 +533,7 @@ mod async_worker_tests {
 
     #[tokio::test]
     async fn remove_when_finished() {
-        let mut test = AsyncQueue::test().await;
+        let mut test = AsyncQueue::test_postgres().await;
 
         let task1 = insert_task(&mut test, &AsyncTaskType1 {}).await;
         let task12 = insert_task(&mut test, &AsyncTaskType1 {}).await;
@@ -569,7 +569,7 @@ mod async_worker_tests {
 
     #[tokio::test]
     async fn no_schedule_until_run() {
-        let mut test = AsyncQueue::test().await;
+        let mut test = AsyncQueue::test_postgres().await;
 
         let _task_1 = test
             .schedule_task(&WorkerAsyncTaskScheduled {})

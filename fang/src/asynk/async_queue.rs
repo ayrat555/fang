@@ -15,7 +15,6 @@ use cron::Schedule;
 use sha2::{Digest, Sha256};
 use sqlx::any::install_default_drivers;
 use sqlx::pool::PoolOptions;
-use sqlx::types::Uuid;
 use sqlx::Acquire;
 use sqlx::Any;
 use sqlx::AnyPool;
@@ -23,24 +22,46 @@ use sqlx::Transaction;
 use std::str::FromStr;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
+use uuid::Uuid;
 
 #[cfg(test)]
 use self::async_queue_tests::test_asynk_queue;
 
-const INSERT_TASK_QUERY: &str = include_str!("queries/insert_task.sql");
-const INSERT_TASK_UNIQ_QUERY: &str = include_str!("queries/insert_task_uniq.sql");
-const UPDATE_TASK_STATE_QUERY: &str = include_str!("queries/update_task_state.sql");
-const FAIL_TASK_QUERY: &str = include_str!("queries/fail_task.sql");
-const REMOVE_ALL_TASK_QUERY: &str = include_str!("queries/remove_all_tasks.sql");
-const REMOVE_ALL_SCHEDULED_TASK_QUERY: &str =
-    include_str!("queries/remove_all_scheduled_tasks.sql");
-const REMOVE_TASK_QUERY: &str = include_str!("queries/remove_task.sql");
-const REMOVE_TASK_BY_METADATA_QUERY: &str = include_str!("queries/remove_task_by_metadata.sql");
-const REMOVE_TASKS_TYPE_QUERY: &str = include_str!("queries/remove_tasks_type.sql");
-const FETCH_TASK_TYPE_QUERY: &str = include_str!("queries/fetch_task_type.sql");
-const FIND_TASK_BY_UNIQ_HASH_QUERY: &str = include_str!("queries/find_task_by_uniq_hash.sql");
-const FIND_TASK_BY_ID_QUERY: &str = include_str!("queries/find_task_by_id.sql");
-const RETRY_TASK_QUERY: &str = include_str!("queries/retry_task.sql");
+const INSERT_TASK_QUERY_POSTGRES: &str = include_str!("queries_postgres/insert_task.sql");
+const INSERT_TASK_UNIQ_QUERY_POSTGRES: &str = include_str!("queries_postgres/insert_task_uniq.sql");
+const UPDATE_TASK_STATE_QUERY_POSTGRES: &str =
+    include_str!("queries_postgres/update_task_state.sql");
+const FAIL_TASK_QUERY_POSTGRES: &str = include_str!("queries_postgres/fail_task.sql");
+const REMOVE_ALL_TASK_QUERY_POSTGRES: &str = include_str!("queries_postgres/remove_all_tasks.sql");
+const REMOVE_ALL_SCHEDULED_TASK_QUERY_POSTGRES: &str =
+    include_str!("queries_postgres/remove_all_scheduled_tasks.sql");
+const REMOVE_TASK_QUERY_POSTGRES: &str = include_str!("queries_postgres/remove_task.sql");
+const REMOVE_TASK_BY_METADATA_QUERY_POSTGRES: &str =
+    include_str!("queries_postgres/remove_task_by_metadata.sql");
+const REMOVE_TASKS_TYPE_QUERY_POSTGRES: &str =
+    include_str!("queries_postgres/remove_tasks_type.sql");
+const FETCH_TASK_TYPE_QUERY_POSTGRES: &str = include_str!("queries_postgres/fetch_task_type.sql");
+const FIND_TASK_BY_UNIQ_HASH_QUERY_POSTGRES: &str =
+    include_str!("queries_postgres/find_task_by_uniq_hash.sql");
+const FIND_TASK_BY_ID_QUERY_POSTGRES: &str = include_str!("queries_postgres/find_task_by_id.sql");
+const RETRY_TASK_QUERY_POSTGRES: &str = include_str!("queries_postgres/retry_task.sql");
+
+const INSERT_TASK_QUERY_SQLITE: &str = include_str!("queries_sqlite/insert_task.sql");
+const INSERT_TASK_UNIQ_QUERY_SQLITE: &str = include_str!("queries_sqlite/insert_task_uniq.sql");
+const UPDATE_TASK_STATE_QUERY_SQLITE: &str = include_str!("queries_sqlite/update_task_state.sql");
+const FAIL_TASK_QUERY_SQLITE: &str = include_str!("queries_sqlite/fail_task.sql");
+const REMOVE_ALL_TASK_QUERY_SQLITE: &str = include_str!("queries_sqlite/remove_all_tasks.sql");
+const REMOVE_ALL_SCHEDULED_TASK_QUERY_SQLITE: &str =
+    include_str!("queries_sqlite/remove_all_scheduled_tasks.sql");
+const REMOVE_TASK_QUERY_SQLITE: &str = include_str!("queries_sqlite/remove_task.sql");
+const REMOVE_TASK_BY_METADATA_QUERY_SQLITE: &str =
+    include_str!("queries_sqlite/remove_task_by_metadata.sql");
+const REMOVE_TASKS_TYPE_QUERY_SQLITE: &str = include_str!("queries_sqlite/remove_tasks_type.sql");
+const FETCH_TASK_TYPE_QUERY_SQLITE: &str = include_str!("queries_sqlite/fetch_task_type.sql");
+const FIND_TASK_BY_UNIQ_HASH_QUERY_SQLITE: &str =
+    include_str!("queries_sqlite/find_task_by_uniq_hash.sql");
+const FIND_TASK_BY_ID_QUERY_SQLITE: &str = include_str!("queries_sqlite/find_task_by_id.sql");
+const RETRY_TASK_QUERY_SQLITE: &str = include_str!("queries_sqlite/retry_task.sql");
 
 pub const DEFAULT_TASK_TYPE: &str = "common";
 
@@ -159,28 +180,36 @@ pub struct AsyncQueue {
     max_pool_size: u32,
     #[builder(default = false, setter(skip))]
     connected: bool,
+    #[builder(default = "".to_string() , setter(skip))]
+    backend: String,
 }
 
 #[cfg(test)]
 use tokio::sync::Mutex;
 
 #[cfg(test)]
-static ASYNC_QUEUE_DB_TEST_COUNTER: Mutex<u32> = Mutex::const_new(0);
+static ASYNC_QUEUE_POSTGRES_TEST_COUNTER: Mutex<u32> = Mutex::const_new(0);
+
+#[cfg(test)]
+static ASYNC_QUEUE_SQLITE_TEST_COUNTER: Mutex<u32> = Mutex::const_new(0);
 
 #[cfg(test)]
 use sqlx::Executor;
 
 #[cfg(test)]
+use std::path::Path;
+
+#[cfg(test)]
 impl AsyncQueue {
     /// Provides an AsyncQueue connected to its own DB
-    pub async fn test() -> Self {
+    pub async fn test_postgres() -> Self {
         const BASE_URI: &str = "postgres://postgres:postgres@localhost";
         let mut res = Self::builder()
             .max_pool_size(1_u32)
             .uri(format!("{}/fang", BASE_URI))
             .build();
 
-        let mut new_number = ASYNC_QUEUE_DB_TEST_COUNTER.lock().await;
+        let mut new_number = ASYNC_QUEUE_POSTGRES_TEST_COUNTER.lock().await;
         res.connect().await.unwrap();
 
         let db_name = format!("async_queue_test_{}", *new_number);
@@ -214,6 +243,35 @@ impl AsyncQueue {
 
         res
     }
+
+    /// Provides an AsyncQueue connected to its own DB
+    pub async fn test_sqlite() -> Self {
+        const BASE_FILE: &str = "../fang.db";
+
+        let mut new_number = ASYNC_QUEUE_SQLITE_TEST_COUNTER.lock().await;
+
+        let db_name = format!("../tests_sqlite/async_queue_test_{}.db", *new_number);
+        *new_number += 1;
+
+        let path = Path::new(&db_name);
+
+        if path.exists() {
+            log::info!("Deleting database {db_name} ...");
+            std::fs::remove_file(path).unwrap();
+        }
+
+        log::info!("Creating database {db_name} ...");
+        std::fs::copy(BASE_FILE, &db_name).unwrap();
+        log::info!("Database {db_name} created !!");
+
+        let mut res = Self::builder()
+            .max_pool_size(1_u32)
+            .uri(format!("sqlite://{}", db_name))
+            .build();
+
+        res.connect().await.expect("fail to connect");
+        res
+    }
 }
 
 impl AsyncQueue {
@@ -235,6 +293,12 @@ impl AsyncQueue {
             .connect(&self.uri)
             .await?;
 
+        let conn = pool.acquire().await?;
+
+        self.backend = conn.backend_name().to_string();
+
+        drop(conn);
+
         self.pool = Some(pool);
         self.connected = true;
         Ok(())
@@ -242,8 +306,19 @@ impl AsyncQueue {
 
     async fn remove_all_tasks_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
     ) -> Result<u64, AsyncQueueError> {
-        Ok(sqlx::query(REMOVE_ALL_TASK_QUERY)
+        let query = if backend == "PostgreSQL" {
+            REMOVE_ALL_TASK_QUERY_POSTGRES
+        } else if backend == "SQLite" {
+            REMOVE_ALL_TASK_QUERY_SQLITE
+        } else if backend == "MySQL" {
+            unimplemented!()
+        } else {
+            unreachable!()
+        };
+
+        Ok(sqlx::query(query)
             .execute(transaction.acquire().await?)
             .await?
             .rows_affected())
@@ -251,11 +326,21 @@ impl AsyncQueue {
 
     async fn remove_all_scheduled_tasks_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
     ) -> Result<u64, AsyncQueueError> {
-        let now = Utc::now();
-        let now_str = now.to_rfc3339();
+        let query = if backend == "PostgreSQL" {
+            REMOVE_ALL_SCHEDULED_TASK_QUERY_POSTGRES
+        } else if backend == "SQLite" {
+            REMOVE_ALL_SCHEDULED_TASK_QUERY_SQLITE
+        } else if backend == "MySQL" {
+            unimplemented!()
+        } else {
+            unreachable!()
+        };
 
-        Ok(sqlx::query(REMOVE_ALL_SCHEDULED_TASK_QUERY)
+        let now_str = format!("{}", Utc::now().format("%F %T%.f+00"));
+
+        Ok(sqlx::query(query)
             .bind(now_str)
             .execute(transaction.acquire().await?)
             .await?
@@ -264,9 +349,20 @@ impl AsyncQueue {
 
     async fn remove_task_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
         id: &[u8],
     ) -> Result<u64, AsyncQueueError> {
-        let result = sqlx::query(REMOVE_TASK_QUERY)
+        let query = if backend == "PostgreSQL" {
+            REMOVE_TASK_QUERY_POSTGRES
+        } else if backend == "SQLite" {
+            REMOVE_TASK_QUERY_SQLITE
+        } else if backend == "MySQL" {
+            unimplemented!()
+        } else {
+            unreachable!()
+        };
+
+        let result = sqlx::query(query)
             .bind(id)
             .execute(transaction.acquire().await?)
             .await?
@@ -284,13 +380,24 @@ impl AsyncQueue {
 
     async fn remove_task_by_metadata_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
         task: &dyn AsyncRunnable,
     ) -> Result<u64, AsyncQueueError> {
         let metadata = serde_json::to_value(task)?;
 
         let uniq_hash = Self::calculate_hash(metadata.to_string());
 
-        Ok(sqlx::query(REMOVE_TASK_BY_METADATA_QUERY)
+        let query = if backend == "PostgreSQL" {
+            REMOVE_TASK_BY_METADATA_QUERY_POSTGRES
+        } else if backend == "SQLite" {
+            REMOVE_TASK_BY_METADATA_QUERY_SQLITE
+        } else if backend == "MySQL" {
+            unimplemented!()
+        } else {
+            unreachable!()
+        };
+
+        Ok(sqlx::query(query)
             .bind(uniq_hash)
             .execute(transaction.acquire().await?)
             .await?
@@ -299,9 +406,20 @@ impl AsyncQueue {
 
     async fn remove_tasks_type_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
         task_type: &str,
     ) -> Result<u64, AsyncQueueError> {
-        Ok(sqlx::query(REMOVE_TASKS_TYPE_QUERY)
+        let query = if backend == "PostgreSQL" {
+            REMOVE_TASKS_TYPE_QUERY_POSTGRES
+        } else if backend == "SQLite" {
+            REMOVE_TASKS_TYPE_QUERY_SQLITE
+        } else if backend == "MySQL" {
+            unimplemented!()
+        } else {
+            unreachable!()
+        };
+
+        Ok(sqlx::query(query)
             .bind(task_type)
             .execute(transaction.acquire().await?)
             .await?
@@ -310,9 +428,20 @@ impl AsyncQueue {
 
     async fn find_task_by_id_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
         id: &[u8],
     ) -> Result<Task, AsyncQueueError> {
-        let task: Task = sqlx::query_as(FIND_TASK_BY_ID_QUERY)
+        let query = if backend == "PostgreSQL" {
+            FIND_TASK_BY_ID_QUERY_POSTGRES
+        } else if backend == "SQLite" {
+            FIND_TASK_BY_ID_QUERY_SQLITE
+        } else if backend == "MySQL" {
+            unimplemented!()
+        } else {
+            unreachable!()
+        };
+
+        let task: Task = sqlx::query_as(query)
             .bind(id)
             .fetch_one(transaction.acquire().await?)
             .await?;
@@ -322,12 +451,23 @@ impl AsyncQueue {
 
     async fn fail_task_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
         task: &Task,
         error_message: &str,
     ) -> Result<Task, AsyncQueueError> {
-        let updated_at = Utc::now().to_rfc3339();
+        let query = if backend == "PostgreSQL" {
+            FAIL_TASK_QUERY_POSTGRES
+        } else if backend == "SQLite" {
+            FAIL_TASK_QUERY_SQLITE
+        } else if backend == "MySQL" {
+            unimplemented!()
+        } else {
+            unreachable!()
+        };
 
-        let failed_task: Task = sqlx::query_as(FAIL_TASK_QUERY)
+        let updated_at = format!("{}", Utc::now().format("%F %T%.f+00"));
+
+        let failed_task: Task = sqlx::query_as(query)
             .bind(<&str>::from(FangTaskState::Failed))
             .bind(error_message)
             .bind(updated_at)
@@ -340,17 +480,29 @@ impl AsyncQueue {
 
     async fn schedule_retry_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
         task: &Task,
         backoff_seconds: u32,
         error: &str,
     ) -> Result<Task, AsyncQueueError> {
+        let query = if backend == "PostgreSQL" {
+            RETRY_TASK_QUERY_POSTGRES
+        } else if backend == "SQLite" {
+            RETRY_TASK_QUERY_SQLITE
+        } else if backend == "MySQL" {
+            unimplemented!()
+        } else {
+            unreachable!()
+        };
+
         let now = Utc::now();
-        let now_str = now.to_rfc3339();
+        let now_str = format!("{}", now.format("%F %T%.f+00"));
+
         let scheduled_at = now + Duration::seconds(backoff_seconds as i64);
-        let scheduled_at_str = scheduled_at.to_rfc3339();
+        let scheduled_at_str = format!("{}", scheduled_at.format("%F %T%.f+00"));
         let retries = task.retries + 1;
 
-        let failed_task: Task = sqlx::query_as(RETRY_TASK_QUERY)
+        let failed_task: Task = sqlx::query_as(query)
             .bind(error)
             .bind(retries)
             .bind(scheduled_at_str)
@@ -364,6 +516,7 @@ impl AsyncQueue {
 
     async fn fetch_and_touch_task_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError> {
         let task_type = match task_type {
@@ -371,14 +524,19 @@ impl AsyncQueue {
             None => DEFAULT_TASK_TYPE.to_string(),
         };
 
-        let task = match Self::get_task_type_query(transaction, &task_type).await {
+        let task = match Self::get_task_type_query(transaction, backend, &task_type).await {
             Ok(some_task) => Some(some_task),
             Err(_) => None,
         };
         let result_task = if let Some(some_task) = task {
             Some(
-                Self::update_task_state_query(transaction, &some_task, FangTaskState::InProgress)
-                    .await?,
+                Self::update_task_state_query(
+                    transaction,
+                    backend,
+                    &some_task,
+                    FangTaskState::InProgress,
+                )
+                .await?,
             )
         } else {
             None
@@ -388,12 +546,22 @@ impl AsyncQueue {
 
     async fn get_task_type_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
         task_type: &str,
     ) -> Result<Task, AsyncQueueError> {
-        let now = Utc::now();
-        let now_str = now.to_rfc3339();
+        let query = if backend == "PostgreSQL" {
+            FETCH_TASK_TYPE_QUERY_POSTGRES
+        } else if backend == "SQLite" {
+            FETCH_TASK_TYPE_QUERY_SQLITE
+        } else if backend == "MySQL" {
+            unimplemented!()
+        } else {
+            unreachable!()
+        };
 
-        let task: Task = sqlx::query_as(FETCH_TASK_TYPE_QUERY)
+        let now_str = format!("{}", Utc::now().format("%F %T%.f+00"));
+
+        let task: Task = sqlx::query_as(query)
             .bind(task_type)
             .bind(now_str)
             .fetch_one(transaction.acquire().await?)
@@ -404,15 +572,25 @@ impl AsyncQueue {
 
     async fn update_task_state_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
         task: &Task,
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError> {
-        let updated_at = Utc::now();
-        let updated_at_str = updated_at.to_rfc3339();
+        let query = if backend == "PostgreSQL" {
+            UPDATE_TASK_STATE_QUERY_POSTGRES
+        } else if backend == "SQLite" {
+            UPDATE_TASK_STATE_QUERY_SQLITE
+        } else if backend == "MySQL" {
+            unimplemented!()
+        } else {
+            unreachable!()
+        };
+
+        let updated_at_str = format!("{}", Utc::now().format("%F %T%.f+00"));
 
         let state_str: &str = state.into();
 
-        let task: Task = sqlx::query_as(UPDATE_TASK_STATE_QUERY)
+        let task: Task = sqlx::query_as(query)
             .bind(state_str)
             .bind(updated_at_str)
             .bind(&task.id)
@@ -424,17 +602,28 @@ impl AsyncQueue {
 
     async fn insert_task_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
         metadata: serde_json::Value,
         task_type: &str,
         scheduled_at: DateTime<Utc>,
     ) -> Result<Task, AsyncQueueError> {
+        let query = if backend == "PostgreSQL" {
+            INSERT_TASK_QUERY_POSTGRES
+        } else if backend == "SQLite" {
+            INSERT_TASK_QUERY_SQLITE
+        } else if backend == "MySQL" {
+            unimplemented!()
+        } else {
+            unreachable!()
+        };
+
         let uuid = Uuid::new_v4();
         let bytes: &[u8] = &uuid.to_bytes_le();
 
         let metadata_str = metadata.to_string();
-        let scheduled_at_str = scheduled_at.to_rfc3339();
+        let scheduled_at_str = format!("{}", scheduled_at.format("%F %T%.f+00"));
 
-        let task: Task = sqlx::query_as(INSERT_TASK_QUERY)
+        let task: Task = sqlx::query_as(query)
             .bind(bytes)
             .bind(metadata_str)
             .bind(task_type)
@@ -446,19 +635,30 @@ impl AsyncQueue {
 
     async fn insert_task_uniq_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
         metadata: serde_json::Value,
         task_type: &str,
         scheduled_at: DateTime<Utc>,
     ) -> Result<Task, AsyncQueueError> {
+        let query = if backend == "PostgreSQL" {
+            INSERT_TASK_UNIQ_QUERY_POSTGRES
+        } else if backend == "SQLite" {
+            INSERT_TASK_UNIQ_QUERY_SQLITE
+        } else if backend == "MySQL" {
+            unimplemented!()
+        } else {
+            unreachable!()
+        };
+
         let uuid = Uuid::new_v4();
         let bytes: &[u8] = &uuid.to_bytes_le();
 
         let uniq_hash = Self::calculate_hash(metadata.to_string());
 
         let metadata_str = metadata.to_string();
-        let scheduled_at_str = scheduled_at.to_rfc3339();
+        let scheduled_at_str = format!("{}", scheduled_at.format("%F %T%.f+00"));
 
-        let task: Task = sqlx::query_as(INSERT_TASK_UNIQ_QUERY)
+        let task: Task = sqlx::query_as(query)
             .bind(bytes)
             .bind(metadata_str)
             .bind(task_type)
@@ -471,14 +671,22 @@ impl AsyncQueue {
 
     async fn insert_task_if_not_exist_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
         metadata: serde_json::Value,
         task_type: &str,
         scheduled_at: DateTime<Utc>,
     ) -> Result<Task, AsyncQueueError> {
-        match Self::find_task_by_uniq_hash_query(transaction, &metadata).await {
+        match Self::find_task_by_uniq_hash_query(transaction, backend, &metadata).await {
             Some(task) => Ok(task),
             None => {
-                Self::insert_task_uniq_query(transaction, metadata, task_type, scheduled_at).await
+                Self::insert_task_uniq_query(
+                    transaction,
+                    backend,
+                    metadata,
+                    task_type,
+                    scheduled_at,
+                )
+                .await
             }
         }
     }
@@ -492,11 +700,22 @@ impl AsyncQueue {
 
     async fn find_task_by_uniq_hash_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
         metadata: &serde_json::Value,
     ) -> Option<Task> {
+        let query = if backend == "PostgreSQL" {
+            FIND_TASK_BY_UNIQ_HASH_QUERY_POSTGRES
+        } else if backend == "SQLite" {
+            FIND_TASK_BY_UNIQ_HASH_QUERY_SQLITE
+        } else if backend == "MySQL" {
+            unimplemented!()
+        } else {
+            unreachable!()
+        };
+
         let uniq_hash = Self::calculate_hash(metadata.to_string());
 
-        sqlx::query_as(FIND_TASK_BY_UNIQ_HASH_QUERY)
+        sqlx::query_as(query)
             .bind(uniq_hash)
             .fetch_one(transaction.acquire().await.ok()?)
             .await
@@ -505,6 +724,7 @@ impl AsyncQueue {
 
     async fn schedule_task_query(
         transaction: &mut Transaction<'_, Any>,
+        backend: &str,
         task: &dyn AsyncRunnable,
     ) -> Result<Task, AsyncQueueError> {
         let metadata = serde_json::to_value(task)?;
@@ -528,10 +748,18 @@ impl AsyncQueue {
         };
 
         let task: Task = if !task.uniq() {
-            Self::insert_task_query(transaction, metadata, &task.task_type(), scheduled_at).await?
+            Self::insert_task_query(
+                transaction,
+                backend,
+                metadata,
+                &task.task_type(),
+                scheduled_at,
+            )
+            .await?
         } else {
             Self::insert_task_if_not_exist_query(
                 transaction,
+                backend,
                 metadata,
                 &task.task_type(),
                 scheduled_at,
@@ -548,7 +776,7 @@ impl AsyncQueueable for AsyncQueue {
         self.check_if_connection()?;
         let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
-        let task = Self::find_task_by_id_query(&mut transaction, id).await?;
+        let task = Self::find_task_by_id_query(&mut transaction, &self.backend, id).await?;
 
         transaction.commit().await?;
 
@@ -562,7 +790,8 @@ impl AsyncQueueable for AsyncQueue {
         self.check_if_connection()?;
         let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
-        let task = Self::fetch_and_touch_task_query(&mut transaction, task_type).await?;
+        let task =
+            Self::fetch_and_touch_task_query(&mut transaction, &self.backend, task_type).await?;
 
         transaction.commit().await?;
 
@@ -575,11 +804,18 @@ impl AsyncQueueable for AsyncQueue {
         let metadata = serde_json::to_value(task)?;
 
         let task = if !task.uniq() {
-            Self::insert_task_query(&mut transaction, metadata, &task.task_type(), Utc::now())
-                .await?
+            Self::insert_task_query(
+                &mut transaction,
+                &self.backend,
+                metadata,
+                &task.task_type(),
+                Utc::now(),
+            )
+            .await?
         } else {
             Self::insert_task_if_not_exist_query(
                 &mut transaction,
+                &self.backend,
                 metadata,
                 &task.task_type(),
                 Utc::now(),
@@ -596,7 +832,7 @@ impl AsyncQueueable for AsyncQueue {
         self.check_if_connection()?;
         let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
-        let task = Self::schedule_task_query(&mut transaction, task).await?;
+        let task = Self::schedule_task_query(&mut transaction, &self.backend, task).await?;
 
         transaction.commit().await?;
 
@@ -607,7 +843,7 @@ impl AsyncQueueable for AsyncQueue {
         self.check_if_connection()?;
         let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
-        let result = Self::remove_all_tasks_query(&mut transaction).await?;
+        let result = Self::remove_all_tasks_query(&mut transaction, &self.backend).await?;
 
         transaction.commit().await?;
 
@@ -618,7 +854,8 @@ impl AsyncQueueable for AsyncQueue {
         self.check_if_connection()?;
         let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
-        let result = Self::remove_all_scheduled_tasks_query(&mut transaction).await?;
+        let result =
+            Self::remove_all_scheduled_tasks_query(&mut transaction, &self.backend).await?;
 
         transaction.commit().await?;
 
@@ -629,7 +866,7 @@ impl AsyncQueueable for AsyncQueue {
         self.check_if_connection()?;
         let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
-        let result = Self::remove_task_query(&mut transaction, id).await?;
+        let result = Self::remove_task_query(&mut transaction, &self.backend, id).await?;
 
         transaction.commit().await?;
 
@@ -644,7 +881,8 @@ impl AsyncQueueable for AsyncQueue {
             self.check_if_connection()?;
             let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
-            let result = Self::remove_task_by_metadata_query(&mut transaction, task).await?;
+            let result =
+                Self::remove_task_by_metadata_query(&mut transaction, &self.backend, task).await?;
 
             transaction.commit().await?;
 
@@ -658,7 +896,8 @@ impl AsyncQueueable for AsyncQueue {
         self.check_if_connection()?;
         let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
-        let result = Self::remove_tasks_type_query(&mut transaction, task_type).await?;
+        let result =
+            Self::remove_tasks_type_query(&mut transaction, &self.backend, task_type).await?;
 
         transaction.commit().await?;
 
@@ -673,7 +912,8 @@ impl AsyncQueueable for AsyncQueue {
         self.check_if_connection()?;
         let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
-        let task = Self::update_task_state_query(&mut transaction, task, state).await?;
+        let task =
+            Self::update_task_state_query(&mut transaction, &self.backend, task, state).await?;
 
         transaction.commit().await?;
 
@@ -688,7 +928,8 @@ impl AsyncQueueable for AsyncQueue {
         self.check_if_connection()?;
         let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
-        let task = Self::fail_task_query(&mut transaction, task, error_message).await?;
+        let task =
+            Self::fail_task_query(&mut transaction, &self.backend, task, error_message).await?;
 
         transaction.commit().await?;
 
@@ -705,8 +946,14 @@ impl AsyncQueueable for AsyncQueue {
 
         let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
-        let failed_task =
-            Self::schedule_retry_query(&mut transaction, task, backoff_seconds, error).await?;
+        let failed_task = Self::schedule_retry_query(
+            &mut transaction,
+            &self.backend,
+            task,
+            backoff_seconds,
+            error,
+        )
+        .await?;
 
         transaction.commit().await?;
 
@@ -715,4 +962,6 @@ impl AsyncQueueable for AsyncQueue {
 }
 
 #[cfg(test)]
-test_asynk_queue! {postgres, crate::AsyncQueue, crate::AsyncQueue::test()}
+test_asynk_queue! {postgres, crate::AsyncQueue, crate::AsyncQueue::test_postgres()}
+#[cfg(test)]
+test_asynk_queue! {sqlite, crate::AsyncQueue, crate::AsyncQueue::test_sqlite()}

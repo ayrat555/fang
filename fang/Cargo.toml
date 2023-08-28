@@ -15,22 +15,28 @@ rust-version = "1.62"
 doctest = false
 
 [features]
-default = ["blocking", "asynk", "derive-error", "postgres", "mysql" , "sqlite", "migrations_postgres", "migrations_sqlite" , "migrations_mysql"]
-blocking = ["dep:diesel", "dep:diesel-derive-enum", "dep:dotenvy", "diesel?/chrono" , "diesel?/serde_json" , "diesel?/uuid"]
-asynk = ["dep:bb8-postgres", "dep:postgres-types", "dep:tokio", "dep:async-trait", "dep:async-recursion"]
+default = ["blocking", "asynk-sqlx", "derive-error", "blocking-postgres", "blocking-mysql" , "blocking-sqlite", "migrations-postgres", "migrations-sqlite" , "migrations-mysql"]
+asynk-postgres = ["asynk-sqlx" , "sqlx?/postgres"]
+asynk-sqlite = ["asynk-sqlx" , "sqlx?/sqlite"]
+asynk-mysql = ["asynk-sqlx"  , "sqlx?/mysql"]
+asynk-sqlx = ["asynk" , "dep:sqlx"]
+asynk = ["dep:tokio", "dep:async-trait", "dep:async-recursion" ]
 derive-error = ["dep:fang-derive-error"]
-postgres = ["diesel?/postgres" , "diesel?/serde_json", "diesel?/chrono" , "diesel?/uuid" , "diesel?/r2d2"]
-sqlite = ["diesel?/sqlite" , "diesel?/serde_json", "diesel?/chrono" , "diesel?/uuid" , "diesel?/r2d2"]
-mysql = ["diesel?/mysql" , "diesel?/serde_json", "diesel?/chrono" , "diesel?/uuid" , "diesel?/r2d2"]
-migrations_postgres = ["migrations"]
-migrations_sqlite = ["migrations"]
-migrations_mysql = ["migrations"]
+blocking = ["dep:diesel", "dep:diesel-derive-enum", "dep:dotenvy", "diesel?/chrono" , "diesel?/serde_json" , "diesel?/uuid", "diesel?/r2d2"]
+blocking-postgres = [ "blocking", "diesel?/postgres"]
+blocking-sqlite = ["blocking", "diesel?/sqlite" ]
+blocking-mysql = [ "blocking", "diesel?/mysql"]
+migrations-postgres = ["migrations"]
+migrations-sqlite = ["migrations"]
+migrations-mysql = ["migrations"]
 migrations = ["dep:diesel_migrations"]
 
 
 [dev-dependencies]
 fang-derive-error = { version = "0.1.0"}
 diesel_migrations = { version = "2.1" , features = ["postgres", "sqlite" , "mysql"]}
+sqlx = {git = "https://github.com/pxp9/sqlx", branch = "main", features = ["any" , "macros" , "runtime-tokio", "postgres", "sqlite", "mysql"]}
+
 
 [dependencies]
 cron = "0.12"
@@ -47,7 +53,9 @@ typetag = "0.2"
 uuid = { version = "1.1", features = ["v4"] }
 fang-derive-error = { version = "0.1.0" , optional = true}
 # sqlx with no TLS, if you want TLS you must to get feature "tls-native-tls" or "tls-rustls"
-sqlx = {version = "0.7", features = ["any" , "macros" , "json" , "uuid" , "chrono" , "runtime-tokio", "postgres", "sqlite", "mysql"] }
+#sqlx = {version = "0.7", features = ["any" , "macros" , "json" , "uuid" , "chrono" , "runtime-tokio", "postgres", "sqlite", "mysql"] }
+# https://github.com/launchbadge/sqlx/issues/2416 is fixed in pxp9's fork
+sqlx = {git = "https://github.com/pxp9/sqlx", branch = "main", features = ["any" , "macros" , "runtime-tokio"] , optional = true}
 
 [dependencies.diesel]
 version = "2.1"
@@ -61,16 +69,6 @@ optional = true
 
 [dependencies.dotenvy]
 version = "0.15"
-optional = true
-
-[dependencies.bb8-postgres]
-version = "0.8"
-features = ["with-serde_json-1" , "with-uuid-1" , "with-chrono-0_4"]
-optional = true
-
-[dependencies.postgres-types]
-version = "0.X.X"
-features = ["derive"]
 optional = true
 
 [dependencies.tokio]

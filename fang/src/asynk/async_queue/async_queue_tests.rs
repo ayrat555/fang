@@ -227,7 +227,7 @@ macro_rules! test_asynk_queue {
                 assert_eq!(Some(2), number);
                 assert_eq!(Some("AsyncTask"), type_task);
 
-                let task = test.fetch_and_touch_task(None).await.unwrap().unwrap();
+                let task = test.fetch_and_touch_task(None).await.unwrap().unwrap(); // This fails if this FOR UPDATE SKIP LOCKED is set in query fetch task type
 
                 let metadata = task.metadata.as_object().unwrap();
                 let number = metadata["number"].as_u64();
@@ -251,9 +251,7 @@ macro_rules! test_asynk_queue {
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
-                println!("{:?}", task.metadata);
-
-                let metadata = task.metadata.as_object().expect("metadata F");
+                let metadata = task.metadata.as_object().unwrap();
                 let number = metadata["number"].as_u64();
                 let type_task = metadata["type"].as_str();
 
@@ -262,10 +260,7 @@ macro_rules! test_asynk_queue {
 
                 let task = test.insert_task(&AsyncTask { number: 2 }).await.unwrap();
 
-                let metadata = task
-                    .metadata
-                    .as_object()
-                    .expect("borrado mi amigo salio mal");
+                let metadata = task.metadata.as_object().unwrap();
 
                 let number = metadata["number"].as_u64();
                 let type_task = metadata["type"].as_str();
@@ -293,7 +288,7 @@ macro_rules! test_asynk_queue {
                     .await
                     .unwrap();
 
-                let metadata = task.metadata.as_object().unwrap();
+                let metadata = task.metadata.as_object().expect("here 1");
                 let number = metadata["number"].as_u64();
                 let type_task = metadata["type"].as_str();
 
@@ -305,7 +300,7 @@ macro_rules! test_asynk_queue {
                     .await
                     .unwrap();
 
-                let metadata = task.metadata.as_object().unwrap();
+                let metadata = task.metadata.as_object().expect("here 2");
                 let number = metadata["number"].as_u64();
                 let type_task = metadata["type"].as_str();
 
