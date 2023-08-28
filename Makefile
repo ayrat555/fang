@@ -1,28 +1,4 @@
-POSTGRES_CONTAINER=postgres
-POSTGRES_DB=fang
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DIESEL_DIR=fang/postgres_migrations
-POSTGRES_MIGRATIONS=$(POSTGRES_DIESEL_DIR)/migrations
-POSTGRES_CONFIG=$(POSTGRES_DIESEL_DIR)/diesel.toml
-
-MYSQL_CONTAINER=mysql
-MYSQL_DB=fang
-MYSQL_USER=root
-MYSQL_PASSWORD=mysql
-MYSQL_DIESEL_DIR=fang/mysql_migrations
-MYSQL_MIGRATIONS=$(MYSQL_DIESEL_DIR)/migrations
-MYSQL_CONFIG=$(MYSQL_DIESEL_DIR)/diesel.toml
-
-SQLITE_FILE=fang.db
-SQLITE_DIESEL_DIR=fang/sqlite_migrations
-SQLITE_MIGRATIONS=$(SQLITE_DIESEL_DIR)/migrations
-SQLITE_CONFIG=$(SQLITE_DIESEL_DIR)/diesel.toml
-
-HOST=127.0.0.1
-DATABASE_URL=$(POSTGRES_URL)
-POSTGRES_URL=postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(HOST)/$(POSTGRES_DB)
-MYSQL_URL=mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(HOST)/$(MYSQL_DB)
+include .env
 
 BOLD='\033[1m'
 END_BOLD='\033[0m'
@@ -44,18 +20,9 @@ default: db tests ignored stop
 	stop $(STOP_TARGETS) \
 	default clippy tests ignored doc .FORCE
 
-.SILENT: .env $(DB_TARGETS) $(WAIT_TARGETS) $(DIESEL_TARGETS) $(CLEAN_TARGETS) $(STOP_TARGETS)
-
-.FORCE:
+.SILENT: $(DB_TARGETS) $(WAIT_TARGETS) $(DIESEL_TARGETS) $(CLEAN_TARGETS) $(STOP_TARGETS)
 
 .NOTPARALLEL: default
-
-.env: .FORCE
-	printf '' > .env
-	echo "DATABASE_URL=$(DATABASE_URL)" >> .env
-	echo "POSTGRES_URL=$(POSTGRES_URL)" >> .env
-	echo "MYSQL_URL=$(MYSQL_URL)" >> .env
-	echo "SQLITE_FILE=$(SQLITE_FILE)" >> .env
 
 db: $(DB_TARGETS)
 
@@ -163,12 +130,12 @@ stop_sqlite:
 clippy:
 	cargo clippy --verbose --all-targets --all-features -- -D warnings
 
-tests: .env
+tests:
 	@echo -e $(BOLD)Running tests...$(END_BOLD)
 	cargo test --all-features -- --color always --nocapture
 	$(MAKE) clean
 
-ignored: .env
+ignored:
 	@echo -e $(BOLD)Running ignored tests...$(END_BOLD)
 	cargo test --all-features -- --color always --nocapture --ignored
 	$(MAKE) clean
