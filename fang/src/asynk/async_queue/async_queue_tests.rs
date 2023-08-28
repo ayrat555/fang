@@ -268,10 +268,7 @@ macro_rules! test_asynk_queue {
                 assert_eq!(Some(2), number);
                 assert_eq!(Some("AsyncTask"), type_task);
 
-                let result = test
-                    .remove_tasks_type("mytype")
-                    .await
-                    .expect("el numero salio bad");
+                let result = test.remove_tasks_type("mytype").await.unwrap();
 
                 assert_eq!(0, result);
 
@@ -288,7 +285,7 @@ macro_rules! test_asynk_queue {
                     .await
                     .unwrap();
 
-                let metadata = task.metadata.as_object().expect("here 1");
+                let metadata = task.metadata.as_object().unwrap();
                 let number = metadata["number"].as_u64();
                 let type_task = metadata["type"].as_str();
 
@@ -300,7 +297,7 @@ macro_rules! test_asynk_queue {
                     .await
                     .unwrap();
 
-                let metadata = task.metadata.as_object().expect("here 2");
+                let metadata = task.metadata.as_object().unwrap();
                 let number = metadata["number"].as_u64();
                 let type_task = metadata["type"].as_str();
 
