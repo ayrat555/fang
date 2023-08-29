@@ -50,7 +50,7 @@ jobs:
           args: --verbose --all-targets --all-features -- -D warnings
 
       - name: Install sqlite3
-      - run: | 
+        run: | 
           sudo apt install -y sqlite3
           sqlite3 fang.db "VACUUM;"
 
