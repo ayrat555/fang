@@ -55,21 +55,21 @@ diesel_postgres:
 	@echo -e $(BOLD)Running Diesel migrations on Postgres database...$(END_BOLD)
 	while ! diesel migration run --database-url "$(POSTGRES_URL)" --migration-dir "$(POSTGRES_MIGRATIONS)" --config-file "$(POSTGRES_CONFIG)" 2> /dev/null; \
 	do \
-		:; \
+		sleep 1; \
 	done
 
-diesel_mysql: wait_for_mysql
+diesel_mysql:
 	@echo -e $(BOLD)Running Diesel migrations on MySQL database...$(END_BOLD)
 	while ! diesel migration run --database-url "$(MYSQL_URL)" --migration-dir "$(MYSQL_MIGRATIONS)" --config-file "$(MYSQL_CONFIG)" 2> /dev/null; \
 	do \
-		:; \
+		sleep 1; \
 	done
 
-diesel_sqlite: wait_for_sqlite
+diesel_sqlite:
 	@echo -e $(BOLD)Running Diesel migrations on SQLite database...$(END_BOLD)
 	while ! diesel migration run --database-url sqlite://"$(SQLITE_FILE)" --migration-dir "$(SQLITE_MIGRATIONS)" --config-file "$(SQLITE_CONFIG)" 2> /dev/null; \
 	do \
-		:; \
+		sleep 1; \
 	done
 
 clean: $(CLEAN_TARGETS)
