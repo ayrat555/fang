@@ -63,7 +63,7 @@ jobs:
 
       - name: Setup Sqlite db
         working-directory: ./fang/sqlite_migrations
-        run: diesel setup --database-url "sqlite3://../../fang.db"
+        run: diesel setup --database-url "sqlite3://../../../fang.db"
 
       - name: Change working dir
         working-directory: ./../..
