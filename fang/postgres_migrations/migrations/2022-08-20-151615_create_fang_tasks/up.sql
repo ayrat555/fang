@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TYPE fang_task_state AS ENUM ('new', 'in_progress', 'failed', 'finished', 'retried');
 
 CREATE TABLE fang_tasks (
-     id BYTEA PRIMARY KEY,
+     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
      metadata jsonb NOT NULL,
      error_message TEXT,
      state fang_task_state DEFAULT 'new' NOT NULL,

@@ -11,6 +11,7 @@ use sqlx::Row;
 use std::time::Duration;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
+use uuid::Uuid;
 ///
 /// Represents a schedule for scheduled tasks.
 /// It's used in the [`AsyncRunnable::cron`] and [`Runnable::cron`]
@@ -157,7 +158,7 @@ impl From<FangTaskState> for &str {
 #[diesel(table_name = fang_tasks)]
 pub struct Task {
     #[builder(setter(into))]
-    pub id: Vec<u8>,
+    pub id: Uuid,
     #[builder(setter(into))]
     pub metadata: serde_json::Value,
     #[builder(setter(into))]
@@ -181,7 +182,9 @@ pub struct Task {
 #[cfg(feature = "asynk-sqlx")]
 impl<'a> FromRow<'a, AnyRow> for Task {
     fn from_row(row: &'a AnyRow) -> Result<Self, sqlx::Error> {
-        let id: Vec<u8> = row.get("id");
+        let uuid_as_text: &str = row.get("id");
+
+        let id = Uuid::parse_str(uuid_as_text).unwrap();
 
         let raw: &str = row.get("metadata"); // will work if database cast json to string
         let raw = raw.replace('\\', "");

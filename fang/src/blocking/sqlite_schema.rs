@@ -2,7 +2,7 @@
 
 diesel::table! {
     fang_tasks (id) {
-        id -> Binary,
+        id -> Text,
         metadata -> Text,
         error_message -> Nullable<Text>,
         state -> Text,

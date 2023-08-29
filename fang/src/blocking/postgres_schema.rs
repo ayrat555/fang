@@ -11,7 +11,7 @@ diesel::table! {
     use super::sql_types::FangTaskState;
 
     fang_tasks (id) {
-        id -> Bytea,
+        id -> Uuid,
         metadata -> Jsonb,
         error_message -> Nullable<Text>,
         state -> FangTaskState,

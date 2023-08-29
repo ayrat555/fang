@@ -117,7 +117,7 @@ pub trait AsyncQueueable: Send {
     async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError>;
 
     /// Remove a task by its id.
-    async fn remove_task(&mut self, id: &[u8]) -> Result<u64, AsyncQueueError>;
+    async fn remove_task(&mut self, id: &Uuid) -> Result<u64, AsyncQueueError>;
 
     /// Remove a task by its metadata (struct fields values)
     async fn remove_task_by_metadata(
@@ -129,7 +129,7 @@ pub trait AsyncQueueable: Send {
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError>;
 
     /// Retrieve a task from storage by its `id`.
-    async fn find_task_by_id(&mut self, id: &[u8]) -> Result<Task, AsyncQueueError>;
+    async fn find_task_by_id(&mut self, id: &Uuid) -> Result<Task, AsyncQueueError>;
 
     /// Update the state field of the specified task
     /// See the `FangTaskState` enum for possible states.
@@ -350,7 +350,7 @@ impl AsyncQueue {
     async fn remove_task_query(
         transaction: &mut Transaction<'_, Any>,
         backend: &str,
-        id: &[u8],
+        id: &Uuid,
     ) -> Result<u64, AsyncQueueError> {
         let query = if backend == "PostgreSQL" {
             REMOVE_TASK_QUERY_POSTGRES
@@ -362,8 +362,11 @@ impl AsyncQueue {
             unreachable!()
         };
 
+        let mut buffer = Uuid::encode_buffer();
+        let uuid_as_text = id.as_hyphenated().encode_lower(&mut buffer);
+
         let result = sqlx::query(query)
-            .bind(id)
+            .bind(&*uuid_as_text)
             .execute(transaction.acquire().await?)
             .await?
             .rows_affected();
@@ -429,7 +432,7 @@ impl AsyncQueue {
     async fn find_task_by_id_query(
         transaction: &mut Transaction<'_, Any>,
         backend: &str,
-        id: &[u8],
+        id: &Uuid,
     ) -> Result<Task, AsyncQueueError> {
         let query = if backend == "PostgreSQL" {
             FIND_TASK_BY_ID_QUERY_POSTGRES
@@ -441,8 +444,11 @@ impl AsyncQueue {
             unreachable!()
         };
 
+        let mut buffer = Uuid::encode_buffer();
+        let uuid_as_text = id.as_hyphenated().encode_lower(&mut buffer);
+
         let task: Task = sqlx::query_as(query)
-            .bind(id)
+            .bind(&*uuid_as_text)
             .fetch_one(transaction.acquire().await?)
             .await?;
 
@@ -467,11 +473,14 @@ impl AsyncQueue {
 
         let updated_at = format!("{}", Utc::now().format("%F %T%.f+00"));
 
+        let mut buffer = Uuid::encode_buffer();
+        let uuid_as_text = task.id.as_hyphenated().encode_lower(&mut buffer);
+
         let failed_task: Task = sqlx::query_as(query)
             .bind(<&str>::from(FangTaskState::Failed))
             .bind(error_message)
             .bind(updated_at)
-            .bind(&task.id)
+            .bind(&*uuid_as_text)
             .fetch_one(transaction.acquire().await?)
             .await?;
 
@@ -502,12 +511,15 @@ impl AsyncQueue {
         let scheduled_at_str = format!("{}", scheduled_at.format("%F %T%.f+00"));
         let retries = task.retries + 1;
 
+        let mut buffer = Uuid::encode_buffer();
+        let uuid_as_text = task.id.as_hyphenated().encode_lower(&mut buffer);
+
         let failed_task: Task = sqlx::query_as(query)
             .bind(error)
             .bind(retries)
             .bind(scheduled_at_str)
             .bind(now_str)
-            .bind(&task.id)
+            .bind(&*uuid_as_text)
             .fetch_one(transaction.acquire().await?)
             .await?;
 
@@ -592,10 +604,13 @@ impl AsyncQueue {
 
         let state_str: &str = state.into();
 
+        let mut buffer = Uuid::encode_buffer();
+        let uuid_as_text = task.id.as_hyphenated().encode_lower(&mut buffer);
+
         let task: Task = sqlx::query_as(query)
             .bind(state_str)
             .bind(updated_at_str)
-            .bind(&task.id)
+            .bind(&*uuid_as_text)
             .fetch_one(transaction.acquire().await?)
             .await?;
 
@@ -620,13 +635,14 @@ impl AsyncQueue {
         };
 
         let uuid = Uuid::new_v4();
-        let bytes: &[u8] = &uuid.to_bytes_le();
+        let mut buffer = Uuid::encode_buffer();
+        let uuid_as_str: &str = uuid.as_hyphenated().encode_lower(&mut buffer);
 
         let metadata_str = metadata.to_string();
         let scheduled_at_str = format!("{}", scheduled_at.format("%F %T%.f+00"));
 
         let task: Task = sqlx::query_as(query)
-            .bind(bytes)
+            .bind(&*uuid_as_str)
             .bind(metadata_str)
             .bind(task_type)
             .bind(scheduled_at_str)
@@ -653,7 +669,8 @@ impl AsyncQueue {
         };
 
         let uuid = Uuid::new_v4();
-        let bytes: &[u8] = &uuid.to_bytes_le();
+        let mut buffer = Uuid::encode_buffer();
+        let uuid_as_str: &str = uuid.as_hyphenated().encode_lower(&mut buffer);
 
         let uniq_hash = Self::calculate_hash(metadata.to_string());
 
@@ -661,7 +678,7 @@ impl AsyncQueue {
         let scheduled_at_str = format!("{}", scheduled_at.format("%F %T%.f+00"));
 
         let task: Task = sqlx::query_as(query)
-            .bind(bytes)
+            .bind(&*uuid_as_str)
             .bind(metadata_str)
             .bind(task_type)
             .bind(uniq_hash)
@@ -774,7 +791,7 @@ impl AsyncQueue {
 
 #[async_trait]
 impl AsyncQueueable for AsyncQueue {
-    async fn find_task_by_id(&mut self, id: &[u8]) -> Result<Task, AsyncQueueError> {
+    async fn find_task_by_id(&mut self, id: &Uuid) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
         let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 
@@ -864,7 +881,7 @@ impl AsyncQueueable for AsyncQueue {
         Ok(result)
     }
 
-    async fn remove_task(&mut self, id: &[u8]) -> Result<u64, AsyncQueueError> {
+    async fn remove_task(&mut self, id: &Uuid) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
         let mut transaction = self.pool.as_ref().unwrap().begin().await?;
 

@@ -1,1 +1,1 @@
-SELECT id , metadata::text , error_message, state::text , task_type , uniq_hash, retries , scheduled_at::text , created_at::text , updated_at::text FROM fang_tasks WHERE uniq_hash = $1 AND state in ('new', 'retried') LIMIT 1
+SELECT id::text , metadata::text , error_message, state::text , task_type , uniq_hash, retries , scheduled_at::text , created_at::text , updated_at::text FROM fang_tasks WHERE uniq_hash = $1 AND state in ('new', 'retried') LIMIT 1

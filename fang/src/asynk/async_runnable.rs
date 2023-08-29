@@ -32,7 +32,7 @@ impl From<SerdeError> for FangError {
 /// Implement this trait to run your custom tasks.
 #[typetag::serde(tag = "type")]
 #[async_trait]
-pub trait AsyncRunnable: Send + Sync + Send {
+pub trait AsyncRunnable: Send + Sync {
     /// Execute the task. This method should define its logic
     async fn run(&self, client: &mut dyn AsyncQueueable) -> Result<(), FangError>;
 

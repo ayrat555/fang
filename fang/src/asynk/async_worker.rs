@@ -391,7 +391,7 @@ mod async_worker_tests {
         let actual_task = WorkerAsyncTask { number: 1 };
 
         let task = insert_task(&mut test, &actual_task).await;
-        let id: &[u8] = &task.id;
+        let id = task.id;
 
         let mut worker = AsyncWorkerTest::builder()
             .queue(&mut test as &mut dyn AsyncQueueable)
@@ -399,7 +399,7 @@ mod async_worker_tests {
             .build();
 
         worker.run(&task, &actual_task).await.unwrap();
-        let task_finished = test.find_task_by_id(id).await.unwrap();
+        let task_finished = test.find_task_by_id(&id).await.unwrap();
         assert_eq!(id, task_finished.id);
         assert_eq!(FangTaskState::Finished, task_finished.state);
     }
@@ -482,7 +482,7 @@ mod async_worker_tests {
 
         let failed_task = AsyncFailedTask { number: 1 };
         let task = insert_task(&mut test, &failed_task).await;
-        let id: &[u8] = &task.id;
+        let id = task.id;
 
         let mut worker = AsyncWorkerTest::builder()
             .queue(&mut test as &mut dyn AsyncQueueable)
@@ -490,7 +490,7 @@ mod async_worker_tests {
             .build();
 
         worker.run(&task, &failed_task).await.unwrap();
-        let task_finished = test.find_task_by_id(id).await.unwrap();
+        let task_finished = test.find_task_by_id(&id).await.unwrap();
 
         assert_eq!(id, task_finished.id);
         assert_eq!(FangTaskState::Failed, task_finished.state);
