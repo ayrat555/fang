@@ -111,7 +111,8 @@ clean_mysql: wait_for_mysql
 
 clean_sqlite: wait_for_sqlite
 	@echo -e $(BOLD)Cleaning SQLite database...$(END_BOLD)
-	$(MAKE) stop_sqlite db_sqlite
+	$(MAKE) stop_sqlite
+	$(MAKE) db_sqlite
 
 stop: $(STOP_TARGETS)
 
