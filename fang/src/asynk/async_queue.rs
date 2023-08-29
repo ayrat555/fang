@@ -642,7 +642,7 @@ impl AsyncQueue {
         let scheduled_at_str = format!("{}", scheduled_at.format("%F %T%.f+00"));
 
         let task: Task = sqlx::query_as(query)
-            .bind(&*uuid_as_str)
+            .bind(uuid_as_str)
             .bind(metadata_str)
             .bind(task_type)
             .bind(scheduled_at_str)
@@ -678,7 +678,7 @@ impl AsyncQueue {
         let scheduled_at_str = format!("{}", scheduled_at.format("%F %T%.f+00"));
 
         let task: Task = sqlx::query_as(query)
-            .bind(&*uuid_as_str)
+            .bind(uuid_as_str)
             .bind(metadata_str)
             .bind(task_type)
             .bind(uniq_hash)
