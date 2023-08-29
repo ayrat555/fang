@@ -47,7 +47,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --verbose --all-targets --all-features --no-deps -- -D warnings
+          args: --verbose --all-targets --all-features -- -D warnings
 
       - name: Install sqlite3
         run: | 
