@@ -405,6 +405,8 @@ cargo install diesel_cli --no-default-features --features "postgres sqlite mysql
 
 - Install docker on your machine.
 
+- Install SQLite 3 on your machine.
+
 - Setup databases for testing.
 
 ```sh
