@@ -7,6 +7,7 @@ use fang::asynk::async_queue::AsyncQueueable;
 use fang::asynk::async_worker_pool::AsyncWorkerPool;
 use fang::run_migrations_postgres;
 use fang::AsyncRunnable;
+use fang::BackendSqlXPg;
 use simple_async_worker::MyFailingTask;
 use simple_async_worker::MyTask;
 use std::env;
@@ -33,12 +34,13 @@ async fn main() {
     let mut queue = AsyncQueue::builder()
         .uri(database_url)
         .max_pool_size(max_pool_size)
+        .backend(BackendSqlXPg {})
         .build();
 
     queue.connect().await.unwrap();
     log::info!("Queue connected...");
 
-    let mut pool: AsyncWorkerPool<AsyncQueue> = AsyncWorkerPool::builder()
+    let mut pool: AsyncWorkerPool<AsyncQueue<BackendSqlXPg>> = AsyncWorkerPool::builder()
         .number_of_workers(10_u32)
         .queue(queue.clone())
         .build();
