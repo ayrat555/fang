@@ -32,7 +32,7 @@ db_postgres:
 		-e POSTGRES_DB="$(POSTGRES_DB)" \
 		-e POSTGRES_USER="$(POSTGRES_USER)" \
 		-e POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" \
-		postgres:latest
+		postgres:"$(POSTGRES_VERSION)"
 	$(MAKE) diesel_postgres
 
 db_mysql:
@@ -41,7 +41,7 @@ db_mysql:
 		-e MYSQL_DATABASE="$(MYSQL_DB)" \
 		-e MYSQL_ROOT_PASSWORD="$(MYSQL_PASSWORD)" \
 		-e TZ=UTC \
-		mysql:latest
+		mysql:"$(MYSQL_VERSION)"
 	$(MAKE) diesel_mysql
 
 db_sqlite:
