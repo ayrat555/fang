@@ -53,6 +53,7 @@ jobs:
         run: | 
           sudo apt install -y sqlite3
           sqlite3 fang.db "VACUUM;"
+          mkdir tests_sqlite
 
       - name: Install diesel-cli
         uses: actions-rs/cargo@v1
