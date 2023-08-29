@@ -5,7 +5,7 @@
 
 CREATE TABLE fang_tasks (
     id TEXT CHECK (LENGTH(id) = 36) NOT NULL PRIMARY KEY, -- UUID generated inside the language
-    -- why uuid is a blob ? https://stackoverflow.com/questions/17277735/using-uuids-in-sqlite
+    -- why uuid is a text ? https://stackoverflow.com/questions/17277735/using-uuids-in-sqlite
     metadata TEXT NOT NULL, 
     -- why metadata is text ? https://stackoverflow.com/questions/16603621/how-to-store-json-object-in-sqlite-database#16603687
     error_message TEXT,
