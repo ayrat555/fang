@@ -113,7 +113,6 @@ clippy:
 tests:
 	@echo -e $(BOLD)Running tests...$(END_BOLD)
 	cargo test --all-features -- --color always --nocapture
-	$(MAKE) clean
 
 ignored:
 	@echo -e $(BOLD)Running ignored tests...$(END_BOLD)
