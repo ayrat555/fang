@@ -63,7 +63,7 @@ jobs:
 
       - name: Setup Sqlite db
         working-directory: ./fang/sqlite_migrations
-        run: diesel setup --database-url "sqlite3://../../fang.db"
+        run: diesel migration run --database-url "sqlite3://../../fang.db"
 
       - name: Change working dir
         working-directory: ./../..
@@ -71,7 +71,7 @@ jobs:
 
       - name: Setup Postgres db
         working-directory: ./fang/postgres_migrations
-        run: diesel setup --database-url "postgres://postgres:postgres@localhost/fang"
+        run: diesel migration run --database-url "postgres://postgres:postgres@localhost/fang"
 
       - name: Change working dir
         working-directory: ./../..
