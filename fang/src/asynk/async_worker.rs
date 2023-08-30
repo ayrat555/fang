@@ -254,7 +254,6 @@ mod async_worker_tests {
     use crate::asynk::async_queue::AsyncQueue;
     use crate::asynk::async_queue::AsyncQueueable;
     use crate::asynk::async_worker::Task;
-    use crate::asynk::backend_sqlx::BackendSqlXPg;
     use crate::asynk::AsyncRunnable;
     use crate::FangError;
     use crate::FangTaskState;
@@ -564,7 +563,7 @@ mod async_worker_tests {
         assert_eq!(id2, task2.id);
     }
 
-    async fn insert_task(test: &mut AsyncQueue<BackendSqlXPg>, task: &dyn AsyncRunnable) -> Task {
+    async fn insert_task(test: &mut AsyncQueue, task: &dyn AsyncRunnable) -> Task {
         test.insert_task(task).await.unwrap()
     }
 

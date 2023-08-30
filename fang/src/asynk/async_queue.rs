@@ -43,7 +43,7 @@ pub enum AsyncQueueError {
         "AsyncQueue is not connected :( , call connect() method first and then perform operations"
     )]
     NotConnectedError,
-    #[error("AsyncQueue generic does not correspond to uri Backend")]
+    #[error("AsyncQueue generic does not correspond to uri BackendSqlX")]
     ConnectionError,
     #[error("Can not convert `std::time::Duration` to `chrono::Duration`")]
     TimeError,
@@ -58,8 +58,8 @@ impl From<cron::error::Error> for AsyncQueueError {
 }
 
 /// This trait defines operations for an asynchronous queue.
-/// The trait can be implemented for different storage backends.
-/// For now, the trait is only implemented for PostgreSQL. More backends are planned to be implemented in the future.
+/// The trait can be implemented for different storage BackendSqlXs.
+/// For now, the trait is only implemented for PostgreSQL. More BackendSqlXs are planned to be implemented in the future.
 
 #[async_trait]
 pub trait AsyncQueueable: Send {
@@ -137,10 +137,7 @@ pub trait AsyncQueueable: Send {
 ///
 
 #[derive(TypedBuilder, Debug, Clone)]
-pub struct AsyncQueue<Backend>
-where
-    Backend: BackendSqlX,
-{
+pub struct AsyncQueue {
     #[builder(default=None, setter(skip))]
     pool: Option<AnyPool>,
     #[builder(setter(into))]
@@ -149,7 +146,8 @@ where
     max_pool_size: u32,
     #[builder(default = false, setter(skip))]
     connected: bool,
-    backend: Backend,
+    #[builder(default = BackendSqlX::NoBackend, setter(skip))]
+    backend: BackendSqlX,
 }
 
 #[cfg(test)]
@@ -170,20 +168,13 @@ use std::path::Path;
 use super::backend_sqlx::BackendSqlX;
 
 #[cfg(test)]
-use super::backend_sqlx::BackendSqlXSQLite;
-
-#[cfg(test)]
-use super::backend_sqlx::BackendSqlXPg;
-
-#[cfg(test)]
-impl AsyncQueue<BackendSqlXPg> {
+impl AsyncQueue {
     /// Provides an AsyncQueue connected to its own DB
     pub async fn test_postgres() -> Self {
         const BASE_URI: &str = "postgres://postgres:postgres@localhost";
         let mut res = Self::builder()
             .max_pool_size(1_u32)
             .uri(format!("{}/fang", BASE_URI))
-            .backend(BackendSqlXPg {})
             .build();
 
         let mut new_number = ASYNC_QUEUE_POSTGRES_TEST_COUNTER.lock().await;
@@ -220,10 +211,7 @@ impl AsyncQueue<BackendSqlXPg> {
 
         res
     }
-}
 
-#[cfg(test)]
-impl AsyncQueue<BackendSqlXSQLite> {
     /// Provides an AsyncQueue connected to its own DB
     pub async fn test_sqlite() -> Self {
         const BASE_FILE: &str = "../fang.db";
@@ -247,7 +235,6 @@ impl AsyncQueue<BackendSqlXSQLite> {
         let mut res = Self::builder()
             .max_pool_size(1_u32)
             .uri(format!("sqlite://{}", db_name))
-            .backend(BackendSqlXSQLite {})
             .build();
 
         res.connect().await.expect("fail to connect");
@@ -255,10 +242,7 @@ impl AsyncQueue<BackendSqlXSQLite> {
     }
 }
 
-impl<Backend> AsyncQueue<Backend>
-where
-    Backend: BackendSqlX,
-{
+impl AsyncQueue {
     /// Check if the connection with db is established
     pub fn check_if_connection(&self) -> Result<(), AsyncQueueError> {
         if self.connected {
@@ -283,9 +267,7 @@ where
 
         drop(conn);
 
-        if self.backend.name() != backend {
-            return Err(AsyncQueueError::ConnectionError);
-        }
+        self.backend = BackendSqlX::new_with_name(&backend);
 
         self.pool = Some(pool);
         self.connected = true;
@@ -294,7 +276,7 @@ where
 
     async fn remove_all_tasks_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
     ) -> Result<u64, AsyncQueueError> {
         let query = backend.select_query("REMOVE_ALL_TASK_QUERY");
 
@@ -306,7 +288,7 @@ where
 
     async fn remove_all_scheduled_tasks_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
     ) -> Result<u64, AsyncQueueError> {
         let query = backend.select_query("REMOVE_ALL_SCHEDULED_TASK_QUERY");
 
@@ -321,7 +303,7 @@ where
 
     async fn remove_task_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
         id: &Uuid,
     ) -> Result<u64, AsyncQueueError> {
         let query = backend.select_query("REMOVE_TASK_QUERY");
@@ -347,7 +329,7 @@ where
 
     async fn remove_task_by_metadata_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
         task: &dyn AsyncRunnable,
     ) -> Result<u64, AsyncQueueError> {
         let metadata = serde_json::to_value(task)?;
@@ -365,7 +347,7 @@ where
 
     async fn remove_tasks_type_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
         task_type: &str,
     ) -> Result<u64, AsyncQueueError> {
         let query = backend.select_query("REMOVE_TASKS_TYPE_QUERY");
@@ -379,7 +361,7 @@ where
 
     async fn find_task_by_id_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
         id: &Uuid,
     ) -> Result<Task, AsyncQueueError> {
         let query = backend.select_query("FIND_TASK_BY_ID_QUERY");
@@ -397,7 +379,7 @@ where
 
     async fn fail_task_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
         task: &Task,
         error_message: &str,
     ) -> Result<Task, AsyncQueueError> {
@@ -421,7 +403,7 @@ where
 
     async fn schedule_retry_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
         task: &Task,
         backoff_seconds: u32,
         error: &str,
@@ -452,7 +434,7 @@ where
 
     async fn fetch_and_touch_task_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError> {
         let task_type = match task_type {
@@ -484,7 +466,7 @@ where
 
     async fn get_task_type_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
         task_type: &str,
     ) -> Result<Task, AsyncQueueError> {
         let query = backend.select_query("FETCH_TASK_TYPE_QUERY");
@@ -502,7 +484,7 @@ where
 
     async fn update_task_state_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
         task: &Task,
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError> {
@@ -527,7 +509,7 @@ where
 
     async fn insert_task_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
         metadata: serde_json::Value,
         task_type: &str,
         scheduled_at: DateTime<Utc>,
@@ -553,7 +535,7 @@ where
 
     async fn insert_task_uniq_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
         metadata: serde_json::Value,
         task_type: &str,
         scheduled_at: DateTime<Utc>,
@@ -582,7 +564,7 @@ where
 
     async fn insert_task_if_not_exist_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
         metadata: serde_json::Value,
         task_type: &str,
         scheduled_at: DateTime<Utc>,
@@ -611,7 +593,7 @@ where
 
     async fn find_task_by_uniq_hash_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
         metadata: &serde_json::Value,
     ) -> Option<Task> {
         let query = backend.select_query("FIND_TASK_BY_UNIQ_HASH_QUERY");
@@ -627,7 +609,7 @@ where
 
     async fn schedule_task_query(
         transaction: &mut Transaction<'_, Any>,
-        backend: &Backend,
+        backend: &BackendSqlX,
         task: &dyn AsyncRunnable,
     ) -> Result<Task, AsyncQueueError> {
         let metadata = serde_json::to_value(task)?;
@@ -674,10 +656,7 @@ where
 }
 
 #[async_trait]
-impl<Backend> AsyncQueueable for AsyncQueue<Backend>
-where
-    Backend: BackendSqlX,
-{
+impl AsyncQueueable for AsyncQueue {
     async fn find_task_by_id(&mut self, id: &Uuid) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
         let mut transaction = self.pool.as_ref().unwrap().begin().await?;
@@ -868,6 +847,6 @@ where
 }
 
 #[cfg(test)]
-test_asynk_queue! {postgres, crate::AsyncQueue<crate::asynk::backend_sqlx::BackendSqlXPg>, crate::AsyncQueue::test_postgres()}
+test_asynk_queue! {postgres, crate::AsyncQueue, crate::AsyncQueue::test_postgres()}
 #[cfg(test)]
-test_asynk_queue! {sqlite, crate::AsyncQueue<crate::asynk::backend_sqlx::BackendSqlXSQLite>, crate::AsyncQueue::test_sqlite()}
+test_asynk_queue! {sqlite, crate::AsyncQueue, crate::AsyncQueue::test_sqlite()}
