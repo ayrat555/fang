@@ -431,7 +431,7 @@ make -j ignored
 make -j stop
 ```
 
-The `-j` flag in the above examples is not necessary but highly recommended.
+The `-j` flag in the above examples enables parallelism for `make`, is not necessary but highly recommended.
 
 ## Authors
 
