@@ -1,46 +1,123 @@
-db_postgres:
-	docker run --rm -d --name postgres -p 5432:5432 \
-  -e POSTGRES_DB=fang \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  postgres:latest
+include .env
 
-# login is root fang
+BOLD='\033[1m'
+END_BOLD='\033[0m'
+
+DB_TARGETS=db_postgres db_mysql db_sqlite
+WAIT_TARGETS=wait_for_postgres wait_for_mysql wait_for_sqlite
+DIESEL_TARGETS=diesel_postgres diesel_mysql diesel_sqlite
+CLEAN_TARGETS=clean_postgres clean_mysql clean_sqlite
+STOP_TARGETS=stop_postgres stop_mysql stop_sqlite
+
+.DEFAULT_GOAL=default
+
+default: db tests ignored stop
+
+.PHONY: db $(DB_TARGETS) \
+	$(WAIT_TARGETS) \
+	diesel $(DIESEL_TARGETS) \
+	clean $(CLEAN_TARGETS)
+	stop $(STOP_TARGETS) \
+	default clippy tests ignored doc .FORCE
+
+.SILENT: $(DB_TARGETS) $(WAIT_TARGETS) $(DIESEL_TARGETS) $(CLEAN_TARGETS) $(STOP_TARGETS)
+
+.NOTPARALLEL: default
+
+db: $(DB_TARGETS)
+
+db_postgres:
+	@echo -e $(BOLD)Setting up Postgres database...$(END_BOLD)
+	docker run --rm -d --name "$(POSTGRES_CONTAINER)" -p 5432:5432 \
+		-e POSTGRES_DB="$(POSTGRES_DB)" \
+		-e POSTGRES_USER="$(POSTGRES_USER)" \
+		-e POSTGRES_PASSWORD="$(POSTGRES_PASSWORD)" \
+		postgres:"$(POSTGRES_VERSION)"
+	$(MAKE) diesel_postgres
+
 db_mysql:
-	docker run --rm -d --name mysql -p 3306:3306 \
-  	-e MYSQL_DATABASE=fang \
-  	-e MYSQL_ROOT_PASSWORD=fang \
-	-e TZ=UTC \
-  	mysql:latest
+	@echo -e $(BOLD)Setting up MySQL database...$(END_BOLD)
+	docker run --rm -d --name "$(MYSQL_CONTAINER)" -p 3306:3306 \
+		-e MYSQL_DATABASE="$(MYSQL_DB)" \
+		-e MYSQL_ROOT_PASSWORD="$(MYSQL_PASSWORD)" \
+		-e TZ=UTC \
+		mysql:"$(MYSQL_VERSION)"
+	$(MAKE) diesel_mysql
 
 db_sqlite:
-	sqlite3 fang.db "VACUUM;"
+	@echo -e $(BOLD)Setting up SQLite database...$(END_BOLD)
+	sqlite3 "$(SQLITE_FILE)" "VACUUM;"
+	$(MAKE) diesel_sqlite
+
+diesel: $(DIESEL_TARGETS)
+
+diesel_postgres:
+	@echo -e $(BOLD)Running Diesel migrations on Postgres database...$(END_BOLD)
+	while ! diesel migration run --database-url "$(POSTGRES_URL)" --migration-dir "$(POSTGRES_MIGRATIONS)" --config-file "$(POSTGRES_CONFIG)" 2> /dev/null; \
+	do \
+		sleep 1; \
+	done
+
+diesel_mysql:
+	@echo -e $(BOLD)Running Diesel migrations on MySQL database...$(END_BOLD)
+	while ! diesel migration run --database-url "$(MYSQL_URL)" --migration-dir "$(MYSQL_MIGRATIONS)" --config-file "$(MYSQL_CONFIG)" 2> /dev/null; \
+	do \
+		sleep 1; \
+	done
+
+diesel_sqlite:
+	@echo -e $(BOLD)Running Diesel migrations on SQLite database...$(END_BOLD)
+	while ! diesel migration run --database-url sqlite://"$(SQLITE_FILE)" --migration-dir "$(SQLITE_MIGRATIONS)" --config-file "$(SQLITE_CONFIG)" 2> /dev/null; \
+	do \
+		sleep 1; \
+	done
+
+clean: $(CLEAN_TARGETS)
+
+clean_postgres:
+	@echo -e $(BOLD)Cleaning Postgres database...$(END_BOLD)
+	docker exec "$(POSTGRES_CONTAINER)" dropdb -U "$(POSTGRES_USER)" "$(POSTGRES_DB)"
+	docker exec "$(POSTGRES_CONTAINER)" psql -U "$(POSTGRES_USER)" --command="CREATE DATABASE $(POSTGRES_DB);"
+	$(MAKE) diesel_postgres
+
+clean_mysql:
+	@echo -e $(BOLD)Cleaning MySQL database...$(END_BOLD)
+	docker exec "$(MYSQL_CONTAINER)" mysql \
+		--user="$(MYSQL_USER)" \
+		--password="$(MYSQL_PASSWORD)" \
+		--execute="DROP DATABASE $(MYSQL_DB); CREATE DATABASE $(MYSQL_DB);"
+	$(MAKE) diesel_mysql
+
+clean_sqlite:
+	@echo -e $(BOLD)Cleaning SQLite database...$(END_BOLD)
+	$(MAKE) stop_sqlite
+	$(MAKE) db_sqlite
+
+stop: $(STOP_TARGETS)
+
+stop_postgres:
+	@echo -e $(BOLD)Stopping Postgres database...$(END_BOLD)
+	docker kill "$(POSTGRES_CONTAINER)"
+
+stop_mysql:
+	@echo -e $(BOLD)Stopping MySQL database...$(END_BOLD)
+	docker kill "$(MYSQL_CONTAINER)"
+
+stop_sqlite:
+	@echo -e $(BOLD)Stopping SQLite database...$(END_BOLD)
+	rm "$(SQLITE_FILE)"
 
 clippy:
 	cargo clippy --verbose --all-targets --all-features -- -D warnings
 
-diesel_sqlite:
-	cd fang/sqlite_migrations && DATABASE_URL=sqlite://../../fang.db diesel migration run
-
-diesel_postgres:
-	cd fang/postgres_migrations && DATABASE_URL=postgres://postgres:postgres@localhost/fang diesel migration run
-
-diesel_mysql:
-	cd fang/mysql_migrations && DATABASE_URL=mysql://root:fang@127.0.0.1/fang diesel migration run
-
-stop_mysql: 
-	docker kill mysql
-
-stop_postgres:
-	docker kill postgres
-
-stop_sqlite:
-	rm fang.db
 tests:
-	DATABASE_URL=postgres://postgres:postgres@localhost/fang cargo test --all-features -- --color always --nocapture
+	@echo -e $(BOLD)Running tests...$(END_BOLD)
+	cargo test --all-features -- --color always --nocapture
 
 ignored:
-	DATABASE_URL=postgres://postgres:postgres@localhost/fang cargo test --all-features -- --color always --nocapture --ignored
+	@echo -e $(BOLD)Running ignored tests...$(END_BOLD)
+	cargo test --all-features -- --color always --nocapture --ignored
+	$(MAKE) clean
 
 doc:
-	cargo doc --open
+	cargo doc --package fang --open
