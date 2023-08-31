@@ -210,8 +210,6 @@ impl AsyncQueue {
 
         log::info!("Database {db_name} created !!");
 
-        drop(conn);
-
         res.connected = false;
         res.pool = None;
         res.uri = format!("{}/{}", base_url, db_name);
