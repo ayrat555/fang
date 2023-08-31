@@ -8,50 +8,53 @@ Background task processing library for Rust. It uses Postgres DB as a task queue
 
 ## Key Features
 
- Here are some of the fang's key features:
+Here are some of the fang's key features:
 
- - Async and threaded workers.
-   Workers can be started in threads (threaded workers) or `tokio` tasks (async workers)
- - Scheduled tasks.
-   Tasks can be scheduled at any time in the future
- - Periodic (CRON) tasks.
-   Tasks can be scheduled using cron expressions
- - Unique tasks.
-   Tasks are not duplicated in the queue if they are unique
- - Single-purpose workers.
-   Tasks are stored in a single table but workers can execute only tasks of the specific type
- - Retries.
-   Tasks can be retried with a custom backoff mode
+- Async and threaded workers.
+  Workers can be started in threads (threaded workers) or `tokio` tasks (async workers)
+- Scheduled tasks.
+  Tasks can be scheduled at any time in the future
+- Periodic (CRON) tasks.
+  Tasks can be scheduled using cron expressions
+- Unique tasks.
+  Tasks are not duplicated in the queue if they are unique
+- Single-purpose workers.
+  Tasks are stored in a single table but workers can execute only tasks of the specific type
+- Retries.
+  Tasks can be retried with a custom backoff mode
 
 ## Installation
 
 1. Add this to your Cargo.toml
 
-
 #### the Blocking feature
+
 ```toml
 [dependencies]
 fang = { version = "0.10.4" , features = ["blocking"], default-features = false }
 ```
 
 #### the Asynk feature
+
 ```toml
 [dependencies]
 fang = { version = "0.10.4" , features = ["asynk"], default-features = false }
 ```
 
 #### the Asynk feature with derive macro
+
 ```toml
 [dependencies]
 fang = { version = "0.10.4" , features = ["asynk", "derive-error" ], default-features = false }
 ```
 
 #### All features
+
 ```toml
 fang = { version = "0.10.4" }
 ```
 
-*Supports rustc 1.62+*
+_Supports rustc 1.62+_
 
 2. Create the `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/fang/postgres_migrations/migrations/2022-08-20-151615_create_fang_tasks/up.sql).
 
@@ -60,10 +63,10 @@ fang = { version = "0.10.4" }
 ### Defining a task
 
 #### Blocking feature
+
 Every task should implement the `fang::Runnable` trait which is used by `fang` to execute it.
 
 If you have a `CustomError`, it is recommended to implement `From<FangError>`. So this way you can use [? operator](https://stackoverflow.com/questions/42917566/what-is-this-question-mark-operator-about#42921174) inside the `run` function available in `fang::Runnable` trait.
-
 
 You can easily implement it with the macro `ToFangError`. This macro is only available in the feature `derive-error`.
 
@@ -79,21 +82,20 @@ use std::fmt::Debug;
 
 #[derive(Debug, ToFangError)]
 enum CustomError {
-  ErrorOne(String),
-  ErrorTwo(u32),
+    ErrorOne(String),
+    ErrorTwo(u32),
 }
 
 fn my_func(num : u16) -> Result<(), CustomError> {
+    if num == 0 {
+        Err(CustomError::ErrorOne("is zero".to_string()))
+    }
 
-  if num == 0 {
-    Err(CustomError::ErrorOne("is zero".to_string()))
-  }
+    if num > 500 {
+        Err(CustomError::ErrorTwo(num))
+    }
 
-  if num > 500 {
-    Err(CustomError::ErrorTwo(num))
-  }
-
-  Ok(())
+    Ok(())
 }
 
 #[derive(Serialize, Deserialize)]
@@ -107,8 +109,8 @@ impl Runnable for MyTask {
     fn run(&self, _queue: &dyn Queueable) -> Result<(), FangError> {
         println!("the number is {}", self.number);
 
-        my_func(self.number)?; 
-        // You can use ? operator because 
+        my_func(self.number)?;
+        // You can use ? operator because
         // From<FangError> is implemented thanks to ToFangError derive macro.
 
         Ok(())
@@ -117,13 +119,13 @@ impl Runnable for MyTask {
     // If `uniq` is set to true and the task is already in the storage, it won't be inserted again
     // The existing record will be returned for for any insertions operaiton
     fn uniq(&self) -> bool {
-      true
+        true
     }
 
     // This will be useful if you want to filter tasks.
     // the default value is `common`
     fn task_type(&self) -> String {
-      "my_task".to_string()
+        "my_task".to_string()
     }
 
     // This will be useful if you would like to schedule tasks.
@@ -136,12 +138,12 @@ impl Runnable for MyTask {
     // the maximum number of retries. Set it to 0 to make it not retriable
     // the default value is 20
     fn max_retries(&self) -> i32 {
-      20
+        20
     }
 
     // backoff mode for retries
     fn backoff(&self, attempt: u32) -> u32 {
-      u32::pow(2, attempt)
+        u32::pow(2, attempt)
     }
 }
 ```
@@ -150,11 +152,12 @@ As you can see from the example above, the trait implementation has `#[typetag::
 
 The second parameter of the `run` function is a struct that implements `fang::Queueable`. You can re-use it to manipulate the task queue, for example, to add a new job during the current job's execution. If you don't need it, just ignore it.
 
-
 #### Asynk feature
+
 Every task should implement `fang::AsyncRunnable` trait which is used by `fang` to execute it.
 
 Be careful not to call two implementations of the AsyncRunnable trait with the same name, because it will cause a failure in the `typetag` crate.
+
 ```rust
 use fang::AsyncRunnable;
 use fang::asynk::async_queue::AsyncQueueable;
@@ -164,7 +167,7 @@ use fang::async_trait;
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "fang::serde")]
 struct AsyncTask {
-  pub number: u16,
+    pub number: u16,
 }
 
 #[typetag::serde]
@@ -183,7 +186,7 @@ impl AsyncRunnable for AsyncTask {
     // If `uniq` is set to true and the task is already in the storage, it won't be inserted again
     // The existing record will be returned for for any insertions operaiton
     fn uniq(&self) -> bool {
-      true
+        true
     }
 
     // This will be useful if you would like to schedule tasks.
@@ -196,12 +199,12 @@ impl AsyncRunnable for AsyncTask {
     // the maximum number of retries. Set it to 0 to make it not retriable
     // the default value is 20
     fn max_retries(&self) -> i32 {
-      20
+        20
     }
 
     // backoff mode for retries
     fn backoff(&self, attempt: u32) -> u32 {
-      u32::pow(2, attempt)
+        u32::pow(2, attempt)
     }
 }
 ```
@@ -215,13 +218,13 @@ Example:
 If your timezone is UTC + 2 and you want to schedule at 11:00:
 
 ```rust
- let expression = "0 0 9 * * * *";
+let expression = "0 0 9 * * * *";
 ```
-
 
 ### Enqueuing a task
 
 #### the Blocking feature
+
 To enqueue a task use `Queue::enqueue_task`
 
 ```rust
@@ -231,16 +234,17 @@ use fang::Queue;
 
 // create a fang queue
 
- let queue = Queue::builder().connection_pool(pool).build();
+let queue = Queue::builder().connection_pool(pool).build();
 
- let task_inserted = queue.insert_task(&MyTask::new(1)).unwrap();
-
+let task_inserted = queue.insert_task(&MyTask::new(1)).unwrap();
 ```
 
 #### the Asynk feature
+
 To enqueue a task use `AsyncQueueable::insert_task`.
 
-For Postgres backend.
+For Postgres backend:
+
 ```rust
 use fang::asynk::async_queue::AsyncQueue;
 use fang::NoTls;
@@ -258,26 +262,26 @@ let mut queue = AsyncQueue::builder()
 
 // Always connect first in order to perform any operation
 queue.connect(NoTls).await.unwrap();
-
 ```
-As an easy example, we are using NoTls type. If for some reason you would like to encrypt Postgres requests, you can use [openssl](https://docs.rs/postgres-openssl/latest/postgres_openssl/)  or [native-tls](https://docs.rs/postgres-native-tls/latest/postgres_native_tls/).
+
+As an easy example, we are using NoTls type. If for some reason you would like to encrypt Postgres requests, you can use [openssl](https://docs.rs/postgres-openssl/latest/postgres_openssl/) or [native-tls](https://docs.rs/postgres-native-tls/latest/postgres_native_tls/).
 
 ```rust
 // AsyncTask from the first example
 let task = AsyncTask { 8 };
 let task_returned = queue
-  .insert_task(&task as &dyn AsyncRunnable)
-  .await
-  .unwrap();
+    .insert_task(&task as &dyn AsyncRunnable)
+    .await
+    .unwrap();
 ```
 
 ### Starting workers
 
 #### the Blocking feature
+
 Every worker runs in a separate thread. In case of panic, they are always restarted.
 
 Use `WorkerPool` to start workers. Use `WorkerPool::builder` to create your worker pool and run tasks.
-
 
 ```rust
 use fang::WorkerPool;
@@ -288,7 +292,7 @@ use fang::Queue;
 let mut worker_pool = WorkerPool::<Queue>::builder()
     .queue(queue)
     .number_of_workers(3_u32)
-     // if you want to run tasks of the specific kind
+    // if you want to run tasks of the specific kind
     .task_type("my_task_type")
     .build();
 
@@ -296,6 +300,7 @@ worker_pool.start();
 ```
 
 #### the Asynk feature
+
 Every worker runs in a separate `tokio` task. In case of panic, they are always restarted.
 Use `AsyncWorkerPool` to start workers.
 
@@ -308,13 +313,12 @@ use fang::asynk::async_worker_pool::AsyncWorkerPool;
 let mut pool: AsyncWorkerPool<AsyncQueue<NoTls>> = AsyncWorkerPool::builder()
         .number_of_workers(max_pool_size)
         .queue(queue.clone())
-         // if you want to run tasks of the specific kind
+        // if you want to run tasks of the specific kind
         .task_type("my_task_type")
         .build();
 
 pool.start().await;
 ```
-
 
 Check out:
 
@@ -370,8 +374,8 @@ pub struct SleepParams {
 
 If there are no tasks in the DB, a worker sleeps for `sleep_period` and each time this value increases by `sleep_step` until it reaches `max_sleep_period`. `min_sleep_period` is the initial value for `sleep_period`. All values are in seconds.
 
-
 Use `set_sleep_params` to set it:
+
 ```rust
 let sleep_params = SleepParams {
     sleep_period: Duration::from_secs(2),
@@ -392,43 +396,48 @@ Set sleep params with worker pools `TypeBuilder` in both modules.
 5. Create a new Pull Request
 
 ### Running tests locally
+
 - Install diesel_cli.
-```
+
+```sh
 cargo install diesel_cli --no-default-features --features "postgres sqlite mysql"
 ```
+
 - Install docker on your machine.
 
-- Run a Postgres docker container. (See in Makefile.)
-```
-make db_postgres
+- Install SQLite 3 on your machine.
+
+- Setup databases for testing.
+
+```sh
+make -j db
 ```
 
-- Run the migrations
-```
-make diesel_postgres
+- Run tests. `make db` does not need to be run in between each test cycle.
+
+```sh
+make -j tests
 ```
 
-- Run tests
-```
-make tests
+- Run dirty/long tests.
+
+```sh
+make -j ignored
 ```
 
-- Run dirty//long tests, DB must be recreated afterwards.
-```
-make ignored
+- Take down databases.
+
+```sh
+make -j stop
 ```
 
-- Kill the docker container
-```
-make stop
-```
+The `-j` flag in the above examples enables parallelism for `make`, is not necessary but highly recommended.
 
 ## Authors
 
 - Ayrat Badykov (@ayrat555)
 
 - Pepe Márquez (@pxp9)
-
 
 [s1]: https://img.shields.io/crates/v/fang.svg
 [docs-badge]: https://img.shields.io/badge/docs-website-blue.svg
