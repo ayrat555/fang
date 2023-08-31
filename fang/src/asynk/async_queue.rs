@@ -165,16 +165,22 @@ use sqlx::Executor;
 #[cfg(test)]
 use std::path::Path;
 
+#[cfg(test)]
+use std::env;
+
 use super::backend_sqlx::BackendSqlX;
 
 #[cfg(test)]
 impl AsyncQueue {
     /// Provides an AsyncQueue connected to its own DB
     pub async fn test_postgres() -> Self {
-        const BASE_URI: &str = "postgres://postgres:postgres@localhost";
+        dotenvy::dotenv().expect(".env file not found");
+        let base_url = env::var("POSTGRES_BASE_URL").expect("Base URL for Postgres not found");
+        let base_db = env::var("POSTGRES_DB").expect("Name for base Postgres DB not found");
+
         let mut res = Self::builder()
             .max_pool_size(1_u32)
-            .uri(format!("{}/fang", BASE_URI))
+            .uri(format!("{}/{}", base_url, base_db))
             .build();
 
         let mut new_number = ASYNC_QUEUE_POSTGRES_TEST_COUNTER.lock().await;
@@ -192,10 +198,12 @@ impl AsyncQueue {
         conn.execute(delete_query).await.unwrap();
 
         log::info!("Creating database {db_name} ...");
+        let expected_error: &str = &format!(
+            "source database \"{}\" is being accessed by other users",
+            base_db
+        );
         while let Err(e) = conn.execute(create_query).await {
-            if e.as_database_error().unwrap().message()
-                != "source database \"fang\" is being accessed by other users"
-            {
+            if e.as_database_error().unwrap().message() != expected_error {
                 panic!("{:?}", e);
             }
         }
@@ -206,7 +214,7 @@ impl AsyncQueue {
 
         res.connected = false;
         res.pool = None;
-        res.uri = format!("{}/{}", BASE_URI, db_name);
+        res.uri = format!("{}/{}", base_url, db_name);
         res.connect().await.unwrap();
 
         res
@@ -214,11 +222,14 @@ impl AsyncQueue {
 
     /// Provides an AsyncQueue connected to its own DB
     pub async fn test_sqlite() -> Self {
-        const BASE_FILE: &str = "../fang.db";
+        dotenvy::dotenv().expect(".env file not found");
+        let tests_dir = env::var("SQLITE_TESTS_DIR").expect("Name for tests directory not found");
+        let base_file = env::var("SQLITE_FILE").expect("Name for SQLite DB file not found");
+        let sqlite_file = format!("../{}", base_file);
 
         let mut new_number = ASYNC_QUEUE_SQLITE_TEST_COUNTER.lock().await;
 
-        let db_name = format!("../tests_sqlite/async_queue_test_{}.db", *new_number);
+        let db_name = format!("../{}/async_queue_test_{}.db", tests_dir, *new_number);
         *new_number += 1;
 
         let path = Path::new(&db_name);
@@ -229,7 +240,7 @@ impl AsyncQueue {
         }
 
         log::info!("Creating database {db_name} ...");
-        std::fs::copy(BASE_FILE, &db_name).unwrap();
+        std::fs::copy(sqlite_file, &db_name).unwrap();
         log::info!("Database {db_name} created !!");
 
         let mut res = Self::builder()
