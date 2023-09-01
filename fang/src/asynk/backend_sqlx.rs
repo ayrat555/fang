@@ -54,7 +54,7 @@ impl BackendSqlX {
         }
     }
 
-    pub (crate) fn select_query<'a>(&self, query: SqlXQuery) -> &'a str {
+    pub(crate) fn select_query<'a>(&self, query: SqlXQuery) -> &'a str {
         match self {
             BackendSqlX::Pg => BackendSqlXPg::select_query(query),
             BackendSqlX::Sqlite => BackendSqlXSQLite::select_query(query),
@@ -64,7 +64,7 @@ impl BackendSqlX {
     }
 
     // I think it is useful to have this method, although it is not used
-    pub (crate) fn _name(&self) -> &str {
+    pub(crate) fn _name(&self) -> &str {
         match self {
             BackendSqlX::Pg => BackendSqlXPg::_name(),
             BackendSqlX::Sqlite => BackendSqlXSQLite::_name(),
@@ -88,13 +88,13 @@ pub(crate) enum SqlXQuery {
     FetchTaskType,
     FindTaskByUniqHash,
     FindTaskById,
-    RetryTask
+    RetryTask,
 }
 
 #[derive(Debug, Clone)]
 struct BackendSqlXPg {}
 
-use SqlXQuery as Q ;
+use SqlXQuery as Q;
 impl BackendSqlXPg {
     fn select_query(query: SqlXQuery) -> &'static str {
         match query {
