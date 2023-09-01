@@ -37,7 +37,7 @@ const FIND_TASK_BY_ID_QUERY_SQLITE: &str = include_str!("queries_sqlite/find_tas
 const RETRY_TASK_QUERY_SQLITE: &str = include_str!("queries_sqlite/retry_task.sql");
 
 #[derive(Debug, Clone)]
-pub enum BackendSqlX {
+pub(crate) enum BackendSqlX {
     Pg,
     Sqlite,
     Mysql,
@@ -54,7 +54,7 @@ impl BackendSqlX {
         }
     }
 
-    pub fn select_query<'a>(&self, query: &'a str) -> &'a str {
+    pub (crate) fn select_query<'a>(&self, query: SqlXQuery) -> &'a str {
         match self {
             BackendSqlX::Pg => BackendSqlXPg::select_query(query),
             BackendSqlX::Sqlite => BackendSqlXSQLite::select_query(query),
@@ -62,40 +62,59 @@ impl BackendSqlX {
             _ => unreachable!(),
         }
     }
-    pub fn name(&self) -> &str {
+
+    // I think it is useful to have this method, although it is not used
+    pub (crate) fn _name(&self) -> &str {
         match self {
-            BackendSqlX::Pg => BackendSqlXPg::name(),
-            BackendSqlX::Sqlite => BackendSqlXSQLite::name(),
-            BackendSqlX::Mysql => BackendSqlXMySQL::name(),
+            BackendSqlX::Pg => BackendSqlXPg::_name(),
+            BackendSqlX::Sqlite => BackendSqlXSQLite::_name(),
+            BackendSqlX::Mysql => BackendSqlXMySQL::_name(),
             _ => unreachable!(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
+pub(crate) enum SqlXQuery {
+    InsertTask,
+    InsertTaskUniq,
+    UpdateTaskState,
+    FailTask,
+    RemoveAllTask,
+    RemoveAllScheduledTask,
+    RemoveTask,
+    RemoveTaskByMetadata,
+    RemoveTaskType,
+    FetchTaskType,
+    FindTaskByUniqHash,
+    FindTaskById,
+    RetryTask
+}
+
+#[derive(Debug, Clone)]
 struct BackendSqlXPg {}
 
+use SqlXQuery as Q ;
 impl BackendSqlXPg {
-    fn select_query(query: &str) -> &str {
+    fn select_query(query: SqlXQuery) -> &'static str {
         match query {
-            "INSERT_TASK_QUERY" => INSERT_TASK_QUERY_POSTGRES,
-            "INSERT_TASK_UNIQ_QUERY" => INSERT_TASK_UNIQ_QUERY_POSTGRES,
-            "UPDATE_TASK_STATE_QUERY" => UPDATE_TASK_STATE_QUERY_POSTGRES,
-            "FAIL_TASK_QUERY" => FAIL_TASK_QUERY_POSTGRES,
-            "REMOVE_ALL_TASK_QUERY" => REMOVE_ALL_TASK_QUERY_POSTGRES,
-            "REMOVE_ALL_SCHEDULED_TASK_QUERY" => REMOVE_ALL_SCHEDULED_TASK_QUERY_POSTGRES,
-            "REMOVE_TASK_QUERY" => REMOVE_TASK_QUERY_POSTGRES,
-            "REMOVE_TASK_BY_METADATA_QUERY" => REMOVE_TASK_BY_METADATA_QUERY_POSTGRES,
-            "REMOVE_TASKS_TYPE_QUERY" => REMOVE_TASKS_TYPE_QUERY_POSTGRES,
-            "FETCH_TASK_TYPE_QUERY" => FETCH_TASK_TYPE_QUERY_POSTGRES,
-            "FIND_TASK_BY_UNIQ_HASH_QUERY" => FIND_TASK_BY_UNIQ_HASH_QUERY_POSTGRES,
-            "FIND_TASK_BY_ID_QUERY" => FIND_TASK_BY_ID_QUERY_POSTGRES,
-            "RETRY_TASK_QUERY" => RETRY_TASK_QUERY_POSTGRES,
-            _ => unreachable!(),
+            Q::InsertTask => INSERT_TASK_QUERY_POSTGRES,
+            Q::InsertTaskUniq => INSERT_TASK_UNIQ_QUERY_POSTGRES,
+            Q::UpdateTaskState => UPDATE_TASK_STATE_QUERY_POSTGRES,
+            Q::FailTask => FAIL_TASK_QUERY_POSTGRES,
+            Q::RemoveAllTask => REMOVE_ALL_TASK_QUERY_POSTGRES,
+            Q::RemoveAllScheduledTask => REMOVE_ALL_SCHEDULED_TASK_QUERY_POSTGRES,
+            Q::RemoveTask => REMOVE_TASK_QUERY_POSTGRES,
+            Q::RemoveTaskByMetadata => REMOVE_TASK_BY_METADATA_QUERY_POSTGRES,
+            Q::RemoveTaskType => REMOVE_TASKS_TYPE_QUERY_POSTGRES,
+            Q::FetchTaskType => FETCH_TASK_TYPE_QUERY_POSTGRES,
+            Q::FindTaskByUniqHash => FIND_TASK_BY_UNIQ_HASH_QUERY_POSTGRES,
+            Q::FindTaskById => FIND_TASK_BY_ID_QUERY_POSTGRES,
+            Q::RetryTask => RETRY_TASK_QUERY_POSTGRES,
         }
     }
 
-    fn name() -> &'static str {
+    fn _name() -> &'static str {
         "PostgreSQL"
     }
 }
@@ -104,26 +123,25 @@ impl BackendSqlXPg {
 struct BackendSqlXSQLite {}
 
 impl BackendSqlXSQLite {
-    fn select_query(query: &str) -> &str {
+    fn select_query(query: SqlXQuery) -> &'static str {
         match query {
-            "INSERT_TASK_QUERY" => INSERT_TASK_QUERY_SQLITE,
-            "INSERT_TASK_UNIQ_QUERY" => INSERT_TASK_UNIQ_QUERY_SQLITE,
-            "UPDATE_TASK_STATE_QUERY" => UPDATE_TASK_STATE_QUERY_SQLITE,
-            "FAIL_TASK_QUERY" => FAIL_TASK_QUERY_SQLITE,
-            "REMOVE_ALL_TASK_QUERY" => REMOVE_ALL_TASK_QUERY_SQLITE,
-            "REMOVE_ALL_SCHEDULED_TASK_QUERY" => REMOVE_ALL_SCHEDULED_TASK_QUERY_SQLITE,
-            "REMOVE_TASK_QUERY" => REMOVE_TASK_QUERY_SQLITE,
-            "REMOVE_TASK_BY_METADATA_QUERY" => REMOVE_TASK_BY_METADATA_QUERY_SQLITE,
-            "REMOVE_TASKS_TYPE_QUERY" => REMOVE_TASKS_TYPE_QUERY_SQLITE,
-            "FETCH_TASK_TYPE_QUERY" => FETCH_TASK_TYPE_QUERY_SQLITE,
-            "FIND_TASK_BY_UNIQ_HASH_QUERY" => FIND_TASK_BY_UNIQ_HASH_QUERY_SQLITE,
-            "FIND_TASK_BY_ID_QUERY" => FIND_TASK_BY_ID_QUERY_SQLITE,
-            "RETRY_TASK_QUERY" => RETRY_TASK_QUERY_SQLITE,
-            _ => unreachable!(),
+            Q::InsertTask => INSERT_TASK_QUERY_SQLITE,
+            Q::InsertTaskUniq => INSERT_TASK_UNIQ_QUERY_SQLITE,
+            Q::UpdateTaskState => UPDATE_TASK_STATE_QUERY_SQLITE,
+            Q::FailTask => FAIL_TASK_QUERY_SQLITE,
+            Q::RemoveAllTask => REMOVE_ALL_TASK_QUERY_SQLITE,
+            Q::RemoveAllScheduledTask => REMOVE_ALL_SCHEDULED_TASK_QUERY_SQLITE,
+            Q::RemoveTask => REMOVE_TASK_QUERY_SQLITE,
+            Q::RemoveTaskByMetadata => REMOVE_TASK_BY_METADATA_QUERY_SQLITE,
+            Q::RemoveTaskType => REMOVE_TASKS_TYPE_QUERY_SQLITE,
+            Q::FetchTaskType => FETCH_TASK_TYPE_QUERY_SQLITE,
+            Q::FindTaskByUniqHash => FIND_TASK_BY_UNIQ_HASH_QUERY_SQLITE,
+            Q::FindTaskById => FIND_TASK_BY_ID_QUERY_SQLITE,
+            Q::RetryTask => RETRY_TASK_QUERY_SQLITE,
         }
     }
 
-    fn name() -> &'static str {
+    fn _name() -> &'static str {
         "SQLite"
     }
 }
@@ -132,29 +150,28 @@ impl BackendSqlXSQLite {
 struct BackendSqlXMySQL {}
 
 impl BackendSqlXMySQL {
-    fn select_query(query: &str) -> &str {
+    fn select_query(query: SqlXQuery) -> &'static str {
         // TODO: MySQL queries
         let _query = match query {
-            "INSERT_TASK_QUERY" => INSERT_TASK_QUERY_POSTGRES,
-            "INSERT_TASK_UNIQ_QUERY" => INSERT_TASK_UNIQ_QUERY_POSTGRES,
-            "UPDATE_TASK_STATE_QUERY" => UPDATE_TASK_STATE_QUERY_POSTGRES,
-            "FAIL_TASK_QUERY" => FAIL_TASK_QUERY_POSTGRES,
-            "REMOVE_ALL_TASK_QUERY" => REMOVE_ALL_TASK_QUERY_POSTGRES,
-            "REMOVE_ALL_SCHEDULED_TASK_QUERY" => REMOVE_ALL_SCHEDULED_TASK_QUERY_POSTGRES,
-            "REMOVE_TASK_QUERY" => REMOVE_TASK_QUERY_POSTGRES,
-            "REMOVE_TASK_BY_METADATA_QUERY" => REMOVE_TASK_BY_METADATA_QUERY_POSTGRES,
-            "REMOVE_TASKS_TYPE_QUERY" => REMOVE_TASKS_TYPE_QUERY_POSTGRES,
-            "FETCH_TASK_TYPE_QUERY" => FETCH_TASK_TYPE_QUERY_POSTGRES,
-            "FIND_TASK_BY_UNIQ_HASH_QUERY" => FIND_TASK_BY_UNIQ_HASH_QUERY_POSTGRES,
-            "FIND_TASK_BY_ID_QUERY" => FIND_TASK_BY_ID_QUERY_POSTGRES,
-            "RETRY_TASK_QUERY" => RETRY_TASK_QUERY_POSTGRES,
-            _ => unreachable!(),
+            Q::InsertTask => INSERT_TASK_QUERY_SQLITE,
+            Q::InsertTaskUniq => INSERT_TASK_UNIQ_QUERY_SQLITE,
+            Q::UpdateTaskState => UPDATE_TASK_STATE_QUERY_SQLITE,
+            Q::FailTask => FAIL_TASK_QUERY_SQLITE,
+            Q::RemoveAllTask => REMOVE_ALL_TASK_QUERY_SQLITE,
+            Q::RemoveAllScheduledTask => REMOVE_ALL_SCHEDULED_TASK_QUERY_SQLITE,
+            Q::RemoveTask => REMOVE_TASK_QUERY_SQLITE,
+            Q::RemoveTaskByMetadata => REMOVE_TASK_BY_METADATA_QUERY_SQLITE,
+            Q::RemoveTaskType => REMOVE_TASKS_TYPE_QUERY_SQLITE,
+            Q::FetchTaskType => FETCH_TASK_TYPE_QUERY_SQLITE,
+            Q::FindTaskByUniqHash => FIND_TASK_BY_UNIQ_HASH_QUERY_SQLITE,
+            Q::FindTaskById => FIND_TASK_BY_ID_QUERY_SQLITE,
+            Q::RetryTask => RETRY_TASK_QUERY_SQLITE,
         };
 
         todo!()
     }
 
-    fn name() -> &'static str {
+    fn _name() -> &'static str {
         "MySQL"
     }
 }

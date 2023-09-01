@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod async_queue_tests;
 
+use crate::SqlXQuery;
 use crate::asynk::async_runnable::AsyncRunnable;
 use crate::CronError;
 use crate::FangTaskState;
@@ -287,7 +288,7 @@ impl AsyncQueue {
         transaction: &mut Transaction<'_, Any>,
         backend: &BackendSqlX,
     ) -> Result<u64, AsyncQueueError> {
-        let query = backend.select_query("REMOVE_ALL_TASK_QUERY");
+        let query = backend.select_query(SqlXQuery::RemoveAllTask);
 
         Ok(sqlx::query(query)
             .execute(transaction.acquire().await?)
@@ -299,7 +300,7 @@ impl AsyncQueue {
         transaction: &mut Transaction<'_, Any>,
         backend: &BackendSqlX,
     ) -> Result<u64, AsyncQueueError> {
-        let query = backend.select_query("REMOVE_ALL_SCHEDULED_TASK_QUERY");
+        let query = backend.select_query(SqlXQuery::RemoveAllScheduledTask);
 
         let now_str = format!("{}", Utc::now().format("%F %T%.f+00"));
 
@@ -315,7 +316,7 @@ impl AsyncQueue {
         backend: &BackendSqlX,
         id: &Uuid,
     ) -> Result<u64, AsyncQueueError> {
-        let query = backend.select_query("REMOVE_TASK_QUERY");
+        let query = backend.select_query(SqlXQuery::RemoveTask);
 
         let mut buffer = Uuid::encode_buffer();
         let uuid_as_text = id.as_hyphenated().encode_lower(&mut buffer);
@@ -345,7 +346,7 @@ impl AsyncQueue {
 
         let uniq_hash = Self::calculate_hash(metadata.to_string());
 
-        let query = backend.select_query("REMOVE_TASK_BY_METADATA_QUERY");
+        let query = backend.select_query(SqlXQuery::RemoveTaskByMetadata);
 
         Ok(sqlx::query(query)
             .bind(uniq_hash)
@@ -359,7 +360,7 @@ impl AsyncQueue {
         backend: &BackendSqlX,
         task_type: &str,
     ) -> Result<u64, AsyncQueueError> {
-        let query = backend.select_query("REMOVE_TASKS_TYPE_QUERY");
+        let query = backend.select_query(SqlXQuery::RemoveTaskType);
 
         Ok(sqlx::query(query)
             .bind(task_type)
@@ -373,7 +374,7 @@ impl AsyncQueue {
         backend: &BackendSqlX,
         id: &Uuid,
     ) -> Result<Task, AsyncQueueError> {
-        let query = backend.select_query("FIND_TASK_BY_ID_QUERY");
+        let query = backend.select_query(SqlXQuery::FindTaskById);
 
         let mut buffer = Uuid::encode_buffer();
         let uuid_as_text = id.as_hyphenated().encode_lower(&mut buffer);
@@ -392,7 +393,7 @@ impl AsyncQueue {
         task: &Task,
         error_message: &str,
     ) -> Result<Task, AsyncQueueError> {
-        let query = backend.select_query("FAIL_TASK_QUERY");
+        let query = backend.select_query(SqlXQuery::FailTask);
 
         let updated_at = format!("{}", Utc::now().format("%F %T%.f+00"));
 
@@ -417,7 +418,7 @@ impl AsyncQueue {
         backoff_seconds: u32,
         error: &str,
     ) -> Result<Task, AsyncQueueError> {
-        let query = backend.select_query("RETRY_TASK_QUERY");
+        let query = backend.select_query(SqlXQuery::RetryTask);
 
         let now = Utc::now();
         let now_str = format!("{}", now.format("%F %T%.f+00"));
@@ -478,7 +479,7 @@ impl AsyncQueue {
         backend: &BackendSqlX,
         task_type: &str,
     ) -> Result<Task, AsyncQueueError> {
-        let query = backend.select_query("FETCH_TASK_TYPE_QUERY");
+        let query = backend.select_query(SqlXQuery::FetchTaskType);
 
         let now_str = format!("{}", Utc::now().format("%F %T%.f+00"));
 
@@ -497,7 +498,7 @@ impl AsyncQueue {
         task: &Task,
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError> {
-        let query = backend.select_query("UPDATE_TASK_STATE_QUERY");
+        let query = backend.select_query(SqlXQuery::UpdateTaskState);
 
         let updated_at_str = format!("{}", Utc::now().format("%F %T%.f+00"));
 
@@ -523,7 +524,7 @@ impl AsyncQueue {
         task_type: &str,
         scheduled_at: DateTime<Utc>,
     ) -> Result<Task, AsyncQueueError> {
-        let query = backend.select_query("INSERT_TASK_QUERY");
+        let query = backend.select_query(SqlXQuery::InsertTask);
 
         let uuid = Uuid::new_v4();
         let mut buffer = Uuid::encode_buffer();
@@ -549,7 +550,7 @@ impl AsyncQueue {
         task_type: &str,
         scheduled_at: DateTime<Utc>,
     ) -> Result<Task, AsyncQueueError> {
-        let query = backend.select_query("INSERT_TASK_UNIQ_QUERY");
+        let query = backend.select_query(SqlXQuery::InsertTaskUniq);
 
         let uuid = Uuid::new_v4();
         let mut buffer = Uuid::encode_buffer();
@@ -605,7 +606,7 @@ impl AsyncQueue {
         backend: &BackendSqlX,
         metadata: &serde_json::Value,
     ) -> Option<Task> {
-        let query = backend.select_query("FIND_TASK_BY_UNIQ_HASH_QUERY");
+        let query = backend.select_query(SqlXQuery::FindTaskByUniqHash);
 
         let uniq_hash = Self::calculate_hash(metadata.to_string());
 
