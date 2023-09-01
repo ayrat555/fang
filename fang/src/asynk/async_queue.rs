@@ -250,6 +250,56 @@ impl AsyncQueue {
         res.connect().await.expect("fail to connect");
         res
     }
+
+    /// Provides an AsyncQueue connected to its own DB
+    pub async fn test_mysql() -> Self {
+        dotenvy::dotenv().expect(".env file not found");
+        let base_url = env::var("MYSQL_BASE_URL").expect("Base URL for MySQL not found");
+        let base_db = env::var("MYSQL_DB").expect("Name for base MySQL DB not found");
+
+        let mut res = Self::builder()
+            .max_pool_size(1_u32)
+            .uri(format!("{}/{}", base_url, base_db))
+            .build();
+
+        let mut new_number = ASYNC_QUEUE_POSTGRES_TEST_COUNTER.lock().await;
+        res.connect().await.unwrap();
+
+        let db_name = format!("async_queue_test_{}", *new_number);
+        *new_number += 1;
+
+        let create_query: &str = &format!(
+            "CREATE DATABASE {}; CREATE TABLE {}.fang_tasks LIKE fang.fang_tasks;",
+            db_name, db_name
+        );
+
+        let delete_query: &str = &format!("DROP DATABASE IF EXISTS {};", db_name);
+
+        let mut conn = res.pool.as_mut().unwrap().acquire().await.unwrap();
+
+        log::info!("Deleting database {db_name} ...");
+        conn.execute(delete_query).await.unwrap();
+
+        log::info!("Creating database {db_name} ...");
+        let expected_error: &str = &format!(
+            "source database \"{}\" is being accessed by other users",
+            base_db
+        );
+        while let Err(e) = conn.execute(create_query).await {
+            if e.as_database_error().unwrap().message() != expected_error {
+                panic!("{:?}", e);
+            }
+        }
+
+        log::info!("Database {db_name} created !!");
+
+        res.connected = false;
+        res.pool = None;
+        res.uri = format!("{}/{}", base_url, db_name);
+        res.connect().await.unwrap();
+
+        res
+    }
 }
 
 impl AsyncQueue {
@@ -860,3 +910,6 @@ impl AsyncQueueable for AsyncQueue {
 test_asynk_queue! {postgres, crate::AsyncQueue, crate::AsyncQueue::test_postgres()}
 #[cfg(test)]
 test_asynk_queue! {sqlite, crate::AsyncQueue, crate::AsyncQueue::test_sqlite()}
+
+#[cfg(test)]
+test_asynk_queue! {mysql, crate::AsyncQueue, crate::AsyncQueue::test_mysql()}
