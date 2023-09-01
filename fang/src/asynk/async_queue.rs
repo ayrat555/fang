@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod async_queue_tests;
 
-use crate::SqlXQuery;
+use crate::backend_sqlx::SqlXQuery;
 use crate::asynk::async_runnable::AsyncRunnable;
 use crate::CronError;
 use crate::FangTaskState;
