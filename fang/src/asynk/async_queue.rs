@@ -159,6 +159,9 @@ static ASYNC_QUEUE_POSTGRES_TEST_COUNTER: Mutex<u32> = Mutex::const_new(0);
 static ASYNC_QUEUE_SQLITE_TEST_COUNTER: Mutex<u32> = Mutex::const_new(0);
 
 #[cfg(test)]
+static ASYNC_QUEUE_MYSQL_TEST_COUNTER: Mutex<u32> = Mutex::const_new(0);
+
+#[cfg(test)]
 use sqlx::Executor;
 
 #[cfg(test)]
@@ -260,7 +263,7 @@ impl AsyncQueue {
             .uri(format!("{}/{}", base_url, base_db))
             .build();
 
-        let mut new_number = ASYNC_QUEUE_POSTGRES_TEST_COUNTER.lock().await;
+        let mut new_number = ASYNC_QUEUE_MYSQL_TEST_COUNTER.lock().await;
         res.connect().await.unwrap();
 
         let db_name = format!("async_queue_test_{}", *new_number);
