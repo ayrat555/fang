@@ -94,7 +94,6 @@ pub(crate) struct QueryParams<'a> {
 pub(crate) enum Res {
     BIGINT(u64),
     Task(Task),
-    OptTask(Option<Task>),
 }
 
 impl Res {
@@ -109,13 +108,6 @@ impl Res {
         match self {
             Res::Task(task) => task,
             _ => panic!("Can not unwrap a task"),
-        }
-    }
-
-    pub(crate) fn unwrap_opt_task(self) -> Option<Task> {
-        match self {
-            Res::OptTask(opt_task) => opt_task,
-            _ => panic!("Can not unwrap a opt_task"),
         }
     }
 }
@@ -160,7 +152,6 @@ impl BackendSqlX {
 #[derive(Debug, Clone)]
 pub(crate) enum SqlXQuery {
     InsertTask,
-    InsertTaskUniq,
     UpdateTaskState,
     FailTask,
     RemoveAllTask,
@@ -169,9 +160,9 @@ pub(crate) enum SqlXQuery {
     RemoveTaskByMetadata,
     RemoveTaskType,
     FetchTaskType,
-    FindTaskByUniqHash,
     FindTaskById,
     RetryTask,
+    InsertTaskIfNotExists,
 }
 
 #[derive(Debug, Clone)]
@@ -194,15 +185,6 @@ impl BackendSqlXPg {
                     general_any_impl_insert_task(INSERT_TASK_QUERY_POSTGRES, transaction, params)
                         .await?;
 
-                Ok(Res::Task(task))
-            }
-            Q::InsertTaskUniq => {
-                let task = general_any_impl_insert_task_uniq(
-                    INSERT_TASK_UNIQ_QUERY_POSTGRES,
-                    transaction,
-                    params,
-                )
-                .await?;
                 Ok(Res::Task(task))
             }
             Q::UpdateTaskState => {
@@ -273,16 +255,6 @@ impl BackendSqlXPg {
                 .await?;
                 Ok(Res::Task(task))
             }
-            Q::FindTaskByUniqHash => {
-                let opt_task: Option<Task> = general_any_impl_find_task_by_uniq_hash(
-                    FIND_TASK_BY_UNIQ_HASH_QUERY_POSTGRES,
-                    transaction,
-                    params,
-                )
-                .await;
-
-                Ok(Res::OptTask(opt_task))
-            }
             Q::FindTaskById => {
                 let task = general_any_impl_find_task_by_id(
                     FIND_TASK_BY_ID_QUERY_POSTGRES,
@@ -296,6 +268,19 @@ impl BackendSqlXPg {
                 let task =
                     general_any_impl_retry_task(RETRY_TASK_QUERY_POSTGRES, transaction, params)
                         .await?;
+
+                Ok(Res::Task(task))
+            }
+            Q::InsertTaskIfNotExists => {
+                let task = general_any_impl_insert_task_if_not_exists(
+                    (
+                        FIND_TASK_BY_UNIQ_HASH_QUERY_POSTGRES,
+                        INSERT_TASK_UNIQ_QUERY_POSTGRES,
+                    ),
+                    transaction,
+                    params,
+                )
+                .await?;
 
                 Ok(Res::Task(task))
             }
@@ -322,15 +307,6 @@ impl BackendSqlXSQLite {
                     general_any_impl_insert_task(INSERT_TASK_QUERY_SQLITE, transaction, params)
                         .await?;
 
-                Ok(Res::Task(task))
-            }
-            Q::InsertTaskUniq => {
-                let task = general_any_impl_insert_task_uniq(
-                    INSERT_TASK_UNIQ_QUERY_SQLITE,
-                    transaction,
-                    params,
-                )
-                .await?;
                 Ok(Res::Task(task))
             }
             Q::UpdateTaskState => {
@@ -400,16 +376,6 @@ impl BackendSqlXSQLite {
                 .await?;
                 Ok(Res::Task(task))
             }
-            Q::FindTaskByUniqHash => {
-                let opt_task: Option<Task> = general_any_impl_find_task_by_uniq_hash(
-                    FIND_TASK_BY_UNIQ_HASH_QUERY_SQLITE,
-                    transaction,
-                    params,
-                )
-                .await;
-
-                Ok(Res::OptTask(opt_task))
-            }
             Q::FindTaskById => {
                 let task = general_any_impl_find_task_by_id(
                     FIND_TASK_BY_ID_QUERY_SQLITE,
@@ -426,11 +392,35 @@ impl BackendSqlXSQLite {
 
                 Ok(Res::Task(task))
             }
+            Q::InsertTaskIfNotExists => {
+                let task = general_any_impl_insert_task_if_not_exists(
+                    (
+                        FIND_TASK_BY_UNIQ_HASH_QUERY_SQLITE,
+                        INSERT_TASK_UNIQ_QUERY_SQLITE,
+                    ),
+                    transaction,
+                    params,
+                )
+                .await?;
+
+                Ok(Res::Task(task))
+            }
         }
     }
 
     fn _name() -> &'static str {
         "SQLite"
+    }
+}
+
+async fn general_any_impl_insert_task_if_not_exists(
+    queries: (&str, &str),
+    transaction: &mut Transaction<'_, Any>,
+    params: QueryParams<'_>,
+) -> Result<Task, AsyncQueueError> {
+    match general_any_impl_find_task_by_uniq_hash(queries.0, transaction, &params).await {
+        Some(task) => Ok(task),
+        None => general_any_impl_insert_task_uniq(queries.1, transaction, params).await,
     }
 }
 
@@ -604,6 +594,8 @@ async fn general_any_impl_remove_task_by_metadata(
 
     let uniq_hash = calculate_hash(&metadata.to_string());
 
+    println!("{query}");
+
     Ok(sqlx::query(query)
         .bind(uniq_hash)
         .execute(transaction.acquire().await?)
@@ -646,7 +638,7 @@ async fn general_any_impl_fetch_task_type(
 async fn general_any_impl_find_task_by_uniq_hash(
     query: &str,
     transaction: &mut Transaction<'_, Any>,
-    params: QueryParams<'_>,
+    params: &QueryParams<'_>,
 ) -> Option<Task> {
     let metadata = params.metadata.unwrap();
 
@@ -729,13 +721,6 @@ impl BackendSqlXMySQL {
 
                 Ok(Res::Task(task))
             }
-            Q::InsertTaskUniq => {
-                let task =
-                    mysql_impl_insert_task_uniq(INSERT_TASK_UNIQ_QUERY_MYSQL, transaction, params)
-                        .await?;
-                Ok(Res::Task(task))
-            }
-
             Q::UpdateTaskState => {
                 let task = mysql_impl_update_task_state(
                     UPDATE_TASK_STATE_QUERY_MYSQL,
@@ -806,16 +791,6 @@ impl BackendSqlXMySQL {
                 .await?;
                 Ok(Res::Task(task))
             }
-            Q::FindTaskByUniqHash => {
-                let opt_task: Option<Task> = general_any_impl_find_task_by_uniq_hash(
-                    FIND_TASK_BY_UNIQ_HASH_QUERY_MYSQL,
-                    transaction,
-                    params,
-                )
-                .await;
-
-                Ok(Res::OptTask(opt_task))
-            }
             Q::FindTaskById => {
                 let task: Task = general_any_impl_find_task_by_id(
                     FIND_TASK_BY_ID_QUERY_MYSQL,
@@ -829,6 +804,19 @@ impl BackendSqlXMySQL {
             Q::RetryTask => {
                 let task =
                     mysql_impl_retry_task(RETRY_TASK_QUERY_MYSQL, transaction, params).await?;
+
+                Ok(Res::Task(task))
+            }
+            Q::InsertTaskIfNotExists => {
+                let task = mysql_any_impl_insert_task_if_not_exists(
+                    (
+                        FIND_TASK_BY_UNIQ_HASH_QUERY_MYSQL,
+                        INSERT_TASK_UNIQ_QUERY_MYSQL,
+                    ),
+                    transaction,
+                    params,
+                )
+                .await?;
 
                 Ok(Res::Task(task))
             }
@@ -895,6 +883,10 @@ async fn mysql_impl_insert_task_uniq(
 
     let uniq_hash = calculate_hash(&metadata_str);
 
+    println!("{} len : {}", uniq_hash, uniq_hash.len());
+
+    println!("reach here");
+
     let affected_rows = sqlx::query(query)
         .bind(uuid_as_str)
         .bind(metadata_str)
@@ -904,6 +896,7 @@ async fn mysql_impl_insert_task_uniq(
         .execute(transaction.acquire().await?)
         .await?
         .rows_affected();
+    println!("reach here 2");
 
     if affected_rows != 1 {
         // here we should return an error
@@ -1033,4 +1026,15 @@ async fn mysql_impl_retry_task(
             .await?;
 
     Ok(failed_task)
+}
+
+async fn mysql_any_impl_insert_task_if_not_exists(
+    queries: (&str, &str),
+    transaction: &mut Transaction<'_, Any>,
+    params: QueryParams<'_>,
+) -> Result<Task, AsyncQueueError> {
+    match general_any_impl_find_task_by_uniq_hash(queries.0, transaction, &params).await {
+        Some(task) => Ok(task),
+        None => mysql_impl_insert_task_uniq(queries.1, transaction, params).await,
+    }
 }

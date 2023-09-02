@@ -22,7 +22,7 @@ diesel::table! {
         #[max_length = 255]
         task_type -> Varchar,
         #[max_length = 64]
-        uniq_hash -> Nullable<Char>,
+        uniq_hash -> Nullable<Varchar>,
         retries -> Integer,
         #[max_length = 32]
         scheduled_at -> Varchar,

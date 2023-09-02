@@ -389,26 +389,6 @@ impl AsyncQueue {
         Ok(task)
     }
 
-    async fn insert_task_uniq_query(
-        transaction: &mut Transaction<'_, Any>,
-        backend: &BackendSqlX,
-        metadata: &serde_json::Value,
-        task_type: &str,
-        scheduled_at: &DateTime<Utc>,
-    ) -> Result<Task, AsyncQueueError> {
-        let query_params = QueryParams::builder()
-            .metadata(&metadata)
-            .task_type(task_type)
-            .scheduled_at(scheduled_at)
-            .build();
-
-        let task = backend
-            .execute_query(SqlXQuery::InsertTaskUniq, transaction, query_params)
-            .await?
-            .unwrap_task();
-        Ok(task)
-    }
-
     async fn insert_task_if_not_exist_query(
         transaction: &mut Transaction<'_, Any>,
         backend: &BackendSqlX,
@@ -416,33 +396,18 @@ impl AsyncQueue {
         task_type: &str,
         scheduled_at: &DateTime<Utc>,
     ) -> Result<Task, AsyncQueueError> {
-        match Self::find_task_by_uniq_hash_query(transaction, backend, &metadata).await {
-            Some(task) => Ok(task),
-            None => {
-                Self::insert_task_uniq_query(
-                    transaction,
-                    backend,
-                    metadata,
-                    task_type,
-                    scheduled_at,
-                )
-                .await
-            }
-        }
-    }
+        let query_params = QueryParams::builder()
+            .metadata(metadata)
+            .task_type(task_type)
+            .scheduled_at(scheduled_at)
+            .build();
 
-    async fn find_task_by_uniq_hash_query(
-        transaction: &mut Transaction<'_, Any>,
-        backend: &BackendSqlX,
-        metadata: &serde_json::Value,
-    ) -> Option<Task> {
-        let query_params = QueryParams::builder().metadata(metadata).build();
+        let task = backend
+            .execute_query(SqlXQuery::InsertTaskIfNotExists, transaction, query_params)
+            .await?
+            .unwrap_task();
 
-        backend
-            .execute_query(SqlXQuery::FindTaskByUniqHash, transaction, query_params)
-            .await
-            .ok()?
-            .unwrap_opt_task()
+        Ok(task)
     }
 
     async fn schedule_task_query(

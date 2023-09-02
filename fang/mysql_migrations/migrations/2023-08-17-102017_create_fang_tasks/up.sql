@@ -15,7 +15,7 @@ CREATE TABLE fang_tasks (
     error_message VARCHAR(2048),
     state ENUM('new', 'in_progress', 'failed', 'finished', 'retried') NOT NULL DEFAULT 'new',
     task_type VARCHAR(255) NOT NULL DEFAULT 'common', -- TEXT type can not have default value, stupid MySQL policy
-    uniq_hash CHAR(64),
+    uniq_hash VARCHAR(64),
     retries INTEGER NOT NULL DEFAULT 0,
     scheduled_at VARCHAR(32) NOT NULL DEFAULT(CONCAT(CURRENT_TIMESTAMP, '.000000000+00')),
     created_at VARCHAR(32) NOT NULL DEFAULT (CONCAT(CURRENT_TIMESTAMP , '.000000000+00')),
