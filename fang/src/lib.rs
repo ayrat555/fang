@@ -210,8 +210,6 @@ impl<'a> FromRow<'a, AnyRow> for Task {
 
         let scheduled_at_str: &str = row.get("scheduled_at");
 
-        println!("{}", scheduled_at_str);
-
         let scheduled_at: DateTime<Utc> = DateTime::parse_from_str(scheduled_at_str, "%F %T%.f%#z")
             .unwrap()
             .into();

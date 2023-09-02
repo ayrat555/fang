@@ -1,1 +1,1 @@
-DELETE FROM fang_tasks WHERE uniq_hash = $1
+DELETE FROM fang_tasks WHERE uniq_hash = ?
