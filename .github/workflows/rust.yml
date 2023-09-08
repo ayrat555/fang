@@ -11,8 +11,29 @@ env :
   DATABASE_URL : postgres://postgres:postgres@localhost/fang
 
 jobs:
-  test:
-    name: Test
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          components: clippy
+          override: true
+          profile: minimal
+          toolchain: stable
+
+      - name: Run clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --verbose --all-targets --all-features -- -D warnings
+
+  test_postgres:
+    name: Test postgres
     runs-on: ubuntu-latest
 
     services:
@@ -46,14 +67,45 @@ jobs:
           profile: minimal
           toolchain: stable
 
-      - name: Run clippy
+      - name: Install diesel-cli
         uses: actions-rs/cargo@v1
         with:
-          command: clippy
-          args: --verbose --all-targets --all-features -- -D warnings
+          command: install
+          args: diesel_cli --no-default-features --features postgres
+
+      - name: Setup Postgres db
+        working-directory: ./fang/postgres_migrations
+        run: diesel setup --database-url "postgres://postgres:postgres@localhost/fang"
+
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --verbose --features asynk-postgres
+
+      - name: Run dirty tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --verbose features asynk-postgres -- --ignored
+
+  test_sqlite:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          components: clippy
+          override: true
+          profile: minimal
+          toolchain: stable
 
       - name: Install sqlite3
-        run: | 
+        run: |
           sudo apt install -y sqlite3
           sqlite3 fang.db "VACUUM;"
           mkdir tests_sqlite
@@ -62,35 +114,23 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: install
-          args: diesel_cli --no-default-features --features "postgres sqlite mysql"
+          args: diesel_cli --no-default-features --features sqlite
 
       - name: Setup Sqlite db
         working-directory: ./fang/sqlite_migrations
         run: diesel setup --database-url "sqlite3://../../../fang.db"
 
-      - name: Change working dir
-        working-directory: ./../..
-        run: pwd
-
-      - name: Setup Postgres db
-        working-directory: ./fang/postgres_migrations
-        run: diesel setup --database-url "postgres://postgres:postgres@localhost/fang"
-
-      - name: Change working dir
-        working-directory: ./../..
-        run: pwd
-
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --verbose --all-features
+          args: --verbose --features asynk-sqlite
 
       - name: Run dirty tests
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --verbose --all-features -- --ignored
+          args: --verbose --features asynk-sqlite -- --ignored
 
   release:
     name: Release x86_64-unknown-linux-gnu
