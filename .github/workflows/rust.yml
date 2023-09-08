@@ -7,8 +7,6 @@ on:
     # Check if it works with current dependencies (weekly on Wednesday 2:32 UTC)
     - cron: '32 2 * * 3'
 
-env :
-  DATABASE_URL : postgres://postgres:postgres@localhost/fang
 
 jobs:
   clippy:
@@ -35,6 +33,8 @@ jobs:
   test_postgres:
     name: Test postgres
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost/fang
 
     services:
       # Label used to access the service container
@@ -90,7 +90,7 @@ jobs:
           args: --verbose features asynk-postgres -- --ignored
 
   test_sqlite:
-    name: Test
+    name: Test sqlite
     runs-on: ubuntu-latest
 
     steps:
@@ -135,7 +135,6 @@ jobs:
   release:
     name: Release x86_64-unknown-linux-gnu
     runs-on: ubuntu-latest
-    needs: test
 
     steps:
       - uses: actions/checkout@v3
