@@ -379,7 +379,7 @@ impl AsyncQueue {
         scheduled_at: &DateTime<Utc>,
     ) -> Result<Task, AsyncQueueError> {
         let query_params = QueryParams::builder()
-            .metadata(&metadata)
+            .metadata(metadata)
             .task_type(task_type)
             .scheduled_at(scheduled_at)
             .build();

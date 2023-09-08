@@ -92,14 +92,14 @@ pub(crate) struct QueryParams<'a> {
 }
 
 pub(crate) enum Res {
-    BIGINT(u64),
+    Bigint(u64),
     Task(Task),
 }
 
 impl Res {
     pub(crate) fn unwrap_u64(self) -> u64 {
         match self {
-            Res::BIGINT(val) => val,
+            Res::Bigint(val) => val,
             _ => panic!("Can not unwrap a u64"),
         }
     }
@@ -208,7 +208,7 @@ impl BackendSqlXPg {
                     general_any_impl_remove_all_task(REMOVE_ALL_TASK_QUERY_POSTGRES, transaction)
                         .await?;
 
-                Ok(Res::BIGINT(affected_rows))
+                Ok(Res::Bigint(affected_rows))
             }
             Q::RemoveAllScheduledTask => {
                 let affected_rows = general_any_impl_remove_all_scheduled_tasks(
@@ -217,14 +217,14 @@ impl BackendSqlXPg {
                 )
                 .await?;
 
-                Ok(Res::BIGINT(affected_rows))
+                Ok(Res::Bigint(affected_rows))
             }
             Q::RemoveTask => {
                 let affected_rows =
                     general_any_impl_remove_task(REMOVE_TASK_QUERY_POSTGRES, transaction, params)
                         .await?;
 
-                Ok(Res::BIGINT(affected_rows))
+                Ok(Res::Bigint(affected_rows))
             }
             Q::RemoveTaskByMetadata => {
                 let affected_rows = general_any_impl_remove_task_by_metadata(
@@ -234,7 +234,7 @@ impl BackendSqlXPg {
                 )
                 .await?;
 
-                Ok(Res::BIGINT(affected_rows))
+                Ok(Res::Bigint(affected_rows))
             }
             Q::RemoveTaskType => {
                 let affected_rows = general_any_impl_remove_task_type(
@@ -244,7 +244,7 @@ impl BackendSqlXPg {
                 )
                 .await?;
 
-                Ok(Res::BIGINT(affected_rows))
+                Ok(Res::Bigint(affected_rows))
             }
             Q::FetchTaskType => {
                 let task = general_any_impl_fetch_task_type(
@@ -329,7 +329,7 @@ impl BackendSqlXSQLite {
                     general_any_impl_remove_all_task(REMOVE_ALL_TASK_QUERY_SQLITE, transaction)
                         .await?;
 
-                Ok(Res::BIGINT(affected_rows))
+                Ok(Res::Bigint(affected_rows))
             }
             Q::RemoveAllScheduledTask => {
                 let affected_rows = general_any_impl_remove_all_scheduled_tasks(
@@ -338,14 +338,14 @@ impl BackendSqlXSQLite {
                 )
                 .await?;
 
-                Ok(Res::BIGINT(affected_rows))
+                Ok(Res::Bigint(affected_rows))
             }
             Q::RemoveTask => {
                 let affected_rows =
                     general_any_impl_remove_task(REMOVE_TASK_QUERY_SQLITE, transaction, params)
                         .await?;
 
-                Ok(Res::BIGINT(affected_rows))
+                Ok(Res::Bigint(affected_rows))
             }
             Q::RemoveTaskByMetadata => {
                 let affected_rows = general_any_impl_remove_task_by_metadata(
@@ -355,7 +355,7 @@ impl BackendSqlXSQLite {
                 )
                 .await?;
 
-                Ok(Res::BIGINT(affected_rows))
+                Ok(Res::Bigint(affected_rows))
             }
             Q::RemoveTaskType => {
                 let affected_rows = general_any_impl_remove_task_type(
@@ -365,7 +365,7 @@ impl BackendSqlXSQLite {
                 )
                 .await?;
 
-                Ok(Res::BIGINT(affected_rows))
+                Ok(Res::Bigint(affected_rows))
             }
             Q::FetchTaskType => {
                 let task = general_any_impl_fetch_task_type(
@@ -742,7 +742,7 @@ impl BackendSqlXMySQL {
                     general_any_impl_remove_all_task(REMOVE_ALL_TASK_QUERY_MYSQL, transaction)
                         .await?;
 
-                Ok(Res::BIGINT(affected_rows))
+                Ok(Res::Bigint(affected_rows))
             }
 
             Q::RemoveAllScheduledTask => {
@@ -752,7 +752,7 @@ impl BackendSqlXMySQL {
                 )
                 .await?;
 
-                Ok(Res::BIGINT(affected_rows))
+                Ok(Res::Bigint(affected_rows))
             }
 
             Q::RemoveTask => {
@@ -760,7 +760,7 @@ impl BackendSqlXMySQL {
                     general_any_impl_remove_task(REMOVE_TASK_QUERY_MYSQL, transaction, params)
                         .await?;
 
-                Ok(Res::BIGINT(affected_rows))
+                Ok(Res::Bigint(affected_rows))
             }
             Q::RemoveTaskByMetadata => {
                 let affected_rows = general_any_impl_remove_task_by_metadata(
@@ -770,7 +770,7 @@ impl BackendSqlXMySQL {
                 )
                 .await?;
 
-                Ok(Res::BIGINT(affected_rows))
+                Ok(Res::Bigint(affected_rows))
             }
             Q::RemoveTaskType => {
                 let affected_rows = general_any_impl_remove_task_type(
@@ -780,7 +780,7 @@ impl BackendSqlXMySQL {
                 )
                 .await?;
 
-                Ok(Res::BIGINT(affected_rows))
+                Ok(Res::Bigint(affected_rows))
             }
             Q::FetchTaskType => {
                 let task = general_any_impl_fetch_task_type(
