@@ -49,23 +49,26 @@ db_sqlite:
 	sqlite3 "$(SQLITE_FILE)" "VACUUM;"
 	$(MAKE) diesel_sqlite
 
+ensure_diesel:
+	@command -v diesel >/dev/null 2>&1 || (echo "diesel_cli not installed, can't continue" && exit 1)
+
 diesel: $(DIESEL_TARGETS)
 
-diesel_postgres:
+diesel_postgres: ensure_diesel
 	@echo -e $(BOLD)Running Diesel migrations on Postgres database...$(END_BOLD)
 	while ! diesel migration run --database-url "$(POSTGRES_URL)" --migration-dir "$(POSTGRES_MIGRATIONS)" --config-file "$(POSTGRES_CONFIG)" 2> /dev/null; \
 	do \
 		sleep 1; \
 	done
 
-diesel_mysql:
+diesel_mysql: ensure_diesel
 	@echo -e $(BOLD)Running Diesel migrations on MySQL database...$(END_BOLD)
 	while ! diesel migration run --database-url "$(MYSQL_URL)" --migration-dir "$(MYSQL_MIGRATIONS)" --config-file "$(MYSQL_CONFIG)" 2> /dev/null; \
 	do \
 		sleep 1; \
 	done
 
-diesel_sqlite:
+diesel_sqlite: ensure_diesel
 	@echo -e $(BOLD)Running Diesel migrations on SQLite database...$(END_BOLD)
 	while ! diesel migration run --database-url sqlite://"$(SQLITE_FILE)" --migration-dir "$(SQLITE_MIGRATIONS)" --config-file "$(SQLITE_CONFIG)" 2> /dev/null; \
 	do \
