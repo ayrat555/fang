@@ -7,7 +7,6 @@ use fang::asynk::async_queue::AsyncQueueable;
 use fang::asynk::async_worker_pool::AsyncWorkerPool;
 use fang::run_migrations_postgres;
 use fang::AsyncRunnable;
-use fang::NoTls;
 use simple_async_worker::MyFailingTask;
 use simple_async_worker::MyTask;
 use std::env;
@@ -36,10 +35,10 @@ async fn main() {
         .max_pool_size(max_pool_size)
         .build();
 
-    queue.connect(NoTls).await.unwrap();
+    queue.connect().await.unwrap();
     log::info!("Queue connected...");
 
-    let mut pool: AsyncWorkerPool<AsyncQueue<NoTls>> = AsyncWorkerPool::builder()
+    let mut pool: AsyncWorkerPool<AsyncQueue> = AsyncWorkerPool::builder()
         .number_of_workers(10_u32)
         .queue(queue.clone())
         .build();

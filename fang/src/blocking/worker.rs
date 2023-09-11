@@ -136,12 +136,12 @@ where
             }
 
             RetentionMode::RemoveAll => {
-                self.queue.remove_task(task.id)?;
+                self.queue.remove_task(&task.id)?;
             }
 
             RetentionMode::RemoveFinished => match result {
                 Ok(_) => {
-                    self.queue.remove_task(task.id)?;
+                    self.queue.remove_task(&task.id)?;
                 }
                 Err(error) => {
                     self.queue.fail_task(task, &error.description)?;
@@ -305,7 +305,7 @@ mod worker_tests {
         // this operation commits and thats why need to commit this test
         worker.run(&task).unwrap();
 
-        let found_task = Queue::find_task_by_id_query(&mut pooled_connection, task.id).unwrap();
+        let found_task = Queue::find_task_by_id_query(&mut pooled_connection, &task.id).unwrap();
 
         assert_eq!(FangTaskState::Finished, found_task.state);
 
@@ -340,10 +340,10 @@ mod worker_tests {
 
         std::thread::sleep(std::time::Duration::from_millis(1000));
 
-        let found_task1 = Queue::find_task_by_id_query(&mut pooled_connection, task1.id).unwrap();
+        let found_task1 = Queue::find_task_by_id_query(&mut pooled_connection, &task1.id).unwrap();
         assert_eq!(FangTaskState::Finished, found_task1.state);
 
-        let found_task2 = Queue::find_task_by_id_query(&mut pooled_connection, task2.id).unwrap();
+        let found_task2 = Queue::find_task_by_id_query(&mut pooled_connection, &task2.id).unwrap();
         assert_eq!(FangTaskState::New, found_task2.state);
 
         Queue::remove_tasks_of_type_query(&mut pooled_connection, "type1").unwrap();
@@ -373,7 +373,7 @@ mod worker_tests {
 
         worker.run(&task).unwrap();
 
-        let found_task = Queue::find_task_by_id_query(&mut pooled_connection, task.id).unwrap();
+        let found_task = Queue::find_task_by_id_query(&mut pooled_connection, &task.id).unwrap();
 
         assert_eq!(FangTaskState::Failed, found_task.state);
         assert_eq!(
@@ -409,7 +409,7 @@ mod worker_tests {
 
         std::thread::sleep(std::time::Duration::from_millis(1000));
 
-        let found_task = Queue::find_task_by_id_query(&mut pooled_connection, task.id).unwrap();
+        let found_task = Queue::find_task_by_id_query(&mut pooled_connection, &task.id).unwrap();
 
         assert_eq!(FangTaskState::Retried, found_task.state);
         assert_eq!(1, found_task.retries);
@@ -420,7 +420,7 @@ mod worker_tests {
 
         worker.run_tasks_until_none().unwrap();
 
-        let found_task = Queue::find_task_by_id_query(&mut pooled_connection, task.id).unwrap();
+        let found_task = Queue::find_task_by_id_query(&mut pooled_connection, &task.id).unwrap();
 
         assert_eq!(FangTaskState::Failed, found_task.state);
         assert_eq!(2, found_task.retries);

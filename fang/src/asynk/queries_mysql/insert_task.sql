@@ -1,0 +1,1 @@
+INSERT INTO fang_tasks (id, metadata, task_type, scheduled_at) VALUES (?, ?, ?, ?);

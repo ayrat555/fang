@@ -3,9 +3,8 @@ use crate::asynk::async_queue::AsyncQueueable;
 use crate::FangError;
 use crate::Scheduled;
 use async_trait::async_trait;
-use bb8_postgres::bb8::RunError;
-use bb8_postgres::tokio_postgres::Error as TokioPostgresError;
 use serde_json::Error as SerdeError;
+use sqlx::Error as SqlXError;
 
 const COMMON_TYPE: &str = "common";
 pub const RETRIES_NUMBER: i32 = 20;
@@ -19,18 +18,11 @@ impl From<AsyncQueueError> for FangError {
     }
 }
 
-impl From<TokioPostgresError> for FangError {
-    fn from(error: TokioPostgresError) -> Self {
-        Self::from(AsyncQueueError::PgError(error))
+impl From<SqlXError> for FangError {
+    fn from(error: SqlXError) -> Self {
+        Self::from(AsyncQueueError::SqlXError(error))
     }
 }
-
-impl From<RunError<TokioPostgresError>> for FangError {
-    fn from(error: RunError<TokioPostgresError>) -> Self {
-        Self::from(AsyncQueueError::PoolError(error))
-    }
-}
-
 impl From<SerdeError> for FangError {
     fn from(error: SerdeError) -> Self {
         Self::from(AsyncQueueError::SerdeError(error))

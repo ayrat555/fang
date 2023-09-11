@@ -16,10 +16,10 @@ CREATE TABLE fang_tasks (
     retries INTEGER NOT NULL DEFAULT 0,
     -- The datetime() function returns the date and time as text in this formats: YYYY-MM-DD HH:MM:SS. 
     -- https://www.sqlite.org/lang_datefunc.html
-    scheduled_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    scheduled_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP || '.000000+00'),
     -- why timestamps are texts ? https://www.sqlite.org/datatype3.html
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP || '.000000+00'),
+    updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP || '.000000+00')
 );
 
 CREATE INDEX fang_tasks_state_index ON fang_tasks(state);

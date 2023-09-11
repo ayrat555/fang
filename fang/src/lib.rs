@@ -2,15 +2,18 @@
 
 #[cfg(feature = "blocking")]
 use diesel::{Identifiable, Queryable};
+#[cfg(feature = "asynk-sqlx")]
+use sqlx::any::AnyRow;
+#[cfg(feature = "asynk-sqlx")]
+use sqlx::FromRow;
+#[cfg(feature = "asynk-sqlx")]
+use sqlx::Row;
 use std::time::Duration;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
-
-#[cfg(feature = "asynk")]
-use postgres_types::{FromSql, ToSql};
-/// Represents a schedule for scheduled tasks.
 ///
+/// Represents a schedule for scheduled tasks.
 /// It's used in the [`AsyncRunnable::cron`] and [`Runnable::cron`]
 #[derive(Debug, Clone)]
 pub enum Scheduled {
@@ -104,37 +107,55 @@ pub struct FangError {
 /// Possible states of the task
 #[derive(Debug, Eq, PartialEq, Clone)]
 #[cfg_attr(feature = "blocking", derive(diesel_derive_enum::DbEnum))]
-#[cfg_attr(feature = "asynk", derive(ToSql, FromSql, Default))]
-#[cfg_attr(feature = "asynk", postgres(name = "fang_task_state"))]
 #[cfg_attr(
     feature = "blocking",
     ExistingTypePath = "crate::postgres_schema::sql_types::FangTaskState"
 )]
 pub enum FangTaskState {
     /// The task is ready to be executed
-    #[cfg_attr(feature = "asynk", postgres(name = "new"))]
-    #[cfg_attr(feature = "asynk", default)]
     New,
     /// The task is being executed.
     ///
     /// The task may stay in this state forever
     /// if an unexpected error happened
-    #[cfg_attr(feature = "asynk", postgres(name = "in_progress"))]
     InProgress,
     /// The task failed
-    #[cfg_attr(feature = "asynk", postgres(name = "failed"))]
     Failed,
     /// The task finished successfully
-    #[cfg_attr(feature = "asynk", postgres(name = "finished"))]
     Finished,
     /// The task is being retried. It means it failed but it's scheduled to be executed again
-    #[cfg_attr(feature = "asynk", postgres(name = "retried"))]
     Retried,
+}
+
+impl<S: AsRef<str>> From<S> for FangTaskState {
+    fn from(str: S) -> Self {
+        let str = str.as_ref();
+        match str {
+            "new" => FangTaskState::New,
+            "in_progress" => FangTaskState::InProgress,
+            "failed" => FangTaskState::Failed,
+            "finished" => FangTaskState::Finished,
+            "retried" => FangTaskState::Retried,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl From<FangTaskState> for &str {
+    fn from(state: FangTaskState) -> Self {
+        match state {
+            FangTaskState::New => "new",
+            FangTaskState::InProgress => "in_progress",
+            FangTaskState::Failed => "failed",
+            FangTaskState::Finished => "finished",
+            FangTaskState::Retried => "retried",
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, TypedBuilder)]
 #[cfg_attr(feature = "blocking", derive(Queryable, Identifiable))]
-#[cfg_attr(feature = "blocking",  diesel(table_name = fang_tasks))]
+#[diesel(table_name = fang_tasks)]
 pub struct Task {
     #[builder(setter(into))]
     pub id: Uuid,
@@ -156,6 +177,68 @@ pub struct Task {
     pub created_at: DateTime<Utc>,
     #[builder(setter(into))]
     pub updated_at: DateTime<Utc>,
+}
+
+#[cfg(feature = "asynk-sqlx")]
+impl<'a> FromRow<'a, AnyRow> for Task {
+    fn from_row(row: &'a AnyRow) -> Result<Self, sqlx::Error> {
+        let uuid_as_text: &str = row.get("id");
+
+        let id = Uuid::parse_str(uuid_as_text).unwrap();
+
+        let raw: &str = row.get("metadata"); // will work if database cast json to string
+        let raw = raw.replace('\\', "");
+
+        // -- SELECT metadata->>'type' FROM fang_tasks ; this works because jsonb casting
+        let metadata: serde_json::Value = serde_json::from_str(&raw).unwrap();
+
+        // This should be changed when issue https://github.com/launchbadge/sqlx/issues/2416 is fixed
+        // Fixed in pxp9's fork
+        let error_message: Option<String> = row.get("error_message");
+
+        let state_str: &str = row.get("state"); // will work if database cast json to string
+
+        let state: FangTaskState = state_str.into();
+
+        let task_type: String = row.get("task_type");
+
+        // This should be changed when issue https://github.com/launchbadge/sqlx/issues/2416 is fixed
+        // Fixed in pxp9's fork
+        let uniq_hash: Option<String> = row.get("uniq_hash");
+
+        let retries: i32 = row.get("retries");
+
+        let scheduled_at_str: &str = row.get("scheduled_at");
+
+        let scheduled_at: DateTime<Utc> = DateTime::parse_from_str(scheduled_at_str, "%F %T%.f%#z")
+            .unwrap()
+            .into();
+
+        let created_at_str: &str = row.get("created_at");
+
+        let created_at: DateTime<Utc> = DateTime::parse_from_str(created_at_str, "%F %T%.f%#z")
+            .unwrap()
+            .into();
+
+        let updated_at_str: &str = row.get("updated_at");
+
+        let updated_at: DateTime<Utc> = DateTime::parse_from_str(updated_at_str, "%F %T%.f%#z")
+            .unwrap()
+            .into();
+
+        Ok(Task::builder()
+            .id(id)
+            .metadata(metadata)
+            .error_message(error_message)
+            .state(state)
+            .task_type(task_type)
+            .uniq_hash(uniq_hash)
+            .retries(retries)
+            .scheduled_at(scheduled_at)
+            .created_at(created_at)
+            .updated_at(updated_at)
+            .build())
+    }
 }
 
 #[doc(hidden)]
@@ -197,10 +280,6 @@ pub use asynk::*;
 
 #[cfg(feature = "asynk")]
 #[doc(hidden)]
-pub use bb8_postgres::tokio_postgres::tls::NoTls;
-
-#[cfg(feature = "asynk")]
-#[doc(hidden)]
 pub use async_trait::async_trait;
 
 #[cfg(feature = "derive-error")]
@@ -212,14 +291,14 @@ use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 #[cfg(feature = "migrations")]
 use std::error::Error as SomeError;
 
-#[cfg(feature = "migrations_postgres")]
+#[cfg(feature = "migrations-postgres")]
 use diesel::pg::Pg;
 
-#[cfg(feature = "migrations_postgres")]
+#[cfg(feature = "migrations-postgres")]
 pub const MIGRATIONS_POSTGRES: EmbeddedMigrations =
     embed_migrations!("postgres_migrations/migrations");
 
-#[cfg(feature = "migrations_postgres")]
+#[cfg(feature = "migrations-postgres")]
 pub fn run_migrations_postgres(
     connection: &mut impl MigrationHarness<Pg>,
 ) -> Result<(), Box<dyn SomeError + Send + Sync + 'static>> {
@@ -228,13 +307,13 @@ pub fn run_migrations_postgres(
     Ok(())
 }
 
-#[cfg(feature = "migrations_mysql")]
+#[cfg(feature = "migrations-mysql")]
 use diesel::mysql::Mysql;
 
-#[cfg(feature = "migrations_mysql")]
+#[cfg(feature = "migrations-mysql")]
 pub const MIGRATIONS_MYSQL: EmbeddedMigrations = embed_migrations!("mysql_migrations/migrations");
 
-#[cfg(feature = "migrations_mysql")]
+#[cfg(feature = "migrations-mysql")]
 pub fn run_migrations_mysql(
     connection: &mut impl MigrationHarness<Mysql>,
 ) -> Result<(), Box<dyn SomeError + Send + Sync + 'static>> {
@@ -243,13 +322,13 @@ pub fn run_migrations_mysql(
     Ok(())
 }
 
-#[cfg(feature = "migrations_sqlite")]
+#[cfg(feature = "migrations-sqlite")]
 use diesel::sqlite::Sqlite;
 
-#[cfg(feature = "migrations_sqlite")]
+#[cfg(feature = "migrations-sqlite")]
 pub const MIGRATIONS_SQLITE: EmbeddedMigrations = embed_migrations!("sqlite_migrations/migrations");
 
-#[cfg(feature = "migrations_sqlite")]
+#[cfg(feature = "migrations-sqlite")]
 pub fn run_migrations_sqlite(
     connection: &mut impl MigrationHarness<Sqlite>,
 ) -> Result<(), Box<dyn SomeError + Send + Sync + 'static>> {

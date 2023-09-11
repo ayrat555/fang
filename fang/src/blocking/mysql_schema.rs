@@ -13,17 +13,22 @@ diesel::table! {
     fang_tasks (id) {
         #[max_length = 36]
         id -> Varchar,
-        metadata -> Json,
-        error_message -> Nullable<Text>,
+        #[max_length = 2048]
+        metadata -> Varchar,
+        #[max_length = 2048]
+        error_message -> Nullable<Varchar>,
         #[max_length = 11]
         state -> FangTasksStateEnum,
         #[max_length = 255]
         task_type -> Varchar,
         #[max_length = 64]
-        uniq_hash -> Nullable<Char>,
+        uniq_hash -> Nullable<Varchar>,
         retries -> Integer,
-        scheduled_at -> Timestamp,
-        created_at -> Timestamp,
-        updated_at -> Timestamp,
+        #[max_length = 32]
+        scheduled_at -> Varchar,
+        #[max_length = 32]
+        created_at -> Varchar,
+        #[max_length = 32]
+        updated_at -> Varchar,
     }
 }
