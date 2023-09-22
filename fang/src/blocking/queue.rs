@@ -73,7 +73,7 @@ pub trait Queueable {
 
     /// Enqueue a task to the queue, The task will be executed as soon as possible by the worker of the same type
     /// created by an `WorkerPool`.
-    fn insert_task(&self, params: &dyn Runnable) -> Result<Task, QueueError>;
+    fn insert_task(&self, params: &dyn Runnable, scheduled_at: DateTime<Utc>) -> Result<Task, QueueError>;
 
     /// The method will remove all tasks from the queue
     fn remove_all_tasks(&self) -> Result<usize, QueueError>;
@@ -146,10 +146,10 @@ impl Queueable for Queue {
         Self::fetch_and_touch_query(&mut connection, task_type)
     }
 
-    fn insert_task(&self, params: &dyn Runnable) -> Result<Task, QueueError> {
+    fn insert_task(&self, params: &dyn Runnable, scheduled_at: DateTime<Utc>) -> Result<Task, QueueError> {
         let mut connection = self.get_connection()?;
 
-        Self::insert_query(&mut connection, params, Utc::now())
+        Self::insert_query(&mut connection, params, scheduled_at)
     }
     fn schedule_task(&self, params: &dyn Runnable) -> Result<Task, QueueError> {
         let mut connection = self.get_connection()?;
