@@ -596,9 +596,13 @@ async fn general_any_impl_remove_task_by_metadata(
 
     println!("{query}");
 
+    let adquire = transaction.acquire().await?;
+
+    println!("Adquire {:?}", adquire);
+
     Ok(sqlx::query(query)
         .bind(uniq_hash)
-        .execute(transaction.acquire().await?)
+        .execute(adquire)
         .await?
         .rows_affected())
 }
@@ -887,16 +891,19 @@ async fn mysql_impl_insert_task_uniq(
 
     println!("reach here");
 
+    let adquire = transaction.acquire().await?;
+    println!("reach here 2");
+
     let affected_rows = sqlx::query(query)
         .bind(uuid_as_str)
         .bind(metadata_str)
         .bind(task_type)
         .bind(uniq_hash)
         .bind(scheduled_at_str)
-        .execute(transaction.acquire().await?)
+        .execute(adquire)
         .await?
         .rows_affected();
-    println!("reach here 2");
+    println!("reach here 3");
 
     if affected_rows != 1 {
         // here we should return an error
