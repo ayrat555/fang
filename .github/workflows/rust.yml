@@ -78,10 +78,10 @@ jobs:
         run: diesel setup --database-url "postgres://postgres:postgres@localhost/fang"
 
       - name: Run tests
-        run: cargo test "asynk::async_queue::postgres" --verbose --features asynk-postgres --color always --nocapture
+        run: cargo test "asynk::async_queue::postgres" --verbose --features asynk-postgres --color always -- --nocapture
 
       - name: Run dirty tests
-        run: cargo test "asynk::async_queue::postgres" --verbose features asynk-postgres --ignored
+        run: cargo test "asynk::async_queue::postgres" --verbose features asynk-postgres -- --ignored
 
   test_sqlite:
     name: Test sqlite
@@ -112,7 +112,7 @@ jobs:
         run: diesel setup --database-url "sqlite3://../../../fang.db"
 
       - name: Run tests
-        run: cargo test "asynk::async_queue::sqlite" --verbose --features asynk-sqlite
+        run: cargo test "asynk::async_queue::sqlite" --verbose --features asynk-sqlite -- --nocapture
 
       - name: Run dirty tests
         run: cargo test "asynk::async_queue::sqlite" --verbose --features asynk-sqlite -- --ignored
