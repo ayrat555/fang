@@ -80,7 +80,7 @@ jobs:
         run: cargo test "blocking::queue::postgres" --verbose --features blocking --color always -- --nocapture
       
       - name: Run blocking dirty tests
-        run: cargo test "blocking::queue::postgres" --verbose --features blocking -- --ignored
+        run: cargo test "blocking::worker" --verbose --features blocking -- --ignored
 
   test_fang_derive_error:
     name: Test fang_derive_error
@@ -101,6 +101,7 @@ jobs:
 
       - name: Run fang derive error tests
         run: cargo test "fang_derive_error" --verbose --color always -- --nocapture
+
   test_postgres:
     name: Test postgres
     runs-on: ubuntu-latest
@@ -149,8 +150,8 @@ jobs:
       - name: Run tests
         run: cargo test "asynk::async_queue::postgres" --verbose --features asynk-postgres --color always -- --nocapture
 
-      - name: Run dirty tests
-        run: cargo test "asynk::async_queue::postgres" --verbose --features asynk-postgres -- --ignored
+      - name: Run worker tests
+        run: cargo test "asynk::async_worker::async_worker_tests" --verbose --features asynk-postgres --color always -- --nocapture
 
   test_sqlite:
     name: Test sqlite
@@ -182,9 +183,6 @@ jobs:
 
       - name: Run tests
         run: cargo test "asynk::async_queue::sqlite" --verbose --features asynk-sqlite -- --nocapture
-
-      - name: Run dirty tests
-        run: cargo test "asynk::async_queue::sqlite" --verbose --features asynk-sqlite -- --ignored
 
   release:
     name: Release x86_64-unknown-linux-gnu
