@@ -81,7 +81,7 @@ jobs:
         run: cargo test "asynk::async_queue::postgres" --verbose --features asynk-postgres --color always -- --nocapture
 
       - name: Run dirty tests
-        run: cargo test "asynk::async_queue::postgres" --verbose features asynk-postgres -- --ignored
+        run: cargo test "asynk::async_queue::postgres" --verbose --features asynk-postgres -- --ignored
 
   test_sqlite:
     name: Test sqlite
