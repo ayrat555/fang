@@ -31,7 +31,56 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy --verbose --all-targets --all-features -- -D warnings
+  
+  test_postgres_blocking:
+    name: Test blocking
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
 
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Rust
+        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+
+      - name: Install diesel-cli
+        run: cargo install diesel_cli --no-default-features --features postgres
+
+      - name: Setup Postgres db
+        working-directory: ./fang/postgres_migrations
+        run: diesel setup --database-url "postgres://postgres:postgres@localhost/fang"
+
+      - name: Run blocking tests
+        run: cargo test "blocking::queue::postgres" --verbose --features blocking --color always -- --nocapture
+      
+      - name: Run blocking dirty tests
+        run: cargo test "blocking::queue::postgres" --verbose --features blocking -- --ignored
+
+  test_fang_derive_error:
+    name: Test fang_derive_error
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Rust
+        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+
+      - name: Run fang derive error tests
+        run: cargo test "fang_derive_error" --verbose --color always -- --nocapture
   test_postgres:
     name: Test postgres
     runs-on: ubuntu-latest
