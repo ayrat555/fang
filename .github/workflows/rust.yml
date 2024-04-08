@@ -156,6 +156,8 @@ jobs:
   test_sqlite:
     name: Test sqlite
     runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
 
     strategy:
       matrix:
