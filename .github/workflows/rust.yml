@@ -13,7 +13,9 @@ jobs:
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
-    
+    env:
+      CARGO_TERM_COLOR: always
+
     strategy:
       matrix:
         toolchain:
@@ -28,13 +30,14 @@ jobs:
 
 
       - name: Run clippy
-        run: clippy --verbose --all-targets --all-features -- -D warnings
+        run: cargo clippy --verbose --all-targets --all-features -- -D warnings
 
   test_postgres:
     name: Test postgres
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost/fang
+      CARGO_TERM_COLOR: always
 
     strategy:
       matrix:
@@ -75,10 +78,10 @@ jobs:
         run: diesel setup --database-url "postgres://postgres:postgres@localhost/fang"
 
       - name: Run tests
-        run: cargo test "asynk::async_queue::postgres" -- --verbose --features asynk-postgres --color always --nocapture
+        run: cargo test "asynk::async_queue::postgres" --verbose --features asynk-postgres --color always --nocapture
 
       - name: Run dirty tests
-        run: cargo test "asynk::async_queue::postgres" --verbose features asynk-postgres -- --ignored
+        run: cargo test "asynk::async_queue::postgres" --verbose features asynk-postgres --ignored
 
   test_sqlite:
     name: Test sqlite
@@ -117,6 +120,8 @@ jobs:
   release:
     name: Release x86_64-unknown-linux-gnu
     runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
 
     strategy:
       matrix:
