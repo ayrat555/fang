@@ -36,7 +36,7 @@ migrations = ["dep:diesel_migrations"]
 fang-derive-error = { version = "0.1.0"}
 diesel_migrations = { version = "2.1" , features = ["postgres", "sqlite" , "mysql"]}
 sqlx = {git = "https://github.com/pxp9/sqlx", branch = "main", features = ["any" , "macros" , "runtime-tokio", "postgres", "sqlite", "mysql"]}
-console-subscriber = "0.2.0"
+# console-subscriber = "0.2.0"
 
 [dependencies]
 cron = "0.12"
@@ -73,7 +73,7 @@ optional = true
 
 [dependencies.tokio]
 version = "1.25"
-features = ["rt", "time", "macros", "tracing"]
+features = ["rt", "time", "macros"]#, "tracing"]
 optional = true
 
 [dependencies.async-trait]

@@ -280,7 +280,7 @@ macro_rules! test_asynk_queue {
 
             #[tokio::test]
             async fn remove_tasks_by_metadata() {
-                console_subscriber::init();
+                //console_subscriber::init();
                 let mut test: $q = $e.await;
 
                 let task = test
