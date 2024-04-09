@@ -232,10 +232,9 @@ jobs:
           - 5432:5432
 
         options: >-
-          --health-cmd mysqladmin
-          ping
-          --connection-timeout 5s
-          --wait=5
+          --health-cmd mysqladmin ping
+          --health-interval 10s
+          --health-timeout 5s
 
     steps:
       - uses: actions/checkout@v3
