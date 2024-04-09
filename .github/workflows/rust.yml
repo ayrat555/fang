@@ -228,7 +228,7 @@ jobs:
           MYSQL_DATABASE: fang
         # here we should check if mysql is ready, but this does not work
         options: >-
-          --health-cmd='$(mysqladmin ping -h localhost -P 3306 -u root --password=mysql 2>&1)'
+          --health-cmd "mysqladmin ping -h localhost -u root -pmysql"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
