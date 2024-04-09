@@ -13,11 +13,11 @@ use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use cron::Schedule;
-use sqlx::any::install_default_drivers;
+//use sqlx::any::install_default_drivers;
 use sqlx::pool::PoolOptions;
 use sqlx::Any;
 use sqlx::AnyPool;
-use sqlx::Transaction;
+use sqlx::Pool;
 use std::str::FromStr;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
@@ -315,20 +315,23 @@ impl AsyncQueue {
 
     /// Connect to the db if not connected
     pub async fn connect(&mut self) -> Result<(), AsyncQueueError> {
-        install_default_drivers();
+        //install_default_drivers();
 
         let pool: AnyPool = PoolOptions::new()
             .max_connections(self.max_pool_size)
             .connect(&self.uri)
             .await?;
 
-        let conn = pool.acquire().await?;
+        let anykind = pool.any_kind();
 
-        let backend = conn.backend_name().to_string();
+        let backend = match anykind {
+            sqlx::any::AnyKind::Postgres => BackendSqlX::Pg,
+            sqlx::any::AnyKind::Sqlite => BackendSqlX::Sqlite,
+            sqlx::any::AnyKind::MySql => BackendSqlX::Mysql,
+            _ => BackendSqlX::NoBackend,
+        };
 
-        drop(conn);
-
-        self.backend = BackendSqlX::new_with_name(&backend);
+        self.backend = backend;
 
         self.pool = Some(pool);
         self.connected = true;
@@ -336,7 +339,7 @@ impl AsyncQueue {
     }
 
     async fn fetch_and_touch_task_query(
-        transaction: &mut Transaction<'_, Any>,
+        pool: &Pool<Any>,
         backend: &BackendSqlX,
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError> {
@@ -348,7 +351,7 @@ impl AsyncQueue {
         let query_params = QueryParams::builder().task_type(&task_type).build();
 
         let task = backend
-            .execute_query(SqlXQuery::FetchTaskType, transaction, query_params)
+            .execute_query(SqlXQuery::FetchTaskType, pool, query_params)
             .await
             .map(|val| val.unwrap_task())
             .ok();
@@ -360,7 +363,7 @@ impl AsyncQueue {
                 .build();
 
             let task = backend
-                .execute_query(SqlXQuery::UpdateTaskState, transaction, query_params)
+                .execute_query(SqlXQuery::UpdateTaskState, pool, query_params)
                 .await?
                 .unwrap_task();
 
@@ -372,7 +375,7 @@ impl AsyncQueue {
     }
 
     async fn insert_task_query(
-        transaction: &mut Transaction<'_, Any>,
+        pool: &Pool<Any>,
         backend: &BackendSqlX,
         metadata: &serde_json::Value,
         task_type: &str,
@@ -385,7 +388,7 @@ impl AsyncQueue {
             .build();
 
         let task = backend
-            .execute_query(SqlXQuery::InsertTask, transaction, query_params)
+            .execute_query(SqlXQuery::InsertTask, pool, query_params)
             .await?
             .unwrap_task();
 
@@ -393,7 +396,7 @@ impl AsyncQueue {
     }
 
     async fn insert_task_if_not_exist_query(
-        transaction: &mut Transaction<'_, Any>,
+        pool: &Pool<Any>,
         backend: &BackendSqlX,
         metadata: &serde_json::Value,
         task_type: &str,
@@ -406,7 +409,7 @@ impl AsyncQueue {
             .build();
 
         let task = backend
-            .execute_query(SqlXQuery::InsertTaskIfNotExists, transaction, query_params)
+            .execute_query(SqlXQuery::InsertTaskIfNotExists, pool, query_params)
             .await?
             .unwrap_task();
 
@@ -414,7 +417,7 @@ impl AsyncQueue {
     }
 
     async fn schedule_task_query(
-        transaction: &mut Transaction<'_, Any>,
+        pool: &Pool<Any>,
         backend: &BackendSqlX,
         task: &dyn AsyncRunnable,
     ) -> Result<Task, AsyncQueueError> {
@@ -439,17 +442,11 @@ impl AsyncQueue {
         };
 
         let task: Task = if !task.uniq() {
-            Self::insert_task_query(
-                transaction,
-                backend,
-                &metadata,
-                &task.task_type(),
-                &scheduled_at,
-            )
-            .await?
+            Self::insert_task_query(pool, backend, &metadata, &task.task_type(), &scheduled_at)
+                .await?
         } else {
             Self::insert_task_if_not_exist_query(
-                transaction,
+                pool,
                 backend,
                 &metadata,
                 &task.task_type(),
@@ -465,17 +462,15 @@ impl AsyncQueue {
 impl AsyncQueueable for AsyncQueue {
     async fn find_task_by_id(&mut self, id: &Uuid) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
+        let pool = self.pool.as_ref().unwrap();
 
         let query_params = QueryParams::builder().uuid(id).build();
 
         let task = self
             .backend
-            .execute_query(SqlXQuery::FindTaskById, &mut transaction, query_params)
+            .execute_query(SqlXQuery::FindTaskById, pool, query_params)
             .await?
             .unwrap_task();
-
-        transaction.commit().await?;
 
         Ok(task)
     }
@@ -485,24 +480,21 @@ impl AsyncQueueable for AsyncQueue {
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
+        let pool = self.pool.as_ref().unwrap();
 
-        let task =
-            Self::fetch_and_touch_task_query(&mut transaction, &self.backend, task_type).await?;
-
-        transaction.commit().await?;
+        let task = Self::fetch_and_touch_task_query(pool, &self.backend, task_type).await?;
 
         Ok(task)
     }
 
     async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
+        let pool = self.pool.as_ref().unwrap();
         let metadata = serde_json::to_value(task)?;
 
         let task = if !task.uniq() {
             Self::insert_task_query(
-                &mut transaction,
+                pool,
                 &self.backend,
                 &metadata,
                 &task.task_type(),
@@ -511,7 +503,7 @@ impl AsyncQueueable for AsyncQueue {
             .await?
         } else {
             Self::insert_task_if_not_exist_query(
-                &mut transaction,
+                pool,
                 &self.backend,
                 &metadata,
                 &task.task_type(),
@@ -520,73 +512,59 @@ impl AsyncQueueable for AsyncQueue {
             .await?
         };
 
-        transaction.commit().await?;
-
         Ok(task)
     }
 
     async fn schedule_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
+        let pool = self.pool.as_ref().unwrap();
 
-        let task = Self::schedule_task_query(&mut transaction, &self.backend, task).await?;
-
-        transaction.commit().await?;
+        let task = Self::schedule_task_query(pool, &self.backend, task).await?;
 
         Ok(task)
     }
 
     async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
+        let pool = self.pool.as_ref().unwrap();
 
         let query_params = QueryParams::builder().build();
 
         let result = self
             .backend
-            .execute_query(SqlXQuery::RemoveAllTask, &mut transaction, query_params)
+            .execute_query(SqlXQuery::RemoveAllTask, pool, query_params)
             .await?
             .unwrap_u64();
-
-        transaction.commit().await?;
 
         Ok(result)
     }
 
     async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
+        let pool = self.pool.as_ref().unwrap();
 
         let query_params = QueryParams::builder().build();
 
         let result = self
             .backend
-            .execute_query(
-                SqlXQuery::RemoveAllScheduledTask,
-                &mut transaction,
-                query_params,
-            )
+            .execute_query(SqlXQuery::RemoveAllScheduledTask, pool, query_params)
             .await?
             .unwrap_u64();
-
-        transaction.commit().await?;
 
         Ok(result)
     }
 
     async fn remove_task(&mut self, id: &Uuid) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
+        let pool = self.pool.as_ref().unwrap();
 
         let query_params = QueryParams::builder().uuid(id).build();
 
         let result = self
             .backend
-            .execute_query(SqlXQuery::RemoveTask, &mut transaction, query_params)
+            .execute_query(SqlXQuery::RemoveTask, pool, query_params)
             .await?
             .unwrap_u64();
-
-        transaction.commit().await?;
 
         Ok(result)
     }
@@ -597,21 +575,15 @@ impl AsyncQueueable for AsyncQueue {
     ) -> Result<u64, AsyncQueueError> {
         if task.uniq() {
             self.check_if_connection()?;
-            let mut transaction = self.pool.as_ref().unwrap().begin().await?;
+            let pool = self.pool.as_ref().unwrap();
 
             let query_params = QueryParams::builder().runnable(task).build();
 
             let result = self
                 .backend
-                .execute_query(
-                    SqlXQuery::RemoveTaskByMetadata,
-                    &mut transaction,
-                    query_params,
-                )
+                .execute_query(SqlXQuery::RemoveTaskByMetadata, pool, query_params)
                 .await?
                 .unwrap_u64();
-
-            transaction.commit().await?;
 
             Ok(result)
         } else {
@@ -621,17 +593,15 @@ impl AsyncQueueable for AsyncQueue {
 
     async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
+        let pool = self.pool.as_ref().unwrap();
 
         let query_params = QueryParams::builder().task_type(task_type).build();
 
         let result = self
             .backend
-            .execute_query(SqlXQuery::RemoveTaskType, &mut transaction, query_params)
+            .execute_query(SqlXQuery::RemoveTaskType, pool, query_params)
             .await?
             .unwrap_u64();
-
-        transaction.commit().await?;
 
         Ok(result)
     }
@@ -642,17 +612,15 @@ impl AsyncQueueable for AsyncQueue {
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
+        let pool = self.pool.as_ref().unwrap();
 
         let query_params = QueryParams::builder().uuid(&task.id).state(state).build();
 
         let task = self
             .backend
-            .execute_query(SqlXQuery::UpdateTaskState, &mut transaction, query_params)
+            .execute_query(SqlXQuery::UpdateTaskState, pool, query_params)
             .await?
             .unwrap_task();
-
-        transaction.commit().await?;
 
         Ok(task)
     }
@@ -663,7 +631,7 @@ impl AsyncQueueable for AsyncQueue {
         error_message: &str,
     ) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
-        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
+        let pool = self.pool.as_ref().unwrap();
 
         let query_params = QueryParams::builder()
             .error_message(error_message)
@@ -672,11 +640,9 @@ impl AsyncQueueable for AsyncQueue {
 
         let failed_task = self
             .backend
-            .execute_query(SqlXQuery::FailTask, &mut transaction, query_params)
+            .execute_query(SqlXQuery::FailTask, pool, query_params)
             .await?
             .unwrap_task();
-
-        transaction.commit().await?;
 
         Ok(failed_task)
     }
@@ -689,7 +655,7 @@ impl AsyncQueueable for AsyncQueue {
     ) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
 
-        let mut transaction = self.pool.as_ref().unwrap().begin().await?;
+        let pool = self.pool.as_ref().unwrap();
 
         let query_params = QueryParams::builder()
             .backoff_seconds(backoff_seconds)
@@ -699,11 +665,9 @@ impl AsyncQueueable for AsyncQueue {
 
         let failed_task = self
             .backend
-            .execute_query(SqlXQuery::RetryTask, &mut transaction, query_params)
+            .execute_query(SqlXQuery::RetryTask, pool, query_params)
             .await?
             .unwrap_task();
-
-        transaction.commit().await?;
 
         Ok(failed_task)
     }

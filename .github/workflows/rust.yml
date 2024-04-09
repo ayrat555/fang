@@ -204,3 +204,60 @@ jobs:
 
       - name: Build release
         run: cargo build --release --verbose --all-features --target x86_64-unknown-linux-gnu
+
+test_mysql:
+    name: Test mysql
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: mysql://root:mysql@localhost/fang
+      CARGO_TERM_COLOR: always
+
+    services:
+      mysql:
+        image: mysql:8.1
+        env:
+          MYSQL_ROOT_PASSWORD: mysql
+          MYSQL_DATABASE: fang
+        ports:
+          - 3306:3306
+        options: --health-cmd "mysqladmin ping" --connect-timeout 5s --wait=5
+
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Rust
+        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+
+      - name: Install diesel-cli
+        run: cargo install diesel_cli --no-default-features --features mysql
+
+      - name: Setup Sqlite db
+        working-directory: ./fang/mysql_migrations
+        run: diesel setup --database-url "mysql://root:mysql@localhost/fang"
+
+      - name: Run tests
+        run: cargo test "asynk::async_queue::mysql" --verbose --features asynk-mysql -- --nocapture
+
+  release:
+    name: Release x86_64-unknown-linux-gnu
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Rust
+        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+
+      - name: Build release
+        run: cargo build --release --verbose --all-features --target x86_64-unknown-linux-gnu
