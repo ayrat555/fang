@@ -114,7 +114,7 @@ impl Res {
 }
 
 impl BackendSqlX {
-    pub fn new_with_name(name: &str) -> BackendSqlX {
+    pub fn _new_with_name(name: &str) -> BackendSqlX {
         match name {
             "PostgreSQL" => BackendSqlX::Pg,
             "SQLite" => BackendSqlX::Sqlite,
@@ -865,7 +865,7 @@ async fn mysql_impl_insert_task_uniq(
     let query_params = QueryParams::builder().uuid(&uuid).build();
 
     let task: Task =
-        general_any_impl_find_task_by_id(FIND_TASK_BY_ID_QUERY_MYSQL, &pool, query_params).await?;
+        general_any_impl_find_task_by_id(FIND_TASK_BY_ID_QUERY_MYSQL, pool, query_params).await?;
 
     Ok(task)
 }

@@ -13,7 +13,8 @@ use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use cron::Schedule;
-//use sqlx::any::install_default_drivers;
+//use sqlx::any::install_default_drivers; // this is supported in sqlx 0.7
+use sqlx::any::AnyKind;
 use sqlx::pool::PoolOptions;
 use sqlx::Any;
 use sqlx::AnyPool;
@@ -325,10 +326,9 @@ impl AsyncQueue {
         let anykind = pool.any_kind();
 
         let backend = match anykind {
-            sqlx::any::AnyKind::Postgres => BackendSqlX::Pg,
-            sqlx::any::AnyKind::Sqlite => BackendSqlX::Sqlite,
-            sqlx::any::AnyKind::MySql => BackendSqlX::Mysql,
-            _ => BackendSqlX::NoBackend,
+            AnyKind::Postgres => BackendSqlX::Pg,
+            AnyKind::Sqlite => BackendSqlX::Sqlite,
+            AnyKind::MySql => BackendSqlX::Mysql,
         };
 
         self.backend = backend;
