@@ -173,137 +173,6 @@ use std::env;
 
 use super::backend_sqlx::BackendSqlX;
 
-#[cfg(test)]
-impl AsyncQueue {
-    /// Provides an AsyncQueue connected to its own DB
-    pub async fn test_postgres() -> Self {
-        dotenvy::dotenv().expect(".env file not found");
-        let base_url = env::var("POSTGRES_BASE_URL").expect("Base URL for Postgres not found");
-        let base_db = env::var("POSTGRES_DB").expect("Name for base Postgres DB not found");
-
-        let mut res = Self::builder()
-            .max_pool_size(1_u32)
-            .uri(format!("{}/{}", base_url, base_db))
-            .build();
-
-        let mut new_number = ASYNC_QUEUE_POSTGRES_TEST_COUNTER.lock().await;
-        res.connect().await.unwrap();
-
-        let db_name = format!("async_queue_test_{}", *new_number);
-        *new_number += 1;
-
-        let create_query: &str = &format!("CREATE DATABASE {} WITH TEMPLATE fang;", db_name);
-        let delete_query: &str = &format!("DROP DATABASE IF EXISTS {};", db_name);
-
-        let mut conn = res.pool.as_mut().unwrap().acquire().await.unwrap();
-
-        log::info!("Deleting database {db_name} ...");
-        conn.execute(delete_query).await.unwrap();
-
-        log::info!("Creating database {db_name} ...");
-        let expected_error: &str = &format!(
-            "source database \"{}\" is being accessed by other users",
-            base_db
-        );
-        while let Err(e) = conn.execute(create_query).await {
-            if e.as_database_error().unwrap().message() != expected_error {
-                panic!("{:?}", e);
-            }
-        }
-
-        log::info!("Database {db_name} created !!");
-
-        res.connected = false;
-        res.pool = None;
-        res.uri = format!("{}/{}", base_url, db_name);
-        res.connect().await.unwrap();
-
-        res
-    }
-
-    /// Provides an AsyncQueue connected to its own DB
-    pub async fn test_sqlite() -> Self {
-        dotenvy::dotenv().expect(".env file not found");
-        let tests_dir = env::var("SQLITE_TESTS_DIR").expect("Name for tests directory not found");
-        let base_file = env::var("SQLITE_FILE").expect("Name for SQLite DB file not found");
-        let sqlite_file = format!("../{}", base_file);
-
-        let mut new_number = ASYNC_QUEUE_SQLITE_TEST_COUNTER.lock().await;
-
-        let db_name = format!("../{}/async_queue_test_{}.db", tests_dir, *new_number);
-        *new_number += 1;
-
-        let path = Path::new(&db_name);
-
-        if path.exists() {
-            log::info!("Deleting database {db_name} ...");
-            std::fs::remove_file(path).unwrap();
-        }
-
-        log::info!("Creating database {db_name} ...");
-        std::fs::copy(sqlite_file, &db_name).unwrap();
-        log::info!("Database {db_name} created !!");
-
-        let mut res = Self::builder()
-            .max_pool_size(1_u32)
-            .uri(format!("sqlite://{}", db_name))
-            .build();
-
-        res.connect().await.expect("fail to connect");
-        res
-    }
-
-    /// Provides an AsyncQueue connected to its own DB
-    pub async fn test_mysql() -> Self {
-        dotenvy::dotenv().expect(".env file not found");
-        let base_url = env::var("MYSQL_BASE_URL").expect("Base URL for MySQL not found");
-        let base_db = env::var("MYSQL_DB").expect("Name for base MySQL DB not found");
-
-        let mut res = Self::builder()
-            .max_pool_size(1_u32)
-            .uri(format!("{}/{}", base_url, base_db))
-            .build();
-
-        let mut new_number = ASYNC_QUEUE_MYSQL_TEST_COUNTER.lock().await;
-        res.connect().await.unwrap();
-
-        let db_name = format!("async_queue_test_{}", *new_number);
-        *new_number += 1;
-
-        let create_query: &str = &format!(
-            "CREATE DATABASE {}; CREATE TABLE {}.fang_tasks LIKE fang.fang_tasks;",
-            db_name, db_name
-        );
-
-        let delete_query: &str = &format!("DROP DATABASE IF EXISTS {};", db_name);
-
-        let mut conn = res.pool.as_mut().unwrap().acquire().await.unwrap();
-
-        log::info!("Deleting database {db_name} ...");
-        conn.execute(delete_query).await.unwrap();
-
-        log::info!("Creating database {db_name} ...");
-        let expected_error: &str = &format!(
-            "source database \"{}\" is being accessed by other users",
-            base_db
-        );
-        while let Err(e) = conn.execute(create_query).await {
-            if e.as_database_error().unwrap().message() != expected_error {
-                panic!("{:?}", e);
-            }
-        }
-
-        log::info!("Database {db_name} created !!");
-
-        res.connected = false;
-        res.pool = None;
-        res.uri = format!("{}/{}", base_url, db_name);
-        res.connect().await.unwrap();
-
-        res
-    }
-}
-
 impl AsyncQueue {
     /// Check if the connection with db is established
     pub fn check_if_connection(&self) -> Result<(), AsyncQueueError> {
@@ -670,6 +539,137 @@ impl AsyncQueueable for AsyncQueue {
             .unwrap_task();
 
         Ok(failed_task)
+    }
+}
+
+#[cfg(test)]
+impl AsyncQueue {
+    /// Provides an AsyncQueue connected to its own DB
+    pub async fn test_postgres() -> Self {
+        dotenvy::dotenv().expect(".env file not found");
+        let base_url = env::var("POSTGRES_BASE_URL").expect("Base URL for Postgres not found");
+        let base_db = env::var("POSTGRES_DB").expect("Name for base Postgres DB not found");
+
+        let mut res = Self::builder()
+            .max_pool_size(1_u32)
+            .uri(format!("{}/{}", base_url, base_db))
+            .build();
+
+        let mut new_number = ASYNC_QUEUE_POSTGRES_TEST_COUNTER.lock().await;
+        res.connect().await.unwrap();
+
+        let db_name = format!("async_queue_test_{}", *new_number);
+        *new_number += 1;
+
+        let create_query: &str = &format!("CREATE DATABASE {} WITH TEMPLATE fang;", db_name);
+        let delete_query: &str = &format!("DROP DATABASE IF EXISTS {};", db_name);
+
+        let mut conn = res.pool.as_mut().unwrap().acquire().await.unwrap();
+
+        log::info!("Deleting database {db_name} ...");
+        conn.execute(delete_query).await.unwrap();
+
+        log::info!("Creating database {db_name} ...");
+        let expected_error: &str = &format!(
+            "source database \"{}\" is being accessed by other users",
+            base_db
+        );
+        while let Err(e) = conn.execute(create_query).await {
+            if e.as_database_error().unwrap().message() != expected_error {
+                panic!("{:?}", e);
+            }
+        }
+
+        log::info!("Database {db_name} created !!");
+
+        res.connected = false;
+        res.pool = None;
+        res.uri = format!("{}/{}", base_url, db_name);
+        res.connect().await.unwrap();
+
+        res
+    }
+
+    /// Provides an AsyncQueue connected to its own DB
+    pub async fn test_sqlite() -> Self {
+        dotenvy::dotenv().expect(".env file not found");
+        let tests_dir = env::var("SQLITE_TESTS_DIR").expect("Name for tests directory not found");
+        let base_file = env::var("SQLITE_FILE").expect("Name for SQLite DB file not found");
+        let sqlite_file = format!("../{}", base_file);
+
+        let mut new_number = ASYNC_QUEUE_SQLITE_TEST_COUNTER.lock().await;
+
+        let db_name = format!("../{}/async_queue_test_{}.db", tests_dir, *new_number);
+        *new_number += 1;
+
+        let path = Path::new(&db_name);
+
+        if path.exists() {
+            log::info!("Deleting database {db_name} ...");
+            std::fs::remove_file(path).unwrap();
+        }
+
+        log::info!("Creating database {db_name} ...");
+        std::fs::copy(sqlite_file, &db_name).unwrap();
+        log::info!("Database {db_name} created !!");
+
+        let mut res = Self::builder()
+            .max_pool_size(1_u32)
+            .uri(format!("sqlite://{}", db_name))
+            .build();
+
+        res.connect().await.expect("fail to connect");
+        res
+    }
+
+    /// Provides an AsyncQueue connected to its own DB
+    pub async fn test_mysql() -> Self {
+        dotenvy::dotenv().expect(".env file not found");
+        let base_url = env::var("MYSQL_BASE_URL").expect("Base URL for MySQL not found");
+        let base_db = env::var("MYSQL_DB").expect("Name for base MySQL DB not found");
+
+        let mut res = Self::builder()
+            .max_pool_size(1_u32)
+            .uri(format!("{}/{}", base_url, base_db))
+            .build();
+
+        let mut new_number = ASYNC_QUEUE_MYSQL_TEST_COUNTER.lock().await;
+        res.connect().await.unwrap();
+
+        let db_name = format!("async_queue_test_{}", *new_number);
+        *new_number += 1;
+
+        let create_query: &str = &format!(
+            "CREATE DATABASE {}; CREATE TABLE {}.fang_tasks LIKE fang.fang_tasks;",
+            db_name, db_name
+        );
+
+        let delete_query: &str = &format!("DROP DATABASE IF EXISTS {};", db_name);
+
+        let mut conn = res.pool.as_mut().unwrap().acquire().await.unwrap();
+
+        log::info!("Deleting database {db_name} ...");
+        conn.execute(delete_query).await.unwrap();
+
+        log::info!("Creating database {db_name} ...");
+        let expected_error: &str = &format!(
+            "source database \"{}\" is being accessed by other users",
+            base_db
+        );
+        while let Err(e) = conn.execute(create_query).await {
+            if e.as_database_error().unwrap().message() != expected_error {
+                panic!("{:?}", e);
+            }
+        }
+
+        log::info!("Database {db_name} created !!");
+
+        res.connected = false;
+        res.pool = None;
+        res.uri = format!("{}/{}", base_url, db_name);
+        res.connect().await.unwrap();
+
+        res
     }
 }
 

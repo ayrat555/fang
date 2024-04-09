@@ -15,7 +15,7 @@ rust-version = "1.62"
 doctest = false
 
 [features]
-default = ["blocking", "asynk-sqlx", "derive-error", "blocking-postgres", "blocking-mysql" , "blocking-sqlite", "migrations-postgres", "migrations-sqlite" , "migrations-mysql"]
+default = ["blocking", "asynk-sqlx", "derive-error", "blocking-postgres", "blocking-mysql" , "blocking-sqlite", "migrations-postgres", "migrations-sqlite", "migrations-mysql"]
 asynk-postgres = ["asynk-sqlx" , "sqlx?/postgres"]
 asynk-sqlite = ["asynk-sqlx" , "sqlx?/sqlite"]
 asynk-mysql = ["asynk-sqlx"  , "sqlx?/mysql"]
@@ -36,8 +36,7 @@ migrations = ["dep:diesel_migrations"]
 fang-derive-error = { version = "0.1.0"}
 diesel_migrations = { version = "2.1" , features = ["postgres", "sqlite" , "mysql"]}
 sqlx = {version = "0.6.3", features = ["any" , "macros" , "runtime-tokio-rustls", "postgres", "sqlite", "mysql"]}
-#sqlx = {git = "https://github.com/pxp9/sqlx", branch = "main", features = ["any" , "macros" , "runtime-tokio", "postgres", "sqlite", "mysql"]}
-#console-subscriber = "0.2.0"
+#console-subscriber = "0.2.0" # for tokio tracing debug
 
 [dependencies]
 cron = "0.12"
@@ -53,10 +52,6 @@ typed-builder = "0.14"
 typetag = "0.2"
 uuid = { version = "1.1", features = ["v4"] }
 fang-derive-error = { version = "0.1.0" , optional = true}
-# sqlx with no TLS, if you want TLS you must to get feature "tls-native-tls" or "tls-rustls"
-#sqlx = {version = "0.7", features = ["any" , "macros" , "json" , "uuid" , "chrono" , "runtime-tokio", "postgres", "sqlite", "mysql"] }
-# https://github.com/launchbadge/sqlx/issues/2416 is fixed in pxp9's fork
-#sqlx = {git = "https://github.com/pxp9/sqlx", branch = "main", features = ["any" , "macros" , "runtime-tokio"] , optional = true}
 sqlx = {version = "0.6.3", features = ["any" , "macros" , "runtime-tokio-rustls", "postgres", "sqlite", "mysql"], optional = true}
 
 [dependencies.diesel]
