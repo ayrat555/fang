@@ -232,7 +232,7 @@ jobs:
           - 5432:5432
 
         options: >-
-          --health-cmd mysqladmin ping
+          --health-cmd='mysqladmin ping -h localhost -u root -pmysql'
           --health-interval 10s
           --health-timeout 5s
 
