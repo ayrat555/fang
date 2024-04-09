@@ -229,12 +229,7 @@ jobs:
         # Set health checks to wait until postgres has started
 
         ports:
-          - 5432:5432
-
-        options: >-
-          --health-cmd='mysqladmin ping -h localhost -u root -pmysql'
-          --health-interval 10s
-          --health-timeout 5s
+          - 3306:3306
 
     steps:
       - uses: actions/checkout@v3
