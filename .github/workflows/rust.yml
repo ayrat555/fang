@@ -226,7 +226,12 @@ jobs:
         env:
           MYSQL_ROOT_PASSWORD: mysql
           MYSQL_DATABASE: fang
-        # Set health checks to wait until postgres has started
+        # here we should check if mysql is ready, but this does not work
+        options: >-
+          --health-cmd='$(mysqladmin ping -h localhost -P 3306 -u root --password=mysql 2>&1)'
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
         ports:
           - 3306:3306
@@ -240,7 +245,7 @@ jobs:
       - name: Install diesel-cli
         run: cargo install diesel_cli --no-default-features --features mysql
 
-      - name: Setup Postgres db
+      - name: Setup MySQL db
         working-directory: ./fang/mysql_migrations
         run: diesel setup --database-url "mysql://root:mysql@localhost/fang"
 
