@@ -36,16 +36,34 @@ fang = { version = "1.0.0" , features = ["blocking"], default-features = false }
 
 #### the Asynk feature
 
+- PostgreSQL as a queue
+
 ```toml
 [dependencies]
-fang = { version = "1.0.0" , features = ["asynk"], default-features = false }
+fang = { version = "1.0.0" , features = ["asynk-postgres"], default-features = false }
+```
+
+- SQLite as a queue
+
+```toml
+[dependencies]
+fang = { version = "1.0.0" , features = ["asynk-sqlite"], default-features = false }
+```
+
+- MySQL as a queue
+
+```toml
+[dependencies]
+fang = { version = "1.0.0" , features = ["asynk-mysql"], default-features = false }
 ```
 
 #### the Asynk feature with derive macro
 
+Substitute `database` with your desired backend.
+
 ```toml
 [dependencies]
-fang = { version = "1.0.0" , features = ["asynk", "derive-error" ], default-features = false }
+fang = { version = "1.0.0" , features = ["asynk-{database}", "derive-error" ], default-features = false }
 ```
 
 #### All features
@@ -259,7 +277,6 @@ For Postgres backend:
 
 ```rust
 use fang::asynk::async_queue::AsyncQueue;
-use fang::NoTls;
 use fang::AsyncRunnable;
 
 // Create an AsyncQueue
@@ -273,10 +290,10 @@ let mut queue = AsyncQueue::builder()
     .build();
 
 // Always connect first in order to perform any operation
-queue.connect(NoTls).await.unwrap();
+queue.connect().await.unwrap();
 ```
 
-As an easy example, we are using NoTls type. If for some reason you would like to encrypt Postgres requests, you can use [openssl](https://docs.rs/postgres-openssl/latest/postgres_openssl/) or [native-tls](https://docs.rs/postgres-native-tls/latest/postgres_native_tls/).
+Encryption is always used with crate `rustls`, if you want to not use encryption, you can issue us to re-export the sqlx feature with no encryption.
 
 ```rust
 // AsyncTask from the first example
@@ -322,7 +339,7 @@ use fang::asynk::async_worker_pool::AsyncWorkerPool;
 // Need to create a queue
 // Also insert some tasks
 
-let mut pool: AsyncWorkerPool<AsyncQueue<NoTls>> = AsyncWorkerPool::builder()
+let mut pool: AsyncWorkerPool<AsyncQueue> = AsyncWorkerPool::builder()
         .number_of_workers(max_pool_size)
         .queue(queue.clone())
         // if you want to run tasks of the specific kind
