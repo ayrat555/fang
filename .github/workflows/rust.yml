@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      
+
 
       - name: Setup Rust
         run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
@@ -31,7 +31,7 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy --verbose --all-targets --all-features -- -D warnings
-  
+
   test_postgres_blocking:
     name: Test blocking
     runs-on: ubuntu-latest
@@ -78,7 +78,7 @@ jobs:
 
       - name: Run blocking tests
         run: cargo test "blocking::queue::postgres" --verbose --features blocking --color always -- --nocapture
-      
+
       - name: Run blocking dirty tests
         run: cargo test "blocking::worker" --verbose --features blocking -- --ignored
 
@@ -247,7 +247,7 @@ jobs:
 
       - name: Setup MySQL db
         working-directory: ./fang/mysql_migrations
-        run: diesel setup --database-url "mysql://root:mysql@localhost/fang"
+        run: diesel setup --database-url "mysql://root:mysql@127.0.0.1/fang"
 
       - name: Run tests
         run: cargo test "asynk::async_queue::mysql" --verbose --features asynk-mysql --color always -- --nocapture
