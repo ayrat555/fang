@@ -811,8 +811,10 @@ async fn mysql_impl_insert_task(
         .rows_affected();
 
     if affected_rows != 1 {
-        // here we should return an error
-        panic!("fock")
+        return Err(AsyncQueueError::ResultError {
+            expected: 1,
+            found: affected_rows,
+        });
     }
 
     let query_params = QueryParams::builder().uuid(&uuid).build();
@@ -858,8 +860,10 @@ async fn mysql_impl_insert_task_uniq(
     println!("reach here 3");
 
     if affected_rows != 1 {
-        // here we should return an error
-        panic!("fock")
+        return Err(AsyncQueueError::ResultError {
+            expected: 1,
+            found: affected_rows,
+        });
     }
 
     let query_params = QueryParams::builder().uuid(&uuid).build();
@@ -893,8 +897,10 @@ async fn mysql_impl_update_task_state(
         .rows_affected();
 
     if affected_rows != 1 {
-        // here we should return an error
-        panic!("fock")
+        return Err(AsyncQueueError::ResultError {
+            expected: 1,
+            found: affected_rows,
+        });
     }
 
     let query_params = QueryParams::builder().uuid(params.uuid.unwrap()).build();
@@ -929,8 +935,10 @@ async fn mysql_impl_fail_task(
         .rows_affected();
 
     if affected_rows != 1 {
-        // here we should return an error
-        panic!("fock")
+        return Err(AsyncQueueError::ResultError {
+            expected: 1,
+            found: affected_rows,
+        });
     }
 
     let query_params = QueryParams::builder().uuid(&id).build();
@@ -971,8 +979,10 @@ async fn mysql_impl_retry_task(
         .rows_affected();
 
     if affected_rows != 1 {
-        // here we should return an error
-        panic!("fock")
+        return Err(AsyncQueueError::ResultError {
+            expected: 1,
+            found: affected_rows,
+        });
     }
 
     let query_params = QueryParams::builder().uuid(&uuid).build();
