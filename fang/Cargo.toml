@@ -1,13 +1,13 @@
 [package]
 name = "fang"
-version = "0.10.4"
+version = "1.0.0"
 authors = ["Ayrat Badykov <ayratin555@gmail.com>" , "Pepe Márquez <pepe.marquezromero@gmail.com>"]
 description = "Background job processing library for Rust"
 repository = "https://github.com/ayrat555/fang"
 edition = "2021"
 license = "MIT"
 readme = "README.md"
-rust-version = "1.62"
+rust-version = "1.77"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
