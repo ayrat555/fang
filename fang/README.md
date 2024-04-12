@@ -4,7 +4,7 @@
 
 # Fang
 
-Background task processing library for Rust. It uses Postgres DB as a task queue.
+Background task processing library for Rust. It can use PostgreSQL, SQLite or MySQL as a task queue.
 
 ## Key Features
 
@@ -31,32 +31,44 @@ Here are some of the fang's key features:
 
 ```toml
 [dependencies]
-fang = { version = "0.10.4" , features = ["blocking"], default-features = false }
+fang = { version = "1.0.0" , features = ["blocking"], default-features = false }
 ```
 
 #### the Asynk feature
 
 ```toml
 [dependencies]
-fang = { version = "0.10.4" , features = ["asynk"], default-features = false }
+fang = { version = "1.0.0" , features = ["asynk"], default-features = false }
 ```
 
 #### the Asynk feature with derive macro
 
 ```toml
 [dependencies]
-fang = { version = "0.10.4" , features = ["asynk", "derive-error" ], default-features = false }
+fang = { version = "1.0.0" , features = ["asynk", "derive-error" ], default-features = false }
 ```
 
 #### All features
 
 ```toml
-fang = { version = "0.10.4" }
+fang = { version = "1.0.0" }
 ```
 
 _Supports rustc 1.62+_
 
-2. Create the `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/fang/postgres_migrations/migrations/2022-08-20-151615_create_fang_tasks/up.sql).
+2. Create the `fang_tasks` table in the database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/fang/postgres_migrations/migrations/2022-08-20-151615_create_fang_tasks/up.sql). 
+
+Migrations can be also run as code, importing the feature `migrations-{database}` being the `database` the backend queue you want to use.
+
+```toml
+[dependencies]
+fang = { version = "1.0.0" , features = ["asynk-postgres", "migrations-postgres" ], default-features = false }
+```
+
+```rust
+use fang::run_migrations_postgres;
+run_migrations_postgres(&mut connection).unwrap();
+```
 
 ## Usage
 

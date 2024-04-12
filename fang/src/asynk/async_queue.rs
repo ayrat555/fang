@@ -172,6 +172,19 @@ use std::env;
 
 use super::backend_sqlx::BackendSqlX;
 
+fn get_backend(_anykind: AnyKind) -> BackendSqlX {
+    match _anykind {
+        #[cfg(feature = "asynk-postgres")]
+        AnyKind::Postgres => BackendSqlX::Pg,
+        #[cfg(feature = "asynk-mysql")]
+        AnyKind::MySql => BackendSqlX::MySql,
+        #[cfg(feature = "asynk-sqlite")]
+        AnyKind::Sqlite => BackendSqlX::Sqlite,
+        #[allow(unreachable_patterns)]
+        _ => unreachable!(),
+    }
+}
+
 impl AsyncQueue {
     /// Check if the connection with db is established
     pub fn check_if_connection(&self) -> Result<(), AsyncQueueError> {
@@ -193,13 +206,7 @@ impl AsyncQueue {
 
         let anykind = pool.any_kind();
 
-        let backend = match anykind {
-            AnyKind::Postgres => BackendSqlX::Pg,
-            AnyKind::Sqlite => BackendSqlX::Sqlite,
-            AnyKind::MySql => BackendSqlX::Mysql,
-        };
-
-        self.backend = backend;
+        self.backend = get_backend(anykind);
 
         self.pool = Some(pool);
         self.connected = true;
