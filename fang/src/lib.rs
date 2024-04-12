@@ -192,8 +192,7 @@ impl<'a> FromRow<'a, AnyRow> for Task {
         // -- SELECT metadata->>'type' FROM fang_tasks ; this works because jsonb casting
         let metadata: serde_json::Value = serde_json::from_str(&raw).unwrap();
 
-        // This should be changed when issue https://github.com/launchbadge/sqlx/issues/2416 is fixed
-        // Fixed in pxp9's fork
+        // Be careful with this if we update sqlx, https://github.com/launchbadge/sqlx/issues/2416
         let error_message: Option<String> = row.get("error_message");
 
         let state_str: &str = row.get("state"); // will work if database cast json to string
@@ -202,8 +201,7 @@ impl<'a> FromRow<'a, AnyRow> for Task {
 
         let task_type: String = row.get("task_type");
 
-        // This should be changed when issue https://github.com/launchbadge/sqlx/issues/2416 is fixed
-        // Fixed in pxp9's fork
+        // Be careful with this if we update sqlx, https://github.com/launchbadge/sqlx/issues/2416
         let uniq_hash: Option<String> = row.get("uniq_hash");
 
         let retries: i32 = row.get("retries");

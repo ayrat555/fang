@@ -565,11 +565,7 @@ async fn general_any_impl_remove_task_by_metadata(
 
     let uniq_hash = calculate_hash(&metadata.to_string());
 
-    println!("{query}");
-
     let adquire = pool;
-
-    println!("Adquire {:?}", adquire);
 
     Ok(sqlx::query(query)
         .bind(uniq_hash)
@@ -843,10 +839,6 @@ async fn mysql_impl_insert_task_uniq(
 
     let uniq_hash = calculate_hash(&metadata_str);
 
-    println!("{} len : {}", uniq_hash, uniq_hash.len());
-
-    println!("reach here");
-
     let affected_rows = sqlx::query(query)
         .bind(uuid_as_str)
         .bind(metadata_str)
@@ -856,8 +848,6 @@ async fn mysql_impl_insert_task_uniq(
         .execute(pool)
         .await?
         .rows_affected();
-
-    println!("reach here 3");
 
     if affected_rows != 1 {
         return Err(AsyncQueueError::ResultError {

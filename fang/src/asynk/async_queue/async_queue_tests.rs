@@ -227,9 +227,7 @@ macro_rules! test_asynk_queue {
                 assert_eq!(Some(2), number);
                 assert_eq!(Some("AsyncTask"), type_task);
 
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-
-                let task = test.fetch_and_touch_task(None).await.unwrap().unwrap(); // This fails if this FOR UPDATE SKIP LOCKED is set in query fetch task type
+                let task = test.fetch_and_touch_task(None).await.unwrap().unwrap();
 
                 let metadata = task.metadata.as_object().unwrap();
                 let number = metadata["number"].as_u64();
