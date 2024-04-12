@@ -208,18 +208,21 @@ impl<'a> FromRow<'a, AnyRow> for Task {
 
         let scheduled_at_str: &str = row.get("scheduled_at");
 
+        // This unwrap is safe because we know that the database returns the date in the correct format
         let scheduled_at: DateTime<Utc> = DateTime::parse_from_str(scheduled_at_str, "%F %T%.f%#z")
             .unwrap()
             .into();
 
         let created_at_str: &str = row.get("created_at");
 
+        // This unwrap is safe because we know that the database returns the date in the correct format
         let created_at: DateTime<Utc> = DateTime::parse_from_str(created_at_str, "%F %T%.f%#z")
             .unwrap()
             .into();
 
         let updated_at_str: &str = row.get("updated_at");
 
+        // This unwrap is safe because we know that the database returns the date in the correct format
         let updated_at: DateTime<Utc> = DateTime::parse_from_str(updated_at_str, "%F %T%.f%#z")
             .unwrap()
             .into();

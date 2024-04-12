@@ -99,7 +99,7 @@ where
             {
                 Ok(Some(task)) => {
                     let actual_task: Box<dyn AsyncRunnable> =
-                        serde_json::from_value(task.metadata.clone()).unwrap();
+                        serde_json::from_value(task.metadata.clone())?;
 
                     let cron = actual_task.cron();
 

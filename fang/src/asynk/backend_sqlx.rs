@@ -114,15 +114,6 @@ impl Res {
 }
 
 impl BackendSqlX {
-    pub fn _new_with_name(name: &str) -> BackendSqlX {
-        match name {
-            "PostgreSQL" => BackendSqlX::Pg,
-            "SQLite" => BackendSqlX::Sqlite,
-            "MySQL" => BackendSqlX::Mysql,
-            _ => unreachable!(),
-        }
-    }
-
     pub(crate) async fn execute_query<'a>(
         &self,
         query: SqlXQuery,
@@ -163,6 +154,9 @@ pub(crate) enum SqlXQuery {
     RetryTask,
     InsertTaskIfNotExists,
 }
+
+// Unwraps by QueryParams are safe because the responsibility is of the caller
+// and the caller is the library itself
 
 #[derive(Debug, Clone)]
 struct BackendSqlXPg {}
@@ -565,11 +559,9 @@ async fn general_any_impl_remove_task_by_metadata(
 
     let uniq_hash = calculate_hash(&metadata.to_string());
 
-    let adquire = pool;
-
     Ok(sqlx::query(query)
         .bind(uniq_hash)
-        .execute(adquire)
+        .execute(pool)
         .await?
         .rows_affected())
 }

@@ -58,8 +58,7 @@ impl From<cron::error::Error> for AsyncQueueError {
 }
 
 /// This trait defines operations for an asynchronous queue.
-/// The trait can be implemented for different storage BackendSqlXs.
-/// For now, the trait is only implemented for PostgreSQL. More BackendSqlXs are planned to be implemented in the future.
+/// This is implemented by the `AsyncQueue` struct which uses internally a `AnyPool` of `sqlx` to connect to the database.
 
 #[async_trait]
 pub trait AsyncQueueable: Send {
@@ -349,6 +348,7 @@ impl AsyncQueueable for AsyncQueue {
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError> {
         self.check_if_connection()?;
+        // this unwrap is safe because we check if connection is established
         let pool = self.pool.as_ref().unwrap();
 
         let task = Self::fetch_and_touch_task_query(pool, &self.backend, task_type).await?;
@@ -358,6 +358,7 @@ impl AsyncQueueable for AsyncQueue {
 
     async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
+        // this unwrap is safe because we check if connection is established
         let pool = self.pool.as_ref().unwrap();
         let metadata = serde_json::to_value(task)?;
 
@@ -386,6 +387,7 @@ impl AsyncQueueable for AsyncQueue {
 
     async fn schedule_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
+        // this unwrap is safe because we check if connection is established
         let pool = self.pool.as_ref().unwrap();
 
         let task = Self::schedule_task_query(pool, &self.backend, task).await?;
@@ -395,6 +397,7 @@ impl AsyncQueueable for AsyncQueue {
 
     async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
+        // this unwrap is safe because we check if connection is established
         let pool = self.pool.as_ref().unwrap();
 
         let query_params = QueryParams::builder().build();
@@ -410,6 +413,7 @@ impl AsyncQueueable for AsyncQueue {
 
     async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
+        // this unwrap is safe because we check if connection is established
         let pool = self.pool.as_ref().unwrap();
 
         let query_params = QueryParams::builder().build();
