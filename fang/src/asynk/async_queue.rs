@@ -686,6 +686,7 @@ impl AsyncQueue {
 
 #[cfg(test)]
 test_asynk_queue! {postgres, crate::AsyncQueue, crate::AsyncQueue::test_postgres()}
+
 #[cfg(test)]
 test_asynk_queue! {sqlite, crate::AsyncQueue, crate::AsyncQueue::test_sqlite()}
 
