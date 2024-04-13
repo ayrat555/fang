@@ -293,7 +293,7 @@ let mut queue = AsyncQueue::builder()
 queue.connect().await.unwrap();
 ```
 
-Encryption is always used with crate `rustls`, if you want to not use encryption, you can issue us to re-export the sqlx feature with no encryption.
+Encryption is always used with crate `rustls`. We plan to add the possibility of disabling it in the future.
 
 ```rust
 // AsyncTask from the first example
