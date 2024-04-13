@@ -31,7 +31,7 @@ Here are some of the fang's key features:
 
 ```toml
 [dependencies]
-fang = { version = "1.0.0" , features = ["blocking"], default-features = false }
+fang = { version = "0.11.0" , features = ["blocking"], default-features = false }
 ```
 
 #### the Asynk feature
@@ -40,21 +40,21 @@ fang = { version = "1.0.0" , features = ["blocking"], default-features = false }
 
 ```toml
 [dependencies]
-fang = { version = "1.0.0" , features = ["asynk-postgres"], default-features = false }
+fang = { version = "0.11.0" , features = ["asynk-postgres"], default-features = false }
 ```
 
 - SQLite as a queue
 
 ```toml
 [dependencies]
-fang = { version = "1.0.0" , features = ["asynk-sqlite"], default-features = false }
+fang = { version = "0.11.0" , features = ["asynk-sqlite"], default-features = false }
 ```
 
 - MySQL as a queue
 
 ```toml
 [dependencies]
-fang = { version = "1.0.0" , features = ["asynk-mysql"], default-features = false }
+fang = { version = "0.11.0" , features = ["asynk-mysql"], default-features = false }
 ```
 
 #### the Asynk feature with derive macro
@@ -63,13 +63,13 @@ Substitute `database` with your desired backend.
 
 ```toml
 [dependencies]
-fang = { version = "1.0.0" , features = ["asynk-{database}", "derive-error" ], default-features = false }
+fang = { version = "0.11.0" , features = ["asynk-{database}", "derive-error" ], default-features = false }
 ```
 
 #### All features
 
 ```toml
-fang = { version = "1.0.0" }
+fang = { version = "0.11.0" }
 ```
 
 _Supports rustc 1.62+_
@@ -80,7 +80,7 @@ Migrations can be also run as code, importing the feature `migrations-{database}
 
 ```toml
 [dependencies]
-fang = { version = "1.0.0" , features = ["asynk-postgres", "migrations-postgres" ], default-features = false }
+fang = { version = "0.11.0" , features = ["asynk-postgres", "migrations-postgres" ], default-features = false }
 ```
 
 ```rust
