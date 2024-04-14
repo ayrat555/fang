@@ -14,15 +14,29 @@ use chrono::DateTime;
 use chrono::Utc;
 use cron::Schedule;
 //use sqlx::any::install_default_drivers; // this is supported in sqlx 0.7
-use sqlx::any::AnyKind;
 use sqlx::pool::PoolOptions;
-use sqlx::Any;
-use sqlx::AnyPool;
+use sqlx::Database;
+
+use sqlx::MySql;
+use sqlx::MySqlPool;
 use sqlx::Pool;
+use sqlx::Postgres;
+use sqlx::Sqlite;
+use sqlx::SqlitePool;
+use std::any::Any;
 use std::str::FromStr;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
+
+#[cfg(feature = "asynk-postgres")]
+use sqlx::PgPool;
+
+#[cfg(feature = "asynk-mysql")]
+use sqlx::MySqlPool;
+
+#[cfg(feature = "asynk-sqlite")]
+use sqlx::SqlitePool;
 
 #[cfg(test)]
 use self::async_queue_tests::test_asynk_queue;
@@ -136,9 +150,12 @@ pub trait AsyncQueueable: Send {
 ///
 
 #[derive(TypedBuilder, Debug, Clone)]
-pub struct AsyncQueue {
+pub struct AsyncQueue<DB>
+where
+    DB: Database,
+{
     #[builder(default=None, setter(skip))]
-    pool: Option<AnyPool>,
+    pool: Option<Pool<DB>>,
     #[builder(setter(into))]
     uri: String,
     #[builder(setter(into))]
@@ -172,20 +189,29 @@ use std::env;
 
 use super::backend_sqlx::BackendSqlX;
 
-fn get_backend(_anykind: AnyKind) -> BackendSqlX {
-    match _anykind {
-        #[cfg(feature = "asynk-postgres")]
-        AnyKind::Postgres => BackendSqlX::Pg,
-        #[cfg(feature = "asynk-mysql")]
-        AnyKind::MySql => BackendSqlX::MySql,
-        #[cfg(feature = "asynk-sqlite")]
-        AnyKind::Sqlite => BackendSqlX::Sqlite,
-        #[allow(unreachable_patterns)]
-        _ => unreachable!(),
+fn get_backend<'a, DB: Database>(pool: &'a Pool<DB>) -> BackendSqlX {
+    let type_pool = pool.type_id();
+    #[cfg(feature = "asynk-postgres")]
+    if std::any::TypeId::of::<PgPool>() == type_pool {
+        return BackendSqlX::Pg;
     }
+    #[cfg(feature = "asynk-mysql")]
+    if std::any::TypeId::of::<MySqlPool>() == type_pool {
+        return BackendSqlX::MySql;
+    }
+
+    #[cfg(feature = "asynk-sqlite")]
+    if std::any::TypeId::of::<SqlitePool>() == type_pool {
+        return BackendSqlX::Sqlite;
+    }
+
+    unreachable!()
 }
 
-impl AsyncQueue {
+impl<DB> AsyncQueue<DB>
+where
+    DB: Database,
+{
     /// Check if the connection with db is established
     pub fn check_if_connection(&self) -> Result<(), AsyncQueueError> {
         if self.connected {
@@ -199,14 +225,12 @@ impl AsyncQueue {
     pub async fn connect(&mut self) -> Result<(), AsyncQueueError> {
         //install_default_drivers();
 
-        let pool: AnyPool = PoolOptions::new()
+        let pool: Pool<DB> = PoolOptions::new()
             .max_connections(self.max_pool_size)
             .connect(&self.uri)
             .await?;
 
-        let anykind = pool.any_kind();
-
-        self.backend = get_backend(anykind);
+        self.backend = get_backend(&pool);
 
         self.pool = Some(pool);
         self.connected = true;
@@ -214,7 +238,7 @@ impl AsyncQueue {
     }
 
     async fn fetch_and_touch_task_query(
-        pool: &Pool<Any>,
+        pool: &Pool<DB>,
         backend: &BackendSqlX,
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError> {
@@ -250,7 +274,7 @@ impl AsyncQueue {
     }
 
     async fn insert_task_query(
-        pool: &Pool<Any>,
+        pool: &Pool<DB>,
         backend: &BackendSqlX,
         metadata: &serde_json::Value,
         task_type: &str,
@@ -271,7 +295,7 @@ impl AsyncQueue {
     }
 
     async fn insert_task_if_not_exist_query(
-        pool: &Pool<Any>,
+        pool: &Pool<DB>,
         backend: &BackendSqlX,
         metadata: &serde_json::Value,
         task_type: &str,
@@ -292,7 +316,7 @@ impl AsyncQueue {
     }
 
     async fn schedule_task_query(
-        pool: &Pool<Any>,
+        pool: &Pool<DB>,
         backend: &BackendSqlX,
         task: &dyn AsyncRunnable,
     ) -> Result<Task, AsyncQueueError> {
@@ -334,7 +358,10 @@ impl AsyncQueue {
 }
 
 #[async_trait]
-impl AsyncQueueable for AsyncQueue {
+impl<DB> AsyncQueueable for AsyncQueue<DB>
+where
+    DB: Database,
+{
     async fn find_task_by_id(&mut self, id: &Uuid) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
         let pool = self.pool.as_ref().unwrap();
@@ -554,7 +581,7 @@ impl AsyncQueueable for AsyncQueue {
 }
 
 #[cfg(test)]
-impl AsyncQueue {
+impl AsyncQueue<Postgres> {
     /// Provides an AsyncQueue connected to its own DB
     pub async fn test_postgres() -> Self {
         dotenvy::dotenv().expect(".env file not found");
@@ -600,7 +627,10 @@ impl AsyncQueue {
 
         res
     }
+}
 
+#[cfg(test)]
+impl AsyncQueue<Sqlite> {
     /// Provides an AsyncQueue connected to its own DB
     pub async fn test_sqlite() -> Self {
         dotenvy::dotenv().expect(".env file not found");
@@ -632,7 +662,10 @@ impl AsyncQueue {
         res.connect().await.expect("fail to connect");
         res
     }
+}
 
+#[cfg(test)]
+impl AsyncQueue<MySql> {
     /// Provides an AsyncQueue connected to its own DB
     pub async fn test_mysql() -> Self {
         dotenvy::dotenv().expect(".env file not found");
@@ -685,10 +718,10 @@ impl AsyncQueue {
 }
 
 #[cfg(test)]
-test_asynk_queue! {postgres, crate::AsyncQueue, crate::AsyncQueue::test_postgres()}
+test_asynk_queue! {postgres, crate::AsyncQueue<Postgres>, crate::AsyncQueue::test_postgres()}
 
 #[cfg(test)]
-test_asynk_queue! {sqlite, crate::AsyncQueue, crate::AsyncQueue::test_sqlite()}
+test_asynk_queue! {sqlite, crate::AsyncQueue<Sqlite>, crate::AsyncQueue::test_sqlite()}
 
 #[cfg(test)]
-test_asynk_queue! {mysql, crate::AsyncQueue, crate::AsyncQueue::test_mysql()}
+test_asynk_queue! {mysql, crate::AsyncQueue<MySql>, crate::AsyncQueue::test_mysql()}

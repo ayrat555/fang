@@ -24,6 +24,7 @@ const RETRY_TASK_QUERY_POSTGRES: &str = include_str!("../queries_postgres/retry_
 #[derive(Debug, Clone)]
 pub(super) struct BackendSqlXPg {}
 
+use sqlx::Database;
 use SqlXQuery as Q;
 
 use crate::AsyncQueueError;
@@ -41,12 +42,12 @@ use super::general_any_impl_remove_task_type;
 use super::general_any_impl_retry_task;
 use super::general_any_impl_update_task_state;
 use super::{QueryParams, Res, SqlXQuery};
-use sqlx::{Any, Pool};
+use sqlx::Pool;
 
 impl BackendSqlXPg {
-    pub(super) async fn execute_query(
+    pub(super) async fn execute_query<DB: Database>(
         query: SqlXQuery,
-        pool: &Pool<Any>,
+        pool: &Pool<DB>,
         params: QueryParams<'_>,
     ) -> Result<Res, AsyncQueueError> {
         match query {

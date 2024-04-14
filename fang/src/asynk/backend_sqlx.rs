@@ -2,6 +2,7 @@ use chrono::{DateTime, Duration, Utc};
 use sha2::Digest;
 use sha2::Sha256;
 use sqlx::Any;
+use sqlx::Database;
 use sqlx::Pool;
 use std::fmt::Debug;
 use typed_builder::TypedBuilder;
@@ -80,10 +81,10 @@ impl Res {
 }
 
 impl BackendSqlX {
-    pub(crate) async fn execute_query<'a>(
+    pub(crate) async fn execute_query<'a, DB: Database>(
         &self,
         _query: SqlXQuery,
-        _pool: &Pool<Any>,
+        _pool: &Pool<DB>,
         _params: QueryParams<'_>,
     ) -> Result<Res, AsyncQueueError> {
         match self {
@@ -212,9 +213,9 @@ async fn general_any_impl_insert_task_uniq(
 }
 
 #[allow(dead_code)]
-async fn general_any_impl_update_task_state(
+async fn general_any_impl_update_task_state<DB: Database>(
     query: &str,
-    pool: &Pool<Any>,
+    pool: &Pool<DB>,
     params: QueryParams<'_>,
 ) -> Result<Task, AsyncQueueError> {
     let updated_at_str = format!("{}", Utc::now().format("%F %T%.f+00"));

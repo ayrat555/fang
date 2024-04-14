@@ -263,6 +263,7 @@ mod async_worker_tests {
     use chrono::Duration;
     use chrono::Utc;
     use serde::{Deserialize, Serialize};
+    use sqlx::Database;
 
     #[derive(Serialize, Deserialize)]
     struct WorkerAsyncTask {
@@ -563,7 +564,10 @@ mod async_worker_tests {
         assert_eq!(id2, task2.id);
     }
 
-    async fn insert_task(test: &mut AsyncQueue, task: &dyn AsyncRunnable) -> Task {
+    async fn insert_task<DB: Database>(
+        test: &mut AsyncQueue<DB>,
+        task: &dyn AsyncRunnable,
+    ) -> Task {
         test.insert_task(task).await.unwrap()
     }
 
