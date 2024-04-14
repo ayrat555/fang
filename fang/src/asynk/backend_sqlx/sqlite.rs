@@ -20,39 +20,103 @@ const RETRY_TASK_QUERY_SQLITE: &str = include_str!("../queries_sqlite/retry_task
 #[derive(Debug, Clone)]
 pub(super) struct BackendSqlXSQLite {}
 
+use super::FangQueryable;
 use super::{QueryParams, Res, SqlXQuery};
 use crate::AsyncQueueError;
-use sqlx::{Any, Pool};
+use crate::FangTaskState;
+use crate::Task;
+use chrono::{DateTime, Utc};
+use sqlx::sqlite::SqliteRow;
+use sqlx::FromRow;
+use sqlx::Pool;
+use sqlx::Row;
+use sqlx::Sqlite;
+use uuid::Uuid;
 use SqlXQuery as Q;
 
-use super::general_any_impl_fail_task;
-use super::general_any_impl_fetch_task_type;
-use super::general_any_impl_find_task_by_id;
-use super::general_any_impl_insert_task;
-use super::general_any_impl_insert_task_if_not_exists;
-use super::general_any_impl_remove_all_scheduled_tasks;
-use super::general_any_impl_remove_all_task;
-use super::general_any_impl_remove_task;
-use super::general_any_impl_remove_task_by_metadata;
-use super::general_any_impl_remove_task_type;
-use super::general_any_impl_retry_task;
-use super::general_any_impl_update_task_state;
+impl<'a> FromRow<'a, SqliteRow> for Task {
+    fn from_row(row: &'a SqliteRow) -> Result<Self, sqlx::Error> {
+        let uuid_as_text: &str = row.get("id");
+
+        let id = Uuid::parse_str(uuid_as_text).unwrap();
+
+        let raw: &str = row.get("metadata"); // will work if database cast json to string
+        let raw = raw.replace('\\', "");
+
+        // -- SELECT metadata->>'type' FROM fang_tasks ; this works because jsonb casting
+        let metadata: serde_json::Value = serde_json::from_str(&raw).unwrap();
+
+        // Be careful with this if we update sqlx, https://github.com/launchbadge/sqlx/issues/2416
+        let error_message: Option<String> = row.get("error_message");
+
+        let state_str: &str = row.get("state"); // will work if database cast json to string
+
+        let state: FangTaskState = state_str.into();
+
+        let task_type: String = row.get("task_type");
+
+        // Be careful with this if we update sqlx, https://github.com/launchbadge/sqlx/issues/2416
+        let uniq_hash: Option<String> = row.get("uniq_hash");
+
+        let retries: i32 = row.get("retries");
+
+        let scheduled_at_str: &str = row.get("scheduled_at");
+
+        // This unwrap is safe because we know that the database returns the date in the correct format
+        let scheduled_at: DateTime<Utc> = DateTime::parse_from_str(scheduled_at_str, "%F %T%.f%#z")
+            .unwrap()
+            .into();
+
+        let created_at_str: &str = row.get("created_at");
+
+        // This unwrap is safe because we know that the database returns the date in the correct format
+        let created_at: DateTime<Utc> = DateTime::parse_from_str(created_at_str, "%F %T%.f%#z")
+            .unwrap()
+            .into();
+
+        let updated_at_str: &str = row.get("updated_at");
+
+        // This unwrap is safe because we know that the database returns the date in the correct format
+        let updated_at: DateTime<Utc> = DateTime::parse_from_str(updated_at_str, "%F %T%.f%#z")
+            .unwrap()
+            .into();
+
+        Ok(Task::builder()
+            .id(id)
+            .metadata(metadata)
+            .error_message(error_message)
+            .state(state)
+            .task_type(task_type)
+            .uniq_hash(uniq_hash)
+            .retries(retries)
+            .scheduled_at(scheduled_at)
+            .created_at(created_at)
+            .updated_at(updated_at)
+            .build())
+    }
+}
+
+impl FangQueryable<Sqlite> for BackendSqlXSQLite {}
 
 impl BackendSqlXSQLite {
     pub(super) async fn execute_query(
         query: SqlXQuery,
-        pool: &Pool<Any>,
+        pool: &Pool<Sqlite>,
         params: QueryParams<'_>,
     ) -> Result<Res, AsyncQueueError> {
         match query {
             Q::InsertTask => {
-                let task =
-                    general_any_impl_insert_task(INSERT_TASK_QUERY_SQLITE, pool, params).await?;
+                let task = <BackendSqlXSQLite as FangQueryable<Sqlite>>::insert_task(
+                    INSERT_TASK_QUERY_SQLITE,
+                    pool,
+                    params,
+                )
+                .await?;
 
                 Ok(Res::Task(task))
             }
             Q::UpdateTaskState => {
-                let task = general_any_impl_update_task_state(
+                let task = <BackendSqlXSQLite as FangQueryable<Sqlite>>::update_task_state(
                     UPDATE_TASK_STATE_QUERY_SQLITE,
                     pool,
                     params,
@@ -61,34 +125,37 @@ impl BackendSqlXSQLite {
                 Ok(Res::Task(task))
             }
             Q::FailTask => {
-                let task = general_any_impl_fail_task(FAIL_TASK_QUERY_SQLITE, pool, params).await?;
+                let task = <BackendSqlXSQLite as FangQueryable<Sqlite>>::fail_task(
+                    FAIL_TASK_QUERY_SQLITE,
+                    pool,
+                    params,
+                )
+                .await?;
 
                 Ok(Res::Task(task))
             }
             Q::RemoveAllTask => {
-                let affected_rows =
-                    general_any_impl_remove_all_task(REMOVE_ALL_TASK_QUERY_SQLITE, pool).await?;
-
-                Ok(Res::Bigint(affected_rows))
-            }
-            Q::RemoveAllScheduledTask => {
-                let affected_rows = general_any_impl_remove_all_scheduled_tasks(
-                    REMOVE_ALL_SCHEDULED_TASK_QUERY_SQLITE,
+                let affected_rows = <BackendSqlXSQLite as FangQueryable<Sqlite>>::remove_all_task(
+                    REMOVE_ALL_TASK_QUERY_SQLITE,
                     pool,
                 )
                 .await?;
 
                 Ok(Res::Bigint(affected_rows))
             }
-            Q::RemoveTask => {
+            Q::RemoveAllScheduledTask => {
                 let affected_rows =
-                    general_any_impl_remove_task(REMOVE_TASK_QUERY_SQLITE, pool, params).await?;
+                    <BackendSqlXSQLite as FangQueryable<Sqlite>>::remove_all_scheduled_tasks(
+                        REMOVE_ALL_SCHEDULED_TASK_QUERY_SQLITE,
+                        pool,
+                    )
+                    .await?;
 
                 Ok(Res::Bigint(affected_rows))
             }
-            Q::RemoveTaskByMetadata => {
-                let affected_rows = general_any_impl_remove_task_by_metadata(
-                    REMOVE_TASK_BY_METADATA_QUERY_SQLITE,
+            Q::RemoveTask => {
+                let affected_rows = <BackendSqlXSQLite as FangQueryable<Sqlite>>::remove_task(
+                    REMOVE_TASK_QUERY_SQLITE,
                     pool,
                     params,
                 )
@@ -96,33 +163,57 @@ impl BackendSqlXSQLite {
 
                 Ok(Res::Bigint(affected_rows))
             }
-            Q::RemoveTaskType => {
+            Q::RemoveTaskByMetadata => {
                 let affected_rows =
-                    general_any_impl_remove_task_type(REMOVE_TASKS_TYPE_QUERY_SQLITE, pool, params)
-                        .await?;
+                    <BackendSqlXSQLite as FangQueryable<Sqlite>>::remove_task_by_metadata(
+                        REMOVE_TASK_BY_METADATA_QUERY_SQLITE,
+                        pool,
+                        params,
+                    )
+                    .await?;
+
+                Ok(Res::Bigint(affected_rows))
+            }
+            Q::RemoveTaskType => {
+                let affected_rows = <BackendSqlXSQLite as FangQueryable<Sqlite>>::remove_task_type(
+                    REMOVE_TASKS_TYPE_QUERY_SQLITE,
+                    pool,
+                    params,
+                )
+                .await?;
 
                 Ok(Res::Bigint(affected_rows))
             }
             Q::FetchTaskType => {
-                let task =
-                    general_any_impl_fetch_task_type(FETCH_TASK_TYPE_QUERY_SQLITE, pool, params)
-                        .await?;
+                let task = <BackendSqlXSQLite as FangQueryable<Sqlite>>::fetch_task_type(
+                    FETCH_TASK_TYPE_QUERY_SQLITE,
+                    pool,
+                    params,
+                )
+                .await?;
                 Ok(Res::Task(task))
             }
             Q::FindTaskById => {
-                let task =
-                    general_any_impl_find_task_by_id(FIND_TASK_BY_ID_QUERY_SQLITE, pool, params)
-                        .await?;
+                let task = <BackendSqlXSQLite as FangQueryable<Sqlite>>::find_task_by_id(
+                    FIND_TASK_BY_ID_QUERY_SQLITE,
+                    pool,
+                    params,
+                )
+                .await?;
                 Ok(Res::Task(task))
             }
             Q::RetryTask => {
-                let task =
-                    general_any_impl_retry_task(RETRY_TASK_QUERY_SQLITE, pool, params).await?;
+                let task = <BackendSqlXSQLite as FangQueryable<Sqlite>>::retry_task(
+                    RETRY_TASK_QUERY_SQLITE,
+                    pool,
+                    params,
+                )
+                .await?;
 
                 Ok(Res::Task(task))
             }
             Q::InsertTaskIfNotExists => {
-                let task = general_any_impl_insert_task_if_not_exists(
+                let task = <BackendSqlXSQLite as FangQueryable<Sqlite>>::insert_task_if_not_exists(
                     (
                         FIND_TASK_BY_UNIQ_HASH_QUERY_SQLITE,
                         INSERT_TASK_UNIQ_QUERY_SQLITE,
