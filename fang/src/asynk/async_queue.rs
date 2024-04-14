@@ -169,6 +169,7 @@ impl InternalPool {
     pub(crate) fn unwrap_pg_pool(&self) -> &PgPool {
         match self {
             InternalPool::Pg(pool) => pool,
+            #[allow(unreachable_patterns)]
             _ => panic!("Not a PgPool!"),
         }
     }
@@ -177,6 +178,7 @@ impl InternalPool {
     pub(crate) fn unwrap_mysql_pool(&self) -> &MySqlPool {
         match self {
             InternalPool::MySql(pool) => pool,
+            #[allow(unreachable_patterns)]
             _ => panic!("Not a MySqlPool!"),
         }
     }
@@ -185,6 +187,7 @@ impl InternalPool {
     pub(crate) fn unwrap_sqlite_pool(&self) -> &SqlitePool {
         match self {
             InternalPool::Sqlite(pool) => pool,
+            #[allow(unreachable_patterns)]
             _ => panic!("Not a SqlitePool!"),
         }
     }
@@ -260,6 +263,7 @@ async fn get_backend(
 
             Ok((BackendSqlX::Sqlite, InternalPool::Sqlite(pool)))
         }
+        #[allow(unreachable_patterns)]
         _ => panic!("Not a valid backend"),
     }
 }
