@@ -274,7 +274,8 @@ async fn get_pool(
 
             Ok(InternalPool::Sqlite(pool))
         }
-        _ => Err(AsyncQueueError::NotConnectedError),
+        #[allow(unreachable_patterns)]
+        _ => Err(AsyncQueueError::ConnectionError),
     }
 }
 
