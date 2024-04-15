@@ -24,40 +24,105 @@ const RETRY_TASK_QUERY_POSTGRES: &str = include_str!("../queries_postgres/retry_
 #[derive(Debug, Clone)]
 pub(super) struct BackendSqlXPg {}
 
+use chrono::DateTime;
+use chrono::Utc;
+use sqlx::postgres::PgRow;
+use sqlx::FromRow;
+use sqlx::Pool;
+use sqlx::Postgres;
+use sqlx::Row;
+use uuid::Uuid;
 use SqlXQuery as Q;
 
-use crate::AsyncQueueError;
-
-use super::general_any_impl_fail_task;
-use super::general_any_impl_fetch_task_type;
-use super::general_any_impl_find_task_by_id;
-use super::general_any_impl_insert_task;
-use super::general_any_impl_insert_task_if_not_exists;
-use super::general_any_impl_remove_all_scheduled_tasks;
-use super::general_any_impl_remove_all_task;
-use super::general_any_impl_remove_task;
-use super::general_any_impl_remove_task_by_metadata;
-use super::general_any_impl_remove_task_type;
-use super::general_any_impl_retry_task;
-use super::general_any_impl_update_task_state;
+use super::FangQueryable;
 use super::{QueryParams, Res, SqlXQuery};
-use sqlx::{Any, Pool};
+use crate::AsyncQueueError;
+use crate::FangTaskState;
+use crate::Task;
+
+impl<'a> FromRow<'a, PgRow> for Task {
+    fn from_row(row: &'a PgRow) -> Result<Self, sqlx::Error> {
+        let uuid_as_text: &str = row.get("id");
+
+        let id = Uuid::parse_str(uuid_as_text).unwrap();
+
+        let raw: &str = row.get("metadata"); // will work if database cast json to string
+        let raw = raw.replace('\\', "");
+
+        // -- SELECT metadata->>'type' FROM fang_tasks ; this works because jsonb casting
+        let metadata: serde_json::Value = serde_json::from_str(&raw).unwrap();
+
+        // Be careful with this if we update sqlx, https://github.com/launchbadge/sqlx/issues/2416
+        let error_message: Option<String> = row.get("error_message");
+
+        let state_str: &str = row.get("state"); // will work if database cast json to string
+
+        let state: FangTaskState = state_str.into();
+
+        let task_type: String = row.get("task_type");
+
+        // Be careful with this if we update sqlx, https://github.com/launchbadge/sqlx/issues/2416
+        let uniq_hash: Option<String> = row.get("uniq_hash");
+
+        let retries: i32 = row.get("retries");
+
+        let scheduled_at_str: &str = row.get("scheduled_at");
+
+        // This unwrap is safe because we know that the database returns the date in the correct format
+        let scheduled_at: DateTime<Utc> = DateTime::parse_from_str(scheduled_at_str, "%F %T%.f%#z")
+            .unwrap()
+            .into();
+
+        let created_at_str: &str = row.get("created_at");
+
+        // This unwrap is safe because we know that the database returns the date in the correct format
+        let created_at: DateTime<Utc> = DateTime::parse_from_str(created_at_str, "%F %T%.f%#z")
+            .unwrap()
+            .into();
+
+        let updated_at_str: &str = row.get("updated_at");
+
+        // This unwrap is safe because we know that the database returns the date in the correct format
+        let updated_at: DateTime<Utc> = DateTime::parse_from_str(updated_at_str, "%F %T%.f%#z")
+            .unwrap()
+            .into();
+
+        Ok(Task::builder()
+            .id(id)
+            .metadata(metadata)
+            .error_message(error_message)
+            .state(state)
+            .task_type(task_type)
+            .uniq_hash(uniq_hash)
+            .retries(retries)
+            .scheduled_at(scheduled_at)
+            .created_at(created_at)
+            .updated_at(updated_at)
+            .build())
+    }
+}
+
+impl FangQueryable<Postgres> for BackendSqlXPg {}
 
 impl BackendSqlXPg {
     pub(super) async fn execute_query(
         query: SqlXQuery,
-        pool: &Pool<Any>,
+        pool: &Pool<Postgres>,
         params: QueryParams<'_>,
     ) -> Result<Res, AsyncQueueError> {
         match query {
             Q::InsertTask => {
-                let task =
-                    general_any_impl_insert_task(INSERT_TASK_QUERY_POSTGRES, pool, params).await?;
+                let task = <BackendSqlXPg as FangQueryable<Postgres>>::insert_task(
+                    INSERT_TASK_QUERY_POSTGRES,
+                    pool,
+                    params,
+                )
+                .await?;
 
                 Ok(Res::Task(task))
             }
             Q::UpdateTaskState => {
-                let task = general_any_impl_update_task_state(
+                let task = <BackendSqlXPg as FangQueryable<Postgres>>::update_task_state(
                     UPDATE_TASK_STATE_QUERY_POSTGRES,
                     pool,
                     params,
@@ -66,35 +131,37 @@ impl BackendSqlXPg {
                 Ok(Res::Task(task))
             }
             Q::FailTask => {
-                let task =
-                    general_any_impl_fail_task(FAIL_TASK_QUERY_POSTGRES, pool, params).await?;
+                let task = <BackendSqlXPg as FangQueryable<Postgres>>::fail_task(
+                    FAIL_TASK_QUERY_POSTGRES,
+                    pool,
+                    params,
+                )
+                .await?;
 
                 Ok(Res::Task(task))
             }
             Q::RemoveAllTask => {
-                let affected_rows =
-                    general_any_impl_remove_all_task(REMOVE_ALL_TASK_QUERY_POSTGRES, pool).await?;
-
-                Ok(Res::Bigint(affected_rows))
-            }
-            Q::RemoveAllScheduledTask => {
-                let affected_rows = general_any_impl_remove_all_scheduled_tasks(
-                    REMOVE_ALL_SCHEDULED_TASK_QUERY_POSTGRES,
+                let affected_rows = <BackendSqlXPg as FangQueryable<Postgres>>::remove_all_task(
+                    REMOVE_ALL_TASK_QUERY_POSTGRES,
                     pool,
                 )
                 .await?;
 
                 Ok(Res::Bigint(affected_rows))
             }
-            Q::RemoveTask => {
+            Q::RemoveAllScheduledTask => {
                 let affected_rows =
-                    general_any_impl_remove_task(REMOVE_TASK_QUERY_POSTGRES, pool, params).await?;
+                    <BackendSqlXPg as FangQueryable<Postgres>>::remove_all_scheduled_tasks(
+                        REMOVE_ALL_SCHEDULED_TASK_QUERY_POSTGRES,
+                        pool,
+                    )
+                    .await?;
 
                 Ok(Res::Bigint(affected_rows))
             }
-            Q::RemoveTaskByMetadata => {
-                let affected_rows = general_any_impl_remove_task_by_metadata(
-                    REMOVE_TASK_BY_METADATA_QUERY_POSTGRES,
+            Q::RemoveTask => {
+                let affected_rows = <BackendSqlXPg as FangQueryable<Postgres>>::remove_task(
+                    REMOVE_TASK_QUERY_POSTGRES,
                     pool,
                     params,
                 )
@@ -102,8 +169,19 @@ impl BackendSqlXPg {
 
                 Ok(Res::Bigint(affected_rows))
             }
+            Q::RemoveTaskByMetadata => {
+                let affected_rows =
+                    <BackendSqlXPg as FangQueryable<Postgres>>::remove_task_by_metadata(
+                        REMOVE_TASK_BY_METADATA_QUERY_POSTGRES,
+                        pool,
+                        params,
+                    )
+                    .await?;
+
+                Ok(Res::Bigint(affected_rows))
+            }
             Q::RemoveTaskType => {
-                let affected_rows = general_any_impl_remove_task_type(
+                let affected_rows = <BackendSqlXPg as FangQueryable<Postgres>>::remove_task_type(
                     REMOVE_TASKS_TYPE_QUERY_POSTGRES,
                     pool,
                     params,
@@ -113,25 +191,35 @@ impl BackendSqlXPg {
                 Ok(Res::Bigint(affected_rows))
             }
             Q::FetchTaskType => {
-                let task =
-                    general_any_impl_fetch_task_type(FETCH_TASK_TYPE_QUERY_POSTGRES, pool, params)
-                        .await?;
+                let task = <BackendSqlXPg as FangQueryable<Postgres>>::fetch_task_type(
+                    FETCH_TASK_TYPE_QUERY_POSTGRES,
+                    pool,
+                    params,
+                )
+                .await?;
                 Ok(Res::Task(task))
             }
             Q::FindTaskById => {
-                let task =
-                    general_any_impl_find_task_by_id(FIND_TASK_BY_ID_QUERY_POSTGRES, pool, params)
-                        .await?;
+                let task = <BackendSqlXPg as FangQueryable<Postgres>>::find_task_by_id(
+                    FIND_TASK_BY_ID_QUERY_POSTGRES,
+                    pool,
+                    params,
+                )
+                .await?;
                 Ok(Res::Task(task))
             }
             Q::RetryTask => {
-                let task =
-                    general_any_impl_retry_task(RETRY_TASK_QUERY_POSTGRES, pool, params).await?;
+                let task = <BackendSqlXPg as FangQueryable<Postgres>>::retry_task(
+                    RETRY_TASK_QUERY_POSTGRES,
+                    pool,
+                    params,
+                )
+                .await?;
 
                 Ok(Res::Task(task))
             }
             Q::InsertTaskIfNotExists => {
-                let task = general_any_impl_insert_task_if_not_exists(
+                let task = <BackendSqlXPg as FangQueryable<Postgres>>::insert_task_if_not_exists(
                     (
                         FIND_TASK_BY_UNIQ_HASH_QUERY_POSTGRES,
                         INSERT_TASK_UNIQ_QUERY_POSTGRES,

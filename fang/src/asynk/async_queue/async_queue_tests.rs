@@ -113,7 +113,7 @@ macro_rules! test_asynk_queue {
             }
 
             #[tokio::test]
-            async fn failed_task_query_test() {
+            async fn failed_task_test() {
                 let mut test: $q = $e.await;
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();

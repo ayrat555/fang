@@ -15,61 +15,399 @@ const FIND_TASK_BY_UNIQ_HASH_QUERY_MYSQL: &str =
 const FIND_TASK_BY_ID_QUERY_MYSQL: &str = include_str!("../queries_mysql/find_task_by_id.sql");
 const RETRY_TASK_QUERY_MYSQL: &str = include_str!("../queries_mysql/retry_task.sql");
 
-use super::general_any_impl_fetch_task_type;
-use super::general_any_impl_find_task_by_id;
-use super::general_any_impl_find_task_by_uniq_hash;
-use super::general_any_impl_remove_all_scheduled_tasks;
-use super::general_any_impl_remove_all_task;
-use super::general_any_impl_remove_task;
-use super::general_any_impl_remove_task_by_metadata;
-use super::general_any_impl_remove_task_type;
-use super::{calculate_hash, QueryParams, Res, SqlXQuery};
-use crate::{AsyncQueueError, FangTaskState, Task};
+use chrono::Duration;
+use chrono::{DateTime, Utc};
+use sqlx::mysql::MySqlQueryResult;
+use sqlx::mysql::MySqlRow;
+use sqlx::FromRow;
+use sqlx::MySql;
+use sqlx::Pool;
+use sqlx::Row;
+use uuid::Uuid;
 use SqlXQuery as Q;
 
-use chrono::Duration;
-use chrono::Utc;
-use sqlx::{Any, Pool};
-use uuid::Uuid;
+use super::FangQueryable;
+use super::{calculate_hash, QueryParams, Res, SqlXQuery};
+use crate::{AsyncQueueError, FangTaskState, Task};
 
 #[derive(Debug, Clone)]
-pub(crate) struct BackendSqlXMySQL {}
+pub(super) struct BackendSqlXMySQL {}
+
+impl<'a> FromRow<'a, MySqlRow> for Task {
+    fn from_row(row: &'a MySqlRow) -> Result<Self, sqlx::Error> {
+        let uuid_as_text: &str = row.get("id");
+
+        let id = Uuid::parse_str(uuid_as_text).unwrap();
+
+        let raw: &str = row.get("metadata"); // will work if database cast json to string
+        let raw = raw.replace('\\', "");
+
+        // -- SELECT metadata->>'type' FROM fang_tasks ; this works because jsonb casting
+        let metadata: serde_json::Value = serde_json::from_str(&raw).unwrap();
+
+        // Be careful with this if we update sqlx, https://github.com/launchbadge/sqlx/issues/2416
+        let error_message: Option<String> = row.get("error_message");
+
+        let state_str: &str = row.get("state"); // will work if database cast json to string
+
+        let state: FangTaskState = state_str.into();
+
+        let task_type: String = row.get("task_type");
+
+        // Be careful with this if we update sqlx, https://github.com/launchbadge/sqlx/issues/2416
+        let uniq_hash: Option<String> = row.get("uniq_hash");
+
+        let retries: i32 = row.get("retries");
+
+        let scheduled_at_str: &str = row.get("scheduled_at");
+
+        // This unwrap is safe because we know that the database returns the date in the correct format
+        let scheduled_at: DateTime<Utc> = DateTime::parse_from_str(scheduled_at_str, "%F %T%.f%#z")
+            .unwrap()
+            .into();
+
+        let created_at_str: &str = row.get("created_at");
+
+        // This unwrap is safe because we know that the database returns the date in the correct format
+        let created_at: DateTime<Utc> = DateTime::parse_from_str(created_at_str, "%F %T%.f%#z")
+            .unwrap()
+            .into();
+
+        let updated_at_str: &str = row.get("updated_at");
+
+        // This unwrap is safe because we know that the database returns the date in the correct format
+        let updated_at: DateTime<Utc> = DateTime::parse_from_str(updated_at_str, "%F %T%.f%#z")
+            .unwrap()
+            .into();
+
+        Ok(Task::builder()
+            .id(id)
+            .metadata(metadata)
+            .error_message(error_message)
+            .state(state)
+            .task_type(task_type)
+            .uniq_hash(uniq_hash)
+            .retries(retries)
+            .scheduled_at(scheduled_at)
+            .created_at(created_at)
+            .updated_at(updated_at)
+            .build())
+    }
+}
+
+impl FangQueryable<MySql> for BackendSqlXMySQL {
+    async fn insert_task(
+        query: &str,
+        pool: &Pool<MySql>,
+        params: QueryParams<'_>,
+    ) -> Result<Task, AsyncQueueError> {
+        let uuid = Uuid::new_v4();
+        let mut buffer = Uuid::encode_buffer();
+        let uuid_as_str: &str = uuid.as_hyphenated().encode_lower(&mut buffer);
+
+        let scheduled_at_str = format!("{}", params.scheduled_at.unwrap().format("%F %T%.f+00"));
+
+        let metadata_str = params.metadata.unwrap().to_string();
+        let task_type = params.task_type.unwrap();
+
+        let affected_rows = Into::<MySqlQueryResult>::into(
+            sqlx::query(query)
+                .bind(uuid_as_str)
+                .bind(metadata_str)
+                .bind(task_type)
+                .bind(scheduled_at_str)
+                .execute(pool)
+                .await?,
+        )
+        .rows_affected();
+
+        if affected_rows != 1 {
+            return Err(AsyncQueueError::ResultError {
+                expected: 1,
+                found: affected_rows,
+            });
+        }
+
+        let query_params = QueryParams::builder().uuid(&uuid).build();
+
+        let task: Task = <BackendSqlXMySQL as FangQueryable<MySql>>::find_task_by_id(
+            FIND_TASK_BY_ID_QUERY_MYSQL,
+            pool,
+            query_params,
+        )
+        .await?;
+
+        Ok(task)
+    }
+
+    async fn update_task_state(
+        query: &str,
+        pool: &Pool<MySql>,
+        params: QueryParams<'_>,
+    ) -> Result<Task, AsyncQueueError> {
+        let updated_at_str = format!("{}", Utc::now().format("%F %T%.f+00"));
+
+        let state_str: &str = params.state.unwrap().into();
+
+        let uuid = params.uuid.unwrap();
+
+        let mut buffer = Uuid::encode_buffer();
+        let uuid_as_text = uuid.as_hyphenated().encode_lower(&mut buffer);
+
+        let affected_rows = Into::<MySqlQueryResult>::into(
+            sqlx::query(query)
+                .bind(state_str)
+                .bind(updated_at_str)
+                .bind(&*uuid_as_text)
+                .execute(pool)
+                .await?,
+        )
+        .rows_affected();
+
+        if affected_rows != 1 {
+            return Err(AsyncQueueError::ResultError {
+                expected: 1,
+                found: affected_rows,
+            });
+        }
+
+        let query_params = QueryParams::builder().uuid(params.uuid.unwrap()).build();
+
+        let task: Task = <BackendSqlXMySQL as FangQueryable<MySql>>::find_task_by_id(
+            FIND_TASK_BY_ID_QUERY_MYSQL,
+            pool,
+            query_params,
+        )
+        .await?;
+
+        Ok(task)
+    }
+
+    async fn insert_task_uniq(
+        query: &str,
+        pool: &Pool<MySql>,
+        params: QueryParams<'_>,
+    ) -> Result<Task, AsyncQueueError> {
+        let uuid = Uuid::new_v4();
+        let mut buffer = Uuid::encode_buffer();
+        let uuid_as_str: &str = uuid.as_hyphenated().encode_lower(&mut buffer);
+
+        let metadata = params.metadata.unwrap();
+
+        let metadata_str = metadata.to_string();
+        let scheduled_at_str = format!("{}", params.scheduled_at.unwrap().format("%F %T%.f+00"));
+
+        let task_type = params.task_type.unwrap();
+
+        let uniq_hash = calculate_hash(&metadata_str);
+
+        let affected_rows = Into::<MySqlQueryResult>::into(
+            sqlx::query(query)
+                .bind(uuid_as_str)
+                .bind(metadata_str)
+                .bind(task_type)
+                .bind(uniq_hash)
+                .bind(scheduled_at_str)
+                .execute(pool)
+                .await?,
+        )
+        .rows_affected();
+
+        if affected_rows != 1 {
+            return Err(AsyncQueueError::ResultError {
+                expected: 1,
+                found: affected_rows,
+            });
+        }
+
+        let query_params = QueryParams::builder().uuid(&uuid).build();
+
+        let task: Task = <BackendSqlXMySQL as FangQueryable<MySql>>::find_task_by_id(
+            FIND_TASK_BY_ID_QUERY_MYSQL,
+            pool,
+            query_params,
+        )
+        .await?;
+
+        Ok(task)
+    }
+
+    async fn fail_task(
+        query: &str,
+        pool: &Pool<MySql>,
+        params: QueryParams<'_>,
+    ) -> Result<Task, AsyncQueueError> {
+        let updated_at = format!("{}", Utc::now().format("%F %T%.f+00"));
+
+        let id = params.task.unwrap().id;
+
+        let mut buffer = Uuid::encode_buffer();
+        let uuid_as_text = id.as_hyphenated().encode_lower(&mut buffer);
+
+        let error_message = params.error_message.unwrap();
+
+        let affected_rows = Into::<MySqlQueryResult>::into(
+            sqlx::query(query)
+                .bind(<&str>::from(FangTaskState::Failed))
+                .bind(error_message)
+                .bind(updated_at)
+                .bind(&*uuid_as_text)
+                .execute(pool)
+                .await?,
+        )
+        .rows_affected();
+
+        if affected_rows != 1 {
+            return Err(AsyncQueueError::ResultError {
+                expected: 1,
+                found: affected_rows,
+            });
+        }
+
+        let query_params = QueryParams::builder().uuid(&id).build();
+
+        let failed_task: Task = <BackendSqlXMySQL as FangQueryable<MySql>>::find_task_by_id(
+            FIND_TASK_BY_ID_QUERY_MYSQL,
+            pool,
+            query_params,
+        )
+        .await?;
+
+        Ok(failed_task)
+    }
+
+    async fn retry_task(
+        query: &str,
+        pool: &Pool<MySql>,
+        params: QueryParams<'_>,
+    ) -> Result<Task, AsyncQueueError> {
+        let now = Utc::now();
+        let now_str = format!("{}", now.format("%F %T%.f+00"));
+
+        let scheduled_at = now + Duration::seconds(params.backoff_seconds.unwrap() as i64);
+        let scheduled_at_str = format!("{}", scheduled_at.format("%F %T%.f+00"));
+        let retries = params.task.unwrap().retries + 1;
+
+        let uuid = params.task.unwrap().id;
+
+        let mut buffer = Uuid::encode_buffer();
+        let uuid_as_text = uuid.as_hyphenated().encode_lower(&mut buffer);
+
+        let error = params.error_message.unwrap();
+
+        let affected_rows = Into::<MySqlQueryResult>::into(
+            sqlx::query(query)
+                .bind(error)
+                .bind(retries)
+                .bind(scheduled_at_str)
+                .bind(now_str)
+                .bind(&*uuid_as_text)
+                .execute(pool)
+                .await?,
+        )
+        .rows_affected();
+
+        if affected_rows != 1 {
+            return Err(AsyncQueueError::ResultError {
+                expected: 1,
+                found: affected_rows,
+            });
+        }
+
+        let query_params = QueryParams::builder().uuid(&uuid).build();
+
+        let failed_task: Task = <BackendSqlXMySQL as FangQueryable<MySql>>::find_task_by_id(
+            FIND_TASK_BY_ID_QUERY_MYSQL,
+            pool,
+            query_params,
+        )
+        .await?;
+
+        Ok(failed_task)
+    }
+
+    async fn insert_task_if_not_exists(
+        queries: (&str, &str),
+        pool: &Pool<MySql>,
+        params: QueryParams<'_>,
+    ) -> Result<Task, AsyncQueueError> {
+        match <BackendSqlXMySQL as FangQueryable<MySql>>::find_task_by_uniq_hash(
+            queries.0, pool, &params,
+        )
+        .await
+        {
+            Some(task) => Ok(task),
+            None => {
+                <BackendSqlXMySQL as FangQueryable<MySql>>::insert_task_uniq(
+                    queries.1, pool, params,
+                )
+                .await
+            }
+        }
+    }
+
+    async fn find_task_by_id(
+        query: &str,
+        pool: &Pool<MySql>,
+        params: QueryParams<'_>,
+    ) -> Result<Task, AsyncQueueError> {
+        let mut buffer = Uuid::encode_buffer();
+        let uuid_as_text = params
+            .uuid
+            .unwrap()
+            .as_hyphenated()
+            .encode_lower(&mut buffer);
+
+        let task: Task = sqlx::query_as(query)
+            .bind(&*uuid_as_text)
+            .fetch_one(pool)
+            .await?;
+
+        Ok(task)
+    }
+}
 
 impl BackendSqlXMySQL {
     pub(super) async fn execute_query(
         query: SqlXQuery,
-        pool: &Pool<Any>,
+        pool: &Pool<MySql>,
         params: QueryParams<'_>,
     ) -> Result<Res, AsyncQueueError> {
         match query {
             Q::InsertTask => {
-                let task = mysql_impl_insert_task(INSERT_TASK_QUERY_MYSQL, pool, params).await?;
+                let task = <BackendSqlXMySQL as FangQueryable<MySql>>::insert_task(
+                    INSERT_TASK_QUERY_MYSQL,
+                    pool,
+                    params,
+                )
+                .await?;
 
                 Ok(Res::Task(task))
             }
             Q::UpdateTaskState => {
-                let task =
-                    mysql_impl_update_task_state(UPDATE_TASK_STATE_QUERY_MYSQL, pool, params)
-                        .await?;
+                let task = <BackendSqlXMySQL as FangQueryable<MySql>>::update_task_state(
+                    UPDATE_TASK_STATE_QUERY_MYSQL,
+                    pool,
+                    params,
+                )
+                .await?;
                 Ok(Res::Task(task))
             }
 
             Q::FailTask => {
-                let task = mysql_impl_fail_task(FAIL_TASK_QUERY_MYSQL, pool, params).await?;
+                let task = <BackendSqlXMySQL as FangQueryable<MySql>>::fail_task(
+                    FAIL_TASK_QUERY_MYSQL,
+                    pool,
+                    params,
+                )
+                .await?;
 
                 Ok(Res::Task(task))
             }
 
             Q::RemoveAllTask => {
-                let affected_rows =
-                    general_any_impl_remove_all_task(REMOVE_ALL_TASK_QUERY_MYSQL, pool).await?;
-
-                Ok(Res::Bigint(affected_rows))
-            }
-
-            Q::RemoveAllScheduledTask => {
-                let affected_rows = general_any_impl_remove_all_scheduled_tasks(
-                    REMOVE_ALL_SCHEDULED_TASK_QUERY_MYSQL,
+                let affected_rows = <BackendSqlXMySQL as FangQueryable<MySql>>::remove_all_task(
+                    REMOVE_ALL_TASK_QUERY_MYSQL,
                     pool,
                 )
                 .await?;
@@ -77,15 +415,20 @@ impl BackendSqlXMySQL {
                 Ok(Res::Bigint(affected_rows))
             }
 
-            Q::RemoveTask => {
+            Q::RemoveAllScheduledTask => {
                 let affected_rows =
-                    general_any_impl_remove_task(REMOVE_TASK_QUERY_MYSQL, pool, params).await?;
+                    <BackendSqlXMySQL as FangQueryable<MySql>>::remove_all_scheduled_tasks(
+                        REMOVE_ALL_SCHEDULED_TASK_QUERY_MYSQL,
+                        pool,
+                    )
+                    .await?;
 
                 Ok(Res::Bigint(affected_rows))
             }
-            Q::RemoveTaskByMetadata => {
-                let affected_rows = general_any_impl_remove_task_by_metadata(
-                    REMOVE_TASK_BY_METADATA_QUERY_MYSQL,
+
+            Q::RemoveTask => {
+                let affected_rows = <BackendSqlXMySQL as FangQueryable<MySql>>::remove_task(
+                    REMOVE_TASK_QUERY_MYSQL,
                     pool,
                     params,
                 )
@@ -93,33 +436,58 @@ impl BackendSqlXMySQL {
 
                 Ok(Res::Bigint(affected_rows))
             }
-            Q::RemoveTaskType => {
+            Q::RemoveTaskByMetadata => {
                 let affected_rows =
-                    general_any_impl_remove_task_type(REMOVE_TASKS_TYPE_QUERY_MYSQL, pool, params)
-                        .await?;
+                    <BackendSqlXMySQL as FangQueryable<MySql>>::remove_task_by_metadata(
+                        REMOVE_TASK_BY_METADATA_QUERY_MYSQL,
+                        pool,
+                        params,
+                    )
+                    .await?;
+
+                Ok(Res::Bigint(affected_rows))
+            }
+            Q::RemoveTaskType => {
+                let affected_rows = <BackendSqlXMySQL as FangQueryable<MySql>>::remove_task_type(
+                    REMOVE_TASKS_TYPE_QUERY_MYSQL,
+                    pool,
+                    params,
+                )
+                .await?;
 
                 Ok(Res::Bigint(affected_rows))
             }
             Q::FetchTaskType => {
-                let task =
-                    general_any_impl_fetch_task_type(FETCH_TASK_TYPE_QUERY_MYSQL, pool, params)
-                        .await?;
+                let task = <BackendSqlXMySQL as FangQueryable<MySql>>::fetch_task_type(
+                    FETCH_TASK_TYPE_QUERY_MYSQL,
+                    pool,
+                    params,
+                )
+                .await?;
                 Ok(Res::Task(task))
             }
             Q::FindTaskById => {
-                let task: Task =
-                    general_any_impl_find_task_by_id(FIND_TASK_BY_ID_QUERY_MYSQL, pool, params)
-                        .await?;
+                let task: Task = <BackendSqlXMySQL as FangQueryable<MySql>>::find_task_by_id(
+                    FIND_TASK_BY_ID_QUERY_MYSQL,
+                    pool,
+                    params,
+                )
+                .await?;
 
                 Ok(Res::Task(task))
             }
             Q::RetryTask => {
-                let task = mysql_impl_retry_task(RETRY_TASK_QUERY_MYSQL, pool, params).await?;
+                let task = <BackendSqlXMySQL as FangQueryable<MySql>>::retry_task(
+                    RETRY_TASK_QUERY_MYSQL,
+                    pool,
+                    params,
+                )
+                .await?;
 
                 Ok(Res::Task(task))
             }
             Q::InsertTaskIfNotExists => {
-                let task = mysql_any_impl_insert_task_if_not_exists(
+                let task = <BackendSqlXMySQL as FangQueryable<MySql>>::insert_task_if_not_exists(
                     (
                         FIND_TASK_BY_UNIQ_HASH_QUERY_MYSQL,
                         INSERT_TASK_UNIQ_QUERY_MYSQL,
@@ -136,216 +504,5 @@ impl BackendSqlXMySQL {
 
     pub(super) fn _name() -> &'static str {
         "MySQL"
-    }
-}
-
-async fn mysql_impl_insert_task(
-    query: &str,
-    pool: &Pool<Any>,
-    params: QueryParams<'_>,
-) -> Result<Task, AsyncQueueError> {
-    let uuid = Uuid::new_v4();
-    let mut buffer = Uuid::encode_buffer();
-    let uuid_as_str: &str = uuid.as_hyphenated().encode_lower(&mut buffer);
-
-    let scheduled_at_str = format!("{}", params.scheduled_at.unwrap().format("%F %T%.f+00"));
-
-    let metadata_str = params.metadata.unwrap().to_string();
-    let task_type = params.task_type.unwrap();
-
-    let affected_rows = sqlx::query(query)
-        .bind(uuid_as_str)
-        .bind(metadata_str)
-        .bind(task_type)
-        .bind(scheduled_at_str)
-        .execute(pool)
-        .await?
-        .rows_affected();
-
-    if affected_rows != 1 {
-        return Err(AsyncQueueError::ResultError {
-            expected: 1,
-            found: affected_rows,
-        });
-    }
-
-    let query_params = QueryParams::builder().uuid(&uuid).build();
-
-    let task: Task =
-        general_any_impl_find_task_by_id(FIND_TASK_BY_ID_QUERY_MYSQL, pool, query_params).await?;
-
-    Ok(task)
-}
-
-async fn mysql_impl_insert_task_uniq(
-    query: &str,
-    pool: &Pool<Any>,
-    params: QueryParams<'_>,
-) -> Result<Task, AsyncQueueError> {
-    let uuid = Uuid::new_v4();
-    let mut buffer = Uuid::encode_buffer();
-    let uuid_as_str: &str = uuid.as_hyphenated().encode_lower(&mut buffer);
-
-    let metadata = params.metadata.unwrap();
-
-    let metadata_str = metadata.to_string();
-    let scheduled_at_str = format!("{}", params.scheduled_at.unwrap().format("%F %T%.f+00"));
-
-    let task_type = params.task_type.unwrap();
-
-    let uniq_hash = calculate_hash(&metadata_str);
-
-    let affected_rows = sqlx::query(query)
-        .bind(uuid_as_str)
-        .bind(metadata_str)
-        .bind(task_type)
-        .bind(uniq_hash)
-        .bind(scheduled_at_str)
-        .execute(pool)
-        .await?
-        .rows_affected();
-
-    if affected_rows != 1 {
-        return Err(AsyncQueueError::ResultError {
-            expected: 1,
-            found: affected_rows,
-        });
-    }
-
-    let query_params = QueryParams::builder().uuid(&uuid).build();
-
-    let task: Task =
-        general_any_impl_find_task_by_id(FIND_TASK_BY_ID_QUERY_MYSQL, pool, query_params).await?;
-
-    Ok(task)
-}
-
-async fn mysql_impl_update_task_state(
-    query: &str,
-    pool: &Pool<Any>,
-    params: QueryParams<'_>,
-) -> Result<Task, AsyncQueueError> {
-    let updated_at_str = format!("{}", Utc::now().format("%F %T%.f+00"));
-
-    let state_str: &str = params.state.unwrap().into();
-
-    let uuid = params.uuid.unwrap();
-
-    let mut buffer = Uuid::encode_buffer();
-    let uuid_as_text = uuid.as_hyphenated().encode_lower(&mut buffer);
-
-    let affected_rows = sqlx::query(query)
-        .bind(state_str)
-        .bind(updated_at_str)
-        .bind(&*uuid_as_text)
-        .execute(pool)
-        .await?
-        .rows_affected();
-
-    if affected_rows != 1 {
-        return Err(AsyncQueueError::ResultError {
-            expected: 1,
-            found: affected_rows,
-        });
-    }
-
-    let query_params = QueryParams::builder().uuid(params.uuid.unwrap()).build();
-
-    let task: Task =
-        general_any_impl_find_task_by_id(FIND_TASK_BY_ID_QUERY_MYSQL, pool, query_params).await?;
-
-    Ok(task)
-}
-
-async fn mysql_impl_fail_task(
-    query: &str,
-    pool: &Pool<Any>,
-    params: QueryParams<'_>,
-) -> Result<Task, AsyncQueueError> {
-    let updated_at = format!("{}", Utc::now().format("%F %T%.f+00"));
-
-    let id = params.task.unwrap().id;
-
-    let mut buffer = Uuid::encode_buffer();
-    let uuid_as_text = id.as_hyphenated().encode_lower(&mut buffer);
-
-    let error_message = params.error_message.unwrap();
-
-    let affected_rows = sqlx::query(query)
-        .bind(<&str>::from(FangTaskState::Failed))
-        .bind(error_message)
-        .bind(updated_at)
-        .bind(&*uuid_as_text)
-        .execute(pool)
-        .await?
-        .rows_affected();
-
-    if affected_rows != 1 {
-        return Err(AsyncQueueError::ResultError {
-            expected: 1,
-            found: affected_rows,
-        });
-    }
-
-    let query_params = QueryParams::builder().uuid(&id).build();
-
-    let failed_task: Task =
-        general_any_impl_find_task_by_id(FIND_TASK_BY_ID_QUERY_MYSQL, pool, query_params).await?;
-
-    Ok(failed_task)
-}
-
-async fn mysql_impl_retry_task(
-    query: &str,
-    pool: &Pool<Any>,
-    params: QueryParams<'_>,
-) -> Result<Task, AsyncQueueError> {
-    let now = Utc::now();
-    let now_str = format!("{}", now.format("%F %T%.f+00"));
-
-    let scheduled_at = now + Duration::seconds(params.backoff_seconds.unwrap() as i64);
-    let scheduled_at_str = format!("{}", scheduled_at.format("%F %T%.f+00"));
-    let retries = params.task.unwrap().retries + 1;
-
-    let uuid = params.task.unwrap().id;
-
-    let mut buffer = Uuid::encode_buffer();
-    let uuid_as_text = uuid.as_hyphenated().encode_lower(&mut buffer);
-
-    let error = params.error_message.unwrap();
-
-    let affected_rows = sqlx::query(query)
-        .bind(error)
-        .bind(retries)
-        .bind(scheduled_at_str)
-        .bind(now_str)
-        .bind(&*uuid_as_text)
-        .execute(pool)
-        .await?
-        .rows_affected();
-
-    if affected_rows != 1 {
-        return Err(AsyncQueueError::ResultError {
-            expected: 1,
-            found: affected_rows,
-        });
-    }
-
-    let query_params = QueryParams::builder().uuid(&uuid).build();
-
-    let failed_task: Task =
-        general_any_impl_find_task_by_id(FIND_TASK_BY_ID_QUERY_MYSQL, pool, query_params).await?;
-
-    Ok(failed_task)
-}
-
-async fn mysql_any_impl_insert_task_if_not_exists(
-    queries: (&str, &str),
-    pool: &Pool<Any>,
-    params: QueryParams<'_>,
-) -> Result<Task, AsyncQueueError> {
-    match general_any_impl_find_task_by_uniq_hash(queries.0, pool, &params).await {
-        Some(task) => Ok(task),
-        None => mysql_impl_insert_task_uniq(queries.1, pool, params).await,
     }
 }
