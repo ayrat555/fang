@@ -9,8 +9,8 @@ diesel::table! {
         task_type -> Text,
         uniq_hash -> Nullable<Text>,
         retries -> Integer,
-        scheduled_at -> Text,
-        created_at -> Text,
-        updated_at -> Text,
+        scheduled_at -> Integer,
+        created_at -> Integer,
+        updated_at -> Integer,
     }
 }

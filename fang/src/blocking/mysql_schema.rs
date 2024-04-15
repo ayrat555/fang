@@ -24,11 +24,8 @@ diesel::table! {
         #[max_length = 64]
         uniq_hash -> Nullable<Varchar>,
         retries -> Integer,
-        #[max_length = 32]
-        scheduled_at -> Varchar,
-        #[max_length = 32]
-        created_at -> Varchar,
-        #[max_length = 32]
-        updated_at -> Varchar,
+        scheduled_at -> Datetime,
+        created_at -> Datetime,
+        updated_at -> Datetime,
     }
 }

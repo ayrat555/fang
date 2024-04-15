@@ -2,12 +2,6 @@
 
 #[cfg(feature = "blocking")]
 use diesel::{Identifiable, Queryable};
-#[cfg(feature = "asynk-sqlx")]
-use sqlx::any::AnyRow;
-#[cfg(feature = "asynk-sqlx")]
-use sqlx::FromRow;
-#[cfg(feature = "asynk-sqlx")]
-use sqlx::Row;
 use std::time::Duration;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
@@ -177,69 +171,6 @@ pub struct Task {
     pub created_at: DateTime<Utc>,
     #[builder(setter(into))]
     pub updated_at: DateTime<Utc>,
-}
-
-#[cfg(feature = "asynk-sqlx")]
-impl<'a> FromRow<'a, AnyRow> for Task {
-    fn from_row(row: &'a AnyRow) -> Result<Self, sqlx::Error> {
-        let uuid_as_text: &str = row.get("id");
-
-        let id = Uuid::parse_str(uuid_as_text).unwrap();
-
-        let raw: &str = row.get("metadata"); // will work if database cast json to string
-        let raw = raw.replace('\\', "");
-
-        // -- SELECT metadata->>'type' FROM fang_tasks ; this works because jsonb casting
-        let metadata: serde_json::Value = serde_json::from_str(&raw).unwrap();
-
-        // Be careful with this if we update sqlx, https://github.com/launchbadge/sqlx/issues/2416
-        let error_message: Option<String> = row.get("error_message");
-
-        let state_str: &str = row.get("state"); // will work if database cast json to string
-
-        let state: FangTaskState = state_str.into();
-
-        let task_type: String = row.get("task_type");
-
-        // Be careful with this if we update sqlx, https://github.com/launchbadge/sqlx/issues/2416
-        let uniq_hash: Option<String> = row.get("uniq_hash");
-
-        let retries: i32 = row.get("retries");
-
-        let scheduled_at_str: &str = row.get("scheduled_at");
-
-        // This unwrap is safe because we know that the database returns the date in the correct format
-        let scheduled_at: DateTime<Utc> = DateTime::parse_from_str(scheduled_at_str, "%F %T%.f%#z")
-            .unwrap()
-            .into();
-
-        let created_at_str: &str = row.get("created_at");
-
-        // This unwrap is safe because we know that the database returns the date in the correct format
-        let created_at: DateTime<Utc> = DateTime::parse_from_str(created_at_str, "%F %T%.f%#z")
-            .unwrap()
-            .into();
-
-        let updated_at_str: &str = row.get("updated_at");
-
-        // This unwrap is safe because we know that the database returns the date in the correct format
-        let updated_at: DateTime<Utc> = DateTime::parse_from_str(updated_at_str, "%F %T%.f%#z")
-            .unwrap()
-            .into();
-
-        Ok(Task::builder()
-            .id(id)
-            .metadata(metadata)
-            .error_message(error_message)
-            .state(state)
-            .task_type(task_type)
-            .uniq_hash(uniq_hash)
-            .retries(retries)
-            .scheduled_at(scheduled_at)
-            .created_at(created_at)
-            .updated_at(updated_at)
-            .build())
-    }
 }
 
 #[doc(hidden)]

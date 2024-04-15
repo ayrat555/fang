@@ -60,26 +60,20 @@ impl<'a> FromRow<'a, SqliteRow> for Task {
 
         let retries: i32 = row.get("retries");
 
-        let scheduled_at_str: &str = row.get("scheduled_at");
+        let scheduled_at: i64 = row.get("scheduled_at");
 
         // This unwrap is safe because we know that the database returns the date in the correct format
-        let scheduled_at: DateTime<Utc> = DateTime::parse_from_str(scheduled_at_str, "%F %T%.f%#z")
-            .unwrap()
-            .into();
+        let scheduled_at: DateTime<Utc> = DateTime::from_timestamp(scheduled_at, 0).unwrap();
 
-        let created_at_str: &str = row.get("created_at");
+        let created_at: i64 = row.get("created_at");
 
         // This unwrap is safe because we know that the database returns the date in the correct format
-        let created_at: DateTime<Utc> = DateTime::parse_from_str(created_at_str, "%F %T%.f%#z")
-            .unwrap()
-            .into();
+        let created_at: DateTime<Utc> = DateTime::from_timestamp(created_at, 0).unwrap();
 
-        let updated_at_str: &str = row.get("updated_at");
+        let updated_at: i64 = row.get("updated_at");
 
         // This unwrap is safe because we know that the database returns the date in the correct format
-        let updated_at: DateTime<Utc> = DateTime::parse_from_str(updated_at_str, "%F %T%.f%#z")
-            .unwrap()
-            .into();
+        let updated_at: DateTime<Utc> = DateTime::from_timestamp(updated_at, 0).unwrap();
 
         Ok(Task::builder()
             .id(id)

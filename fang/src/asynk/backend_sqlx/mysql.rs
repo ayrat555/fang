@@ -59,26 +59,11 @@ impl<'a> FromRow<'a, MySqlRow> for Task {
 
         let retries: i32 = row.get("retries");
 
-        let scheduled_at_str: &str = row.get("scheduled_at");
+        let scheduled_at: DateTime<Utc> = row.get("scheduled_at");
 
-        // This unwrap is safe because we know that the database returns the date in the correct format
-        let scheduled_at: DateTime<Utc> = DateTime::parse_from_str(scheduled_at_str, "%F %T%.f%#z")
-            .unwrap()
-            .into();
+        let created_at: DateTime<Utc> = row.get("created_at");
 
-        let created_at_str: &str = row.get("created_at");
-
-        // This unwrap is safe because we know that the database returns the date in the correct format
-        let created_at: DateTime<Utc> = DateTime::parse_from_str(created_at_str, "%F %T%.f%#z")
-            .unwrap()
-            .into();
-
-        let updated_at_str: &str = row.get("updated_at");
-
-        // This unwrap is safe because we know that the database returns the date in the correct format
-        let updated_at: DateTime<Utc> = DateTime::parse_from_str(updated_at_str, "%F %T%.f%#z")
-            .unwrap()
-            .into();
+        let updated_at: DateTime<Utc> = row.get("updated_at");
 
         Ok(Task::builder()
             .id(id)
@@ -105,7 +90,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
         let mut buffer = Uuid::encode_buffer();
         let uuid_as_str: &str = uuid.as_hyphenated().encode_lower(&mut buffer);
 
-        let scheduled_at_str = format!("{}", params.scheduled_at.unwrap().format("%F %T%.f+00"));
+        let scheduled_at = params.scheduled_at.unwrap();
 
         let metadata_str = params.metadata.unwrap().to_string();
         let task_type = params.task_type.unwrap();
@@ -115,7 +100,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
                 .bind(uuid_as_str)
                 .bind(metadata_str)
                 .bind(task_type)
-                .bind(scheduled_at_str)
+                .bind(scheduled_at)
                 .execute(pool)
                 .await?,
         )
@@ -145,7 +130,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
         pool: &Pool<MySql>,
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
-        let updated_at_str = format!("{}", Utc::now().format("%F %T%.f+00"));
+        let updated_at = Utc::now();
 
         let state_str: &str = params.state.unwrap().into();
 
@@ -157,7 +142,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
         let affected_rows = Into::<MySqlQueryResult>::into(
             sqlx::query(query)
                 .bind(state_str)
-                .bind(updated_at_str)
+                .bind(updated_at)
                 .bind(&*uuid_as_text)
                 .execute(pool)
                 .await?,
@@ -195,7 +180,8 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
         let metadata = params.metadata.unwrap();
 
         let metadata_str = metadata.to_string();
-        let scheduled_at_str = format!("{}", params.scheduled_at.unwrap().format("%F %T%.f+00"));
+
+        let scheduled_at = params.scheduled_at.unwrap();
 
         let task_type = params.task_type.unwrap();
 
@@ -207,7 +193,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
                 .bind(metadata_str)
                 .bind(task_type)
                 .bind(uniq_hash)
-                .bind(scheduled_at_str)
+                .bind(scheduled_at)
                 .execute(pool)
                 .await?,
         )
@@ -237,7 +223,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
         pool: &Pool<MySql>,
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
-        let updated_at = format!("{}", Utc::now().format("%F %T%.f+00"));
+        let updated_at = Utc::now();
 
         let id = params.task.unwrap().id;
 
@@ -282,10 +268,9 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
         let now = Utc::now();
-        let now_str = format!("{}", now.format("%F %T%.f+00"));
 
         let scheduled_at = now + Duration::seconds(params.backoff_seconds.unwrap() as i64);
-        let scheduled_at_str = format!("{}", scheduled_at.format("%F %T%.f+00"));
+
         let retries = params.task.unwrap().retries + 1;
 
         let uuid = params.task.unwrap().id;
@@ -299,8 +284,8 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
             sqlx::query(query)
                 .bind(error)
                 .bind(retries)
-                .bind(scheduled_at_str)
-                .bind(now_str)
+                .bind(scheduled_at)
+                .bind(now)
                 .bind(&*uuid_as_text)
                 .execute(pool)
                 .await?,
@@ -364,6 +349,41 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
             .await?;
 
         Ok(task)
+    }
+
+    async fn fetch_task_type(
+        query: &str,
+        pool: &Pool<MySql>,
+        params: QueryParams<'_>,
+    ) -> Result<Task, AsyncQueueError> {
+        // Unwraps by QueryParams are safe because the responsibility is of the caller
+        // and the caller is the library itself
+        let task_type = params.task_type.unwrap();
+
+        let now = Utc::now();
+
+        let task: Task = sqlx::query_as(query)
+            .bind(task_type)
+            .bind(now)
+            .fetch_one(pool)
+            .await?;
+
+        Ok(task)
+    }
+
+    async fn remove_all_scheduled_tasks(
+        query: &str,
+        pool: &Pool<MySql>,
+    ) -> Result<u64, AsyncQueueError> {
+        let now = Utc::now();
+
+        // This converts <DB>QueryResult to AnyQueryResult and then to u64
+        // do not delete into() method and do not delete Into<AnyQueryResult> trait bound
+
+        Ok(
+            Into::<MySqlQueryResult>::into(sqlx::query(query).bind(now).execute(pool).await?)
+                .rows_affected(),
+        )
     }
 }
 

@@ -158,6 +158,7 @@ where
     for<'r> std::string::String: Encode<'r, DB> + Type<DB>,
     for<'r> &'r str: Encode<'r, DB> + Type<DB>,
     for<'r> i32: Encode<'r, DB> + Type<DB>,
+    for<'r> i64: Encode<'r, DB> + Type<DB>,
     for<'r> &'r Pool<DB>: Executor<'r, Database = DB>,
     for<'r> <DB as HasArguments<'r>>::Arguments: IntoArguments<'r, DB>,
     <DB as Database>::QueryResult: Into<AnyQueryResult>,
@@ -171,11 +172,11 @@ where
         // and the caller is the library itself
         let task_type = params.task_type.unwrap();
 
-        let now_str = format!("{}", Utc::now().format("%F %T%.f+00"));
+        let now = Utc::now().timestamp();
 
         let task: Task = sqlx::query_as(query)
             .bind(task_type)
-            .bind(now_str)
+            .bind(now)
             .fetch_one(pool)
             .await?;
 
@@ -224,10 +225,13 @@ where
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
         let now = Utc::now();
-        let now_str = format!("{}", now.format("%F %T%.f+00"));
+        let now_i64 = now.timestamp();
 
         let scheduled_at = now + Duration::seconds(params.backoff_seconds.unwrap() as i64);
-        let scheduled_at_str = format!("{}", scheduled_at.format("%F %T%.f+00"));
+
+        // shadowing in order to not change a lot depending on types
+        let scheduled_at = scheduled_at.timestamp();
+        let now = now_i64;
         let retries = params.task.unwrap().retries + 1;
 
         let mut buffer = Uuid::encode_buffer();
@@ -243,8 +247,8 @@ where
         let failed_task: Task = sqlx::query_as(query)
             .bind(error)
             .bind(retries)
-            .bind(scheduled_at_str)
-            .bind(now_str)
+            .bind(scheduled_at)
+            .bind(now)
             .bind(&*uuid_as_text)
             .fetch_one(pool)
             .await?;
@@ -264,7 +268,7 @@ where
         let metadata = params.metadata.unwrap();
 
         let metadata_str = metadata.to_string();
-        let scheduled_at_str = format!("{}", params.scheduled_at.unwrap().format("%F %T%.f+00"));
+        let scheduled_at = params.scheduled_at.unwrap().timestamp();
 
         let task_type = params.task_type.unwrap();
 
@@ -275,7 +279,7 @@ where
             .bind(metadata_str)
             .bind(task_type)
             .bind(uniq_hash)
-            .bind(scheduled_at_str)
+            .bind(scheduled_at)
             .fetch_one(pool)
             .await?;
         Ok(task)
@@ -290,7 +294,7 @@ where
         let mut buffer = Uuid::encode_buffer();
         let uuid_as_str: &str = uuid.as_hyphenated().encode_lower(&mut buffer);
 
-        let scheduled_at_str = format!("{}", params.scheduled_at.unwrap().format("%F %T%.f+00"));
+        let scheduled_at_i64 = params.scheduled_at.unwrap().timestamp();
 
         let metadata_str = params.metadata.unwrap().to_string();
         let task_type = params.task_type.unwrap();
@@ -299,7 +303,7 @@ where
             .bind(uuid_as_str)
             .bind(metadata_str)
             .bind(task_type)
-            .bind(scheduled_at_str)
+            .bind(scheduled_at_i64)
             .fetch_one(pool)
             .await?;
 
@@ -311,7 +315,7 @@ where
         pool: &Pool<DB>,
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
-        let updated_at_str = format!("{}", Utc::now().format("%F %T%.f+00"));
+        let updated_at = Utc::now().timestamp();
 
         let state_str: &str = params.state.unwrap().into();
 
@@ -322,7 +326,7 @@ where
 
         let task: Task = sqlx::query_as(query)
             .bind(state_str)
-            .bind(updated_at_str)
+            .bind(updated_at)
             .bind(&*uuid_as_text)
             .fetch_one(pool)
             .await?;
@@ -335,7 +339,7 @@ where
         pool: &Pool<DB>,
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
-        let updated_at = format!("{}", Utc::now().format("%F %T%.f+00"));
+        let updated_at = Utc::now().timestamp();
 
         let id = params.task.unwrap().id;
 
@@ -369,13 +373,13 @@ where
         query: &str,
         pool: &Pool<DB>,
     ) -> Result<u64, AsyncQueueError> {
-        let now_str = format!("{}", Utc::now().format("%F %T%.f+00"));
+        let now = Utc::now().timestamp();
 
         // This converts <DB>QueryResult to AnyQueryResult and then to u64
         // do not delete into() method and do not delete Into<AnyQueryResult> trait bound
 
         Ok(sqlx::query(query)
-            .bind(now_str)
+            .bind(now)
             .execute(pool)
             .await?
             .into()

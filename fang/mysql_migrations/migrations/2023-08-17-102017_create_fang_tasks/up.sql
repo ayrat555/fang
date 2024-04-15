@@ -17,9 +17,9 @@ CREATE TABLE fang_tasks (
     task_type VARCHAR(255) NOT NULL DEFAULT 'common', -- TEXT type can not have default value, stupid MySQL policy
     uniq_hash VARCHAR(64),
     retries INTEGER NOT NULL DEFAULT 0,
-    scheduled_at VARCHAR(32) NOT NULL DEFAULT(CONCAT(CURRENT_TIMESTAMP, '.000000000+00')),
-    created_at VARCHAR(32) NOT NULL DEFAULT (CONCAT(CURRENT_TIMESTAMP , '.000000000+00')),
-    updated_at VARCHAR(32) NOT NULL DEFAULT  (CONCAT(CURRENT_TIMESTAMP , '.000000000+00'))
+    scheduled_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX fang_tasks_state_index ON fang_tasks(state);

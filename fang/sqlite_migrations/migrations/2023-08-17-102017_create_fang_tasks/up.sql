@@ -14,12 +14,13 @@ CREATE TABLE fang_tasks (
     task_type TEXT NOT NULL DEFAULT 'common',
     uniq_hash CHAR(64),
     retries INTEGER NOT NULL DEFAULT 0,
-    -- The datetime() function returns the date and time as text in this formats: YYYY-MM-DD HH:MM:SS. 
-    -- https://www.sqlite.org/lang_datefunc.html
-    scheduled_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP || '.000000+00'),
-    -- why timestamps are texts ? https://www.sqlite.org/datatype3.html
-    created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP || '.000000+00'),
-    updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP || '.000000+00')
+    -- scheduled_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP || '.000000+00'),
+
+    -- Timestamps are stored as the number of seconds since the Unix epoch ('1970-01-01 00:00:00 UTC').
+
+    scheduled_at INTEGER NOT NULL DEFAULT (unixepoch('now')),
+    created_at INTEGER NOT NULL DEFAULT (unixepoch('now')),
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch('now'))
 );
 
 CREATE INDEX fang_tasks_state_index ON fang_tasks(state);
