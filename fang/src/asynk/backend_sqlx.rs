@@ -141,9 +141,6 @@ pub(crate) enum SqlXQuery {
     InsertTaskIfNotExists,
 }
 
-// Unwraps by QueryParams are safe because the responsibility is of the caller
-// and the caller is the library itself
-
 use crate::AsyncQueueError;
 use crate::AsyncRunnable;
 use crate::FangTaskState;
@@ -174,6 +171,8 @@ where
         pool: &Pool<DB>,
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
+        // Unwraps by QueryParams are safe because the responsibility is of the caller
+        // and the caller is the library itself
         let task_type = params.task_type.unwrap();
 
         let now_str = format!("{}", Utc::now().format("%F %T%.f+00"));
