@@ -342,7 +342,7 @@ impl AsyncQueue {
             .build();
 
         let task = backend
-            .execute_query(SqlXQuery::InsertTask, &pool, query_params)
+            .execute_query(SqlXQuery::InsertTask, pool, query_params)
             .await?
             .unwrap_task();
 
@@ -363,7 +363,7 @@ impl AsyncQueue {
             .build();
 
         let task = backend
-            .execute_query(SqlXQuery::InsertTaskIfNotExists, &pool, query_params)
+            .execute_query(SqlXQuery::InsertTaskIfNotExists, pool, query_params)
             .await?
             .unwrap_task();
 
