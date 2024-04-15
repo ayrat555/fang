@@ -39,7 +39,11 @@ pub(crate) enum BackendSqlX {
     #[cfg(feature = "asynk-mysql")]
     MySql,
 
-    #[cfg(not(any(feature = "asynk-postgres", feature = "asynk-sqlite", feature = "asynk-mysql")))]
+    #[cfg(not(any(
+        feature = "asynk-postgres",
+        feature = "asynk-sqlite",
+        feature = "asynk-mysql"
+    )))]
     #[allow(dead_code)]
     Dummy,
 }
@@ -109,7 +113,11 @@ impl BackendSqlX {
             BackendSqlX::MySql => {
                 BackendSqlXMySQL::execute_query(_query, _pool.unwrap_mysql_pool(), _params).await
             }
-            #[cfg(not(any(feature = "asynk-postgres", feature = "asynk-sqlite", feature = "asynk-mysql")))]
+            #[cfg(not(any(
+                feature = "asynk-postgres",
+                feature = "asynk-sqlite",
+                feature = "asynk-mysql"
+            )))]
             BackendSqlX::Dummy => unreachable!(),
         }
     }
@@ -123,7 +131,11 @@ impl BackendSqlX {
             BackendSqlX::Sqlite => BackendSqlXSQLite::_name(),
             #[cfg(feature = "asynk-mysql")]
             BackendSqlX::MySql => BackendSqlXMySQL::_name(),
-            #[cfg(not(any(feature = "asynk-postgres", feature = "asynk-sqlite", feature = "asynk-mysql")))]
+            #[cfg(not(any(
+                feature = "asynk-postgres",
+                feature = "asynk-sqlite",
+                feature = "asynk-mysql"
+            )))]
             BackendSqlX::Dummy => unreachable!(),
         }
     }
