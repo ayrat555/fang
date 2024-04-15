@@ -130,8 +130,12 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
 
         let query_params = QueryParams::builder().uuid(&uuid).build();
 
-        let task: Task =
-            Self::find_task_by_id(FIND_TASK_BY_ID_QUERY_MYSQL, pool, query_params).await?;
+        let task: Task = <BackendSqlXMySQL as FangQueryable<MySql>>::find_task_by_id(
+            FIND_TASK_BY_ID_QUERY_MYSQL,
+            pool,
+            query_params,
+        )
+        .await?;
 
         Ok(task)
     }
@@ -169,8 +173,12 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
 
         let query_params = QueryParams::builder().uuid(params.uuid.unwrap()).build();
 
-        let task: Task =
-            Self::find_task_by_id(FIND_TASK_BY_ID_QUERY_MYSQL, pool, query_params).await?;
+        let task: Task = <BackendSqlXMySQL as FangQueryable<MySql>>::find_task_by_id(
+            FIND_TASK_BY_ID_QUERY_MYSQL,
+            pool,
+            query_params,
+        )
+        .await?;
 
         Ok(task)
     }
@@ -214,8 +222,12 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
 
         let query_params = QueryParams::builder().uuid(&uuid).build();
 
-        let task: Task =
-            Self::find_task_by_id(FIND_TASK_BY_ID_QUERY_MYSQL, pool, query_params).await?;
+        let task: Task = <BackendSqlXMySQL as FangQueryable<MySql>>::find_task_by_id(
+            FIND_TASK_BY_ID_QUERY_MYSQL,
+            pool,
+            query_params,
+        )
+        .await?;
 
         Ok(task)
     }
@@ -254,8 +266,12 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
 
         let query_params = QueryParams::builder().uuid(&id).build();
 
-        let failed_task: Task =
-            Self::find_task_by_id(FIND_TASK_BY_ID_QUERY_MYSQL, pool, query_params).await?;
+        let failed_task: Task = <BackendSqlXMySQL as FangQueryable<MySql>>::find_task_by_id(
+            FIND_TASK_BY_ID_QUERY_MYSQL,
+            pool,
+            query_params,
+        )
+        .await?;
 
         Ok(failed_task)
     }
@@ -300,8 +316,12 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
 
         let query_params = QueryParams::builder().uuid(&uuid).build();
 
-        let failed_task: Task =
-            Self::find_task_by_id(FIND_TASK_BY_ID_QUERY_MYSQL, pool, query_params).await?;
+        let failed_task: Task = <BackendSqlXMySQL as FangQueryable<MySql>>::find_task_by_id(
+            FIND_TASK_BY_ID_QUERY_MYSQL,
+            pool,
+            query_params,
+        )
+        .await?;
 
         Ok(failed_task)
     }
@@ -311,9 +331,18 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
         pool: &Pool<MySql>,
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
-        match Self::find_task_by_uniq_hash(queries.0, pool, &params).await {
+        match <BackendSqlXMySQL as FangQueryable<MySql>>::find_task_by_uniq_hash(
+            queries.0, pool, &params,
+        )
+        .await
+        {
             Some(task) => Ok(task),
-            None => Self::insert_task_uniq(queries.1, pool, params).await,
+            None => {
+                <BackendSqlXMySQL as FangQueryable<MySql>>::insert_task_uniq(
+                    queries.1, pool, params,
+                )
+                .await
+            }
         }
     }
 
