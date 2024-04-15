@@ -38,8 +38,6 @@ pub(crate) enum BackendSqlX {
 
     #[cfg(feature = "asynk-mysql")]
     MySql,
-
-    NoBackend,
 }
 
 #[allow(dead_code)]
