@@ -92,7 +92,7 @@ impl BackendSqlX {
         _pool: &InternalPool,
         _params: QueryParams<'_>,
     ) -> Result<Res, AsyncQueueError> {
-        match self {
+        match *self {
             #[cfg(feature = "asynk-postgres")]
             BackendSqlX::Pg => {
                 BackendSqlXPg::execute_query(_query, _pool.unwrap_pg_pool(), _params).await
@@ -105,20 +105,18 @@ impl BackendSqlX {
             BackendSqlX::MySql => {
                 BackendSqlXMySQL::execute_query(_query, _pool.unwrap_mysql_pool(), _params).await
             }
-            _ => unreachable!(),
         }
     }
 
     // I think it is useful to have this method, although it is not used
     pub(crate) fn _name(&self) -> &str {
-        match self {
+        match *self {
             #[cfg(feature = "asynk-postgres")]
             BackendSqlX::Pg => BackendSqlXPg::_name(),
             #[cfg(feature = "asynk-sqlite")]
             BackendSqlX::Sqlite => BackendSqlXSQLite::_name(),
             #[cfg(feature = "asynk-mysql")]
             BackendSqlX::MySql => BackendSqlXMySQL::_name(),
-            _ => unreachable!(),
         }
     }
 }

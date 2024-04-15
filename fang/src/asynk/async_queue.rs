@@ -239,11 +239,11 @@ use std::env;
 
 use super::backend_sqlx::BackendSqlX;
 
-async fn get_backend(
+async fn get_pool(
     kind: AnyKind,
     _uri: &str,
     _max_connections: u32,
-) -> Result<(BackendSqlX, InternalPool), AsyncQueueError> {
+) -> Result<InternalPool, AsyncQueueError> {
     match kind {
         #[cfg(feature = "asynk-postgres")]
         AnyKind::Postgres => {
@@ -252,7 +252,7 @@ async fn get_backend(
                 .connect(_uri)
                 .await?;
 
-            Ok((BackendSqlX::Pg, InternalPool::Pg(pool)))
+            Ok(InternalPool::Pg(pool))
         }
         #[cfg(feature = "asynk-mysql")]
         AnyKind::MySql => {
@@ -261,7 +261,7 @@ async fn get_backend(
                 .connect(_uri)
                 .await?;
 
-            Ok((BackendSqlX::MySql, InternalPool::MySql(pool)))
+            Ok(InternalPool::MySql(pool))
         }
         #[cfg(feature = "asynk-sqlite")]
         AnyKind::Sqlite => {
@@ -270,7 +270,7 @@ async fn get_backend(
                 .connect(_uri)
                 .await?;
 
-            Ok((BackendSqlX::Sqlite, InternalPool::Sqlite(pool)))
+            Ok(InternalPool::Sqlite(pool))
         }
         #[allow(unreachable_patterns)]
         _ => panic!("Not a valid backend"),
@@ -293,7 +293,7 @@ impl AsyncQueue {
 
         let kind: AnyKind = self.uri.parse::<AnyConnectOptions>()?.kind();
 
-        let (backend, pool) = get_backend(kind, &self.uri, self.max_pool_size).await?;
+        let pool = get_pool(kind, &self.uri, self.max_pool_size).await?;
 
         self.pool = Some(pool);
         self.connected = true;
