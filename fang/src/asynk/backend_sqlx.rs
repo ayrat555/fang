@@ -225,9 +225,10 @@ where
         // shadowing in order to not change a lot depending on types
         let scheduled_at = scheduled_at.timestamp();
         let now = now_i64;
-        let retries = params.task.unwrap().retries + 1;
+        let task = params.task.unwrap();
+        let retries = task.retries + 1;
 
-        let uuid = params.uuid.unwrap();
+        let uuid = task.id;
 
         let error = params.error_message.unwrap();
 
@@ -236,7 +237,7 @@ where
             .bind(retries)
             .bind(scheduled_at)
             .bind(now)
-            .bind(uuid)
+            .bind(&uuid)
             .fetch_one(pool)
             .await?;
 
