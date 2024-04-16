@@ -159,6 +159,7 @@ where
     for<'r> &'r str: Encode<'r, DB> + Type<DB>,
     for<'r> i32: Encode<'r, DB> + Type<DB>,
     for<'r> i64: Encode<'r, DB> + Type<DB>,
+    for<'r> &'r Uuid: Encode<'r, DB> + Type<DB>,
     for<'r> &'r Pool<DB>: Executor<'r, Database = DB>,
     for<'r> <DB as HasArguments<'r>>::Arguments: IntoArguments<'r, DB>,
     <DB as Database>::QueryResult: Into<AnyQueryResult>,
@@ -204,17 +205,9 @@ where
         pool: &Pool<DB>,
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
-        let mut buffer = Uuid::encode_buffer();
-        let uuid_as_text = params
-            .uuid
-            .unwrap()
-            .as_hyphenated()
-            .encode_lower(&mut buffer);
+        let uuid = params.uuid.unwrap();
 
-        let task: Task = sqlx::query_as(query)
-            .bind(&*uuid_as_text)
-            .fetch_one(pool)
-            .await?;
+        let task: Task = sqlx::query_as(query).bind(uuid).fetch_one(pool).await?;
 
         Ok(task)
     }
@@ -234,13 +227,7 @@ where
         let now = now_i64;
         let retries = params.task.unwrap().retries + 1;
 
-        let mut buffer = Uuid::encode_buffer();
-        let uuid_as_text = params
-            .task
-            .unwrap()
-            .id
-            .as_hyphenated()
-            .encode_lower(&mut buffer);
+        let uuid = params.uuid.unwrap();
 
         let error = params.error_message.unwrap();
 
@@ -249,7 +236,7 @@ where
             .bind(retries)
             .bind(scheduled_at)
             .bind(now)
-            .bind(&*uuid_as_text)
+            .bind(uuid)
             .fetch_one(pool)
             .await?;
 
@@ -262,8 +249,6 @@ where
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
         let uuid = Uuid::new_v4();
-        let mut buffer = Uuid::encode_buffer();
-        let uuid_as_str: &str = uuid.as_hyphenated().encode_lower(&mut buffer);
 
         let metadata = params.metadata.unwrap();
 
@@ -275,7 +260,7 @@ where
         let uniq_hash = calculate_hash(&metadata_str);
 
         let task: Task = sqlx::query_as(query)
-            .bind(uuid_as_str)
+            .bind(&uuid)
             .bind(metadata_str)
             .bind(task_type)
             .bind(uniq_hash)
@@ -291,8 +276,6 @@ where
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
         let uuid = Uuid::new_v4();
-        let mut buffer = Uuid::encode_buffer();
-        let uuid_as_str: &str = uuid.as_hyphenated().encode_lower(&mut buffer);
 
         let scheduled_at_i64 = params.scheduled_at.unwrap().timestamp();
 
@@ -300,7 +283,7 @@ where
         let task_type = params.task_type.unwrap();
 
         let task: Task = sqlx::query_as(query)
-            .bind(uuid_as_str)
+            .bind(&uuid)
             .bind(metadata_str)
             .bind(task_type)
             .bind(scheduled_at_i64)
@@ -321,13 +304,10 @@ where
 
         let uuid = params.uuid.unwrap();
 
-        let mut buffer = Uuid::encode_buffer();
-        let uuid_as_text = uuid.as_hyphenated().encode_lower(&mut buffer);
-
         let task: Task = sqlx::query_as(query)
             .bind(state_str)
             .bind(updated_at)
-            .bind(&*uuid_as_text)
+            .bind(uuid)
             .fetch_one(pool)
             .await?;
 
@@ -341,10 +321,7 @@ where
     ) -> Result<Task, AsyncQueueError> {
         let updated_at = Utc::now().timestamp();
 
-        let id = params.task.unwrap().id;
-
-        let mut buffer = Uuid::encode_buffer();
-        let uuid_as_text = id.as_hyphenated().encode_lower(&mut buffer);
+        let uuid = params.task.unwrap().id;
 
         let error_message = params.error_message.unwrap();
 
@@ -352,7 +329,7 @@ where
             .bind(<&str>::from(FangTaskState::Failed))
             .bind(error_message)
             .bind(updated_at)
-            .bind(&*uuid_as_text)
+            .bind(&uuid)
             .fetch_one(pool)
             .await?;
 
@@ -391,15 +368,10 @@ where
         pool: &Pool<DB>,
         params: QueryParams<'_>,
     ) -> Result<u64, AsyncQueueError> {
-        let mut buffer = Uuid::encode_buffer();
-        let uuid_as_text = params
-            .uuid
-            .unwrap()
-            .as_hyphenated()
-            .encode_lower(&mut buffer);
+        let uuid = params.uuid.unwrap();
 
         let result = sqlx::query(query)
-            .bind(&*uuid_as_text)
+            .bind(uuid)
             .execute(pool)
             .await?
             .into()

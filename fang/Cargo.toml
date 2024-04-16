@@ -35,7 +35,7 @@ migrations = ["dep:diesel_migrations"]
 [dev-dependencies]
 fang-derive-error = { version = "0.1.0"}
 diesel_migrations = { version = "2.1" , features = ["postgres", "sqlite" , "mysql"]}
-sqlx = {version = "0.6.3", features = ["any" , "macros" , "chrono", "runtime-tokio-rustls", "postgres", "sqlite", "mysql"]}
+sqlx = {version = "0.6.3", features = ["any" , "macros" , "chrono", "uuid", "runtime-tokio-rustls", "postgres", "sqlite", "mysql"]}
 #console-subscriber = "0.2.0" # for tokio tracing debug
 
 [dependencies]
@@ -52,7 +52,7 @@ typed-builder = "0.14"
 typetag = "0.2"
 uuid = { version = "1.1", features = ["v4"] }
 fang-derive-error = { version = "0.1.0" , optional = true}
-sqlx = {version = "0.6.3", features = ["any" , "macros" , "chrono", "runtime-tokio-rustls"], optional = true}
+sqlx = {version = "0.6.3", features = ["any" , "macros" , "chrono", "uuid", "runtime-tokio-rustls"], optional = true}
 
 [dependencies.diesel]
 version = "2.1"

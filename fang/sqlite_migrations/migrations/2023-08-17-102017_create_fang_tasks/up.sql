@@ -1,11 +1,8 @@
 -- Your SQL goes here
 
-
--- docker exec -ti mysql mysql -u root -pfang -P 3360 fang -e "$(catn fang/mysql_migrations/migrations/2023-08-17-102017_create_fang_tasks/up.sql)"
-
 CREATE TABLE fang_tasks (
-    id TEXT CHECK (LENGTH(id) = 36) NOT NULL PRIMARY KEY, -- UUID generated inside the language
-    -- why uuid is a text ? https://stackoverflow.com/questions/17277735/using-uuids-in-sqlite
+    -- uuid will be stored as a 16 byte BLOB
+    id BLOB NOT NULL PRIMARY KEY, -- UUID generated inside the language
     metadata TEXT NOT NULL, 
     -- why metadata is text ? https://stackoverflow.com/questions/16603621/how-to-store-json-object-in-sqlite-database#16603687
     error_message TEXT,

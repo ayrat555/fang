@@ -1,1 +1,1 @@
-INSERT INTO "fang_tasks" ("id", "metadata", "task_type", "scheduled_at") VALUES ($1::uuid, $2::jsonb, $3, to_timestamp($4) ) RETURNING id::text , metadata::text , error_message, state::text , task_type , uniq_hash, retries , scheduled_at::text , created_at::text , updated_at::text
+INSERT INTO "fang_tasks" ("id", "metadata", "task_type", "scheduled_at") VALUES ($1, $2::jsonb, $3, to_timestamp($4) ) RETURNING id , metadata::text , error_message, state::text , task_type , uniq_hash, retries , scheduled_at , created_at , updated_at

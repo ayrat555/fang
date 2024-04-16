@@ -36,9 +36,9 @@ use SqlXQuery as Q;
 
 impl<'a> FromRow<'a, SqliteRow> for Task {
     fn from_row(row: &'a SqliteRow) -> Result<Self, sqlx::Error> {
-        let uuid_as_text: &str = row.get("id");
+        let id: Uuid = row.get("id");
 
-        let id = Uuid::parse_str(uuid_as_text).unwrap();
+        //let id = Uuid::parse_str(uuid_as_text).unwrap();
 
         let raw: &str = row.get("metadata"); // will work if database cast json to string
         let raw = raw.replace('\\', "");
@@ -60,20 +60,11 @@ impl<'a> FromRow<'a, SqliteRow> for Task {
 
         let retries: i32 = row.get("retries");
 
-        let scheduled_at: i64 = row.get("scheduled_at");
+        let scheduled_at: DateTime<Utc> = row.get("scheduled_at");
 
-        // This unwrap is safe because we know that the database returns the date in the correct format
-        let scheduled_at: DateTime<Utc> = DateTime::from_timestamp(scheduled_at, 0).unwrap();
+        let created_at: DateTime<Utc> = row.get("created_at");
 
-        let created_at: i64 = row.get("created_at");
-
-        // This unwrap is safe because we know that the database returns the date in the correct format
-        let created_at: DateTime<Utc> = DateTime::from_timestamp(created_at, 0).unwrap();
-
-        let updated_at: i64 = row.get("updated_at");
-
-        // This unwrap is safe because we know that the database returns the date in the correct format
-        let updated_at: DateTime<Utc> = DateTime::from_timestamp(updated_at, 0).unwrap();
+        let updated_at: DateTime<Utc> = row.get("updated_at");
 
         Ok(Task::builder()
             .id(id)

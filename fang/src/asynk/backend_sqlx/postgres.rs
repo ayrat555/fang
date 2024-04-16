@@ -42,9 +42,9 @@ use crate::Task;
 
 impl<'a> FromRow<'a, PgRow> for Task {
     fn from_row(row: &'a PgRow) -> Result<Self, sqlx::Error> {
-        let uuid_as_text: &str = row.get("id");
+        let id: Uuid = row.get("id");
 
-        let id = Uuid::parse_str(uuid_as_text).unwrap();
+        //let id = Uuid::parse_str(uuid_as_text).unwrap();
 
         let raw: &str = row.get("metadata"); // will work if database cast json to string
         let raw = raw.replace('\\', "");
@@ -66,26 +66,11 @@ impl<'a> FromRow<'a, PgRow> for Task {
 
         let retries: i32 = row.get("retries");
 
-        let scheduled_at_str: &str = row.get("scheduled_at");
+        let scheduled_at: DateTime<Utc> = row.get("scheduled_at");
 
-        // This unwrap is safe because we know that the database returns the date in the correct format
-        let scheduled_at: DateTime<Utc> = DateTime::parse_from_str(scheduled_at_str, "%F %T%.f%#z")
-            .unwrap()
-            .into();
+        let created_at: DateTime<Utc> = row.get("created_at");
 
-        let created_at_str: &str = row.get("created_at");
-
-        // This unwrap is safe because we know that the database returns the date in the correct format
-        let created_at: DateTime<Utc> = DateTime::parse_from_str(created_at_str, "%F %T%.f%#z")
-            .unwrap()
-            .into();
-
-        let updated_at_str: &str = row.get("updated_at");
-
-        // This unwrap is safe because we know that the database returns the date in the correct format
-        let updated_at: DateTime<Utc> = DateTime::parse_from_str(updated_at_str, "%F %T%.f%#z")
-            .unwrap()
-            .into();
+        let updated_at: DateTime<Utc> = row.get("updated_at");
 
         Ok(Task::builder()
             .id(id)
