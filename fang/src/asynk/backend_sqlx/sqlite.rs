@@ -38,8 +38,6 @@ impl<'a> FromRow<'a, SqliteRow> for Task {
     fn from_row(row: &'a SqliteRow) -> Result<Self, sqlx::Error> {
         let id: Uuid = row.get("id");
 
-        //let id = Uuid::parse_str(uuid_as_text).unwrap();
-
         let raw: &str = row.get("metadata"); // will work if database cast json to string
         let raw = raw.replace('\\', "");
 
