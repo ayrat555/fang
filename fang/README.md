@@ -4,7 +4,7 @@
 
 # Fang
 
-Background task processing library for Rust. It can use PostgreSQL, SQLite or MySQL as a task queue.
+Background task processing library for Rust. It can use PostgreSQL, SQLite or MySQL as an asyncronous task queue.
 
 ## Key Features
 
@@ -31,7 +31,7 @@ Here are some of the fang's key features:
 
 ```toml
 [dependencies]
-fang = { version = "0.11" , features = ["blocking"], default-features = false }
+fang = { version = "0.11.0-rc0" , features = ["blocking"], default-features = false }
 ```
 
 #### the Asynk feature
@@ -40,21 +40,21 @@ fang = { version = "0.11" , features = ["blocking"], default-features = false }
 
 ```toml
 [dependencies]
-fang = { version = "0.11" , features = ["asynk-postgres"], default-features = false }
+fang = { version = "0.11.0-rc0" , features = ["asynk-postgres"], default-features = false }
 ```
 
 - SQLite as a queue
 
 ```toml
 [dependencies]
-fang = { version = "0.11" , features = ["asynk-sqlite"], default-features = false }
+fang = { version = "0.11.0-rc0" , features = ["asynk-sqlite"], default-features = false }
 ```
 
 - MySQL as a queue
 
 ```toml
 [dependencies]
-fang = { version = "0.11" , features = ["asynk-mysql"], default-features = false }
+fang = { version = "0.11.0-rc0" , features = ["asynk-mysql"], default-features = false }
 ```
 
 #### the Asynk feature with derive macro
@@ -63,16 +63,16 @@ Substitute `database` with your desired backend.
 
 ```toml
 [dependencies]
-fang = { version = "0.11" , features = ["asynk-{database}", "derive-error" ], default-features = false }
+fang = { version = "0.11.0-rc0" , features = ["asynk-{database}", "derive-error" ], default-features = false }
 ```
 
 #### All features
 
 ```toml
-fang = { version = "0.11" }
+fang = { version = "0.11.0-rc0" }
 ```
 
-_Supports rustc 1.62+_
+_Supports rustc 1.77+_
 
 1. Create the `fang_tasks` table in the database. The migration of each database can be found in `fang/{database}-migrations` where `database` is `postgres`, `mysql` or `sqlite`.
 
@@ -80,7 +80,7 @@ Migrations can be also run as code, importing the feature `migrations-{database}
 
 ```toml
 [dependencies]
-fang = { version = "0.11" , features = ["asynk-postgres", "migrations-postgres" ], default-features = false }
+fang = { version = "0.11.0-rc0" , features = ["asynk-postgres", "migrations-postgres" ], default-features = false }
 ```
 
 ```rust
