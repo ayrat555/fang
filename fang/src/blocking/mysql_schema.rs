@@ -11,8 +11,8 @@ diesel::table! {
     use super::sql_types::FangTasksStateEnum;
 
     fang_tasks (id) {
-        #[max_length = 36]
-        id -> Varchar,
+        #[max_length = 16]
+        id -> Binary,
         #[max_length = 2048]
         metadata -> Varchar,
         #[max_length = 2048]

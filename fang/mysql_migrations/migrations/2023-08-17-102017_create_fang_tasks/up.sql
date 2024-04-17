@@ -10,7 +10,7 @@
     */
 
 CREATE TABLE fang_tasks (
-    id VARCHAR(36) DEFAULT (uuid()) PRIMARY KEY,
+    id BINARY(16) PRIMARY KEY,
     metadata VARCHAR(2048) NOT NULL,
     error_message VARCHAR(2048),
     state ENUM('new', 'in_progress', 'failed', 'finished', 'retried') NOT NULL DEFAULT 'new',

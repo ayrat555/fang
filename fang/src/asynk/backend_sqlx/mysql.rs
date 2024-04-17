@@ -35,9 +35,7 @@ pub(super) struct BackendSqlXMySQL {}
 
 impl<'a> FromRow<'a, MySqlRow> for Task {
     fn from_row(row: &'a MySqlRow) -> Result<Self, sqlx::Error> {
-        let uuid_as_text: &str = row.get("id");
-
-        let id = Uuid::parse_str(uuid_as_text).unwrap();
+        let id: Uuid = row.get("id");
 
         let raw: &str = row.get("metadata"); // will work if database cast json to string
         let raw = raw.replace('\\', "");
@@ -87,8 +85,6 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
         let uuid = Uuid::new_v4();
-        let mut buffer = Uuid::encode_buffer();
-        let uuid_as_str: &str = uuid.as_hyphenated().encode_lower(&mut buffer);
 
         let scheduled_at = params.scheduled_at.unwrap();
 
@@ -97,7 +93,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
 
         let affected_rows = Into::<MySqlQueryResult>::into(
             sqlx::query(query)
-                .bind(uuid_as_str)
+                .bind(&uuid)
                 .bind(metadata_str)
                 .bind(task_type)
                 .bind(scheduled_at)
@@ -136,14 +132,11 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
 
         let uuid = params.uuid.unwrap();
 
-        let mut buffer = Uuid::encode_buffer();
-        let uuid_as_text = uuid.as_hyphenated().encode_lower(&mut buffer);
-
         let affected_rows = Into::<MySqlQueryResult>::into(
             sqlx::query(query)
                 .bind(state_str)
                 .bind(updated_at)
-                .bind(&*uuid_as_text)
+                .bind(&uuid)
                 .execute(pool)
                 .await?,
         )
@@ -174,8 +167,6 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
         let uuid = Uuid::new_v4();
-        let mut buffer = Uuid::encode_buffer();
-        let uuid_as_str: &str = uuid.as_hyphenated().encode_lower(&mut buffer);
 
         let metadata = params.metadata.unwrap();
 
@@ -189,7 +180,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
 
         let affected_rows = Into::<MySqlQueryResult>::into(
             sqlx::query(query)
-                .bind(uuid_as_str)
+                .bind(&uuid)
                 .bind(metadata_str)
                 .bind(task_type)
                 .bind(uniq_hash)
@@ -227,9 +218,6 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
 
         let id = params.task.unwrap().id;
 
-        let mut buffer = Uuid::encode_buffer();
-        let uuid_as_text = id.as_hyphenated().encode_lower(&mut buffer);
-
         let error_message = params.error_message.unwrap();
 
         let affected_rows = Into::<MySqlQueryResult>::into(
@@ -237,7 +225,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
                 .bind(<&str>::from(FangTaskState::Failed))
                 .bind(error_message)
                 .bind(updated_at)
-                .bind(&*uuid_as_text)
+                .bind(&id)
                 .execute(pool)
                 .await?,
         )
@@ -275,9 +263,6 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
 
         let uuid = params.task.unwrap().id;
 
-        let mut buffer = Uuid::encode_buffer();
-        let uuid_as_text = uuid.as_hyphenated().encode_lower(&mut buffer);
-
         let error = params.error_message.unwrap();
 
         let affected_rows = Into::<MySqlQueryResult>::into(
@@ -286,7 +271,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
                 .bind(retries)
                 .bind(scheduled_at)
                 .bind(now)
-                .bind(&*uuid_as_text)
+                .bind(&uuid)
                 .execute(pool)
                 .await?,
         )
@@ -329,26 +314,6 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
                 .await
             }
         }
-    }
-
-    async fn find_task_by_id(
-        query: &str,
-        pool: &Pool<MySql>,
-        params: QueryParams<'_>,
-    ) -> Result<Task, AsyncQueueError> {
-        let mut buffer = Uuid::encode_buffer();
-        let uuid_as_text = params
-            .uuid
-            .unwrap()
-            .as_hyphenated()
-            .encode_lower(&mut buffer);
-
-        let task: Task = sqlx::query_as(query)
-            .bind(&*uuid_as_text)
-            .fetch_one(pool)
-            .await?;
-
-        Ok(task)
     }
 }
 
