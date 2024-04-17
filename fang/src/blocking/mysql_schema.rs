@@ -13,10 +13,8 @@ diesel::table! {
     fang_tasks (id) {
         #[max_length = 16]
         id -> Binary,
-        #[max_length = 2048]
-        metadata -> Varchar,
-        #[max_length = 2048]
-        error_message -> Nullable<Varchar>,
+        metadata -> Json,
+        error_message -> Nullable<Text>,
         #[max_length = 11]
         state -> FangTasksStateEnum,
         #[max_length = 255]

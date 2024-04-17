@@ -37,11 +37,7 @@ impl<'a> FromRow<'a, MySqlRow> for Task {
     fn from_row(row: &'a MySqlRow) -> Result<Self, sqlx::Error> {
         let id: Uuid = row.get("id");
 
-        let raw: &str = row.get("metadata"); // will work if database cast json to string
-        let raw = raw.replace('\\', "");
-
-        // -- SELECT metadata->>'type' FROM fang_tasks ; this works because jsonb casting
-        let metadata: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        let metadata: serde_json::Value = row.get("metadata");
 
         // Be careful with this if we update sqlx, https://github.com/launchbadge/sqlx/issues/2416
         let error_message: Option<String> = row.get("error_message");
@@ -88,13 +84,13 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
 
         let scheduled_at = params.scheduled_at.unwrap();
 
-        let metadata_str = params.metadata.unwrap().to_string();
+        let metadata = params.metadata.unwrap();
         let task_type = params.task_type.unwrap();
 
         let affected_rows = Into::<MySqlQueryResult>::into(
             sqlx::query(query)
                 .bind(uuid)
-                .bind(metadata_str)
+                .bind(metadata)
                 .bind(task_type)
                 .bind(scheduled_at)
                 .execute(pool)
@@ -181,7 +177,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
         let affected_rows = Into::<MySqlQueryResult>::into(
             sqlx::query(query)
                 .bind(uuid)
-                .bind(metadata_str)
+                .bind(metadata)
                 .bind(task_type)
                 .bind(uniq_hash)
                 .bind(scheduled_at)

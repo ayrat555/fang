@@ -11,8 +11,8 @@
 
 CREATE TABLE fang_tasks (
     id BINARY(16) PRIMARY KEY,
-    metadata VARCHAR(2048) NOT NULL,
-    error_message VARCHAR(2048),
+    metadata JSON NOT NULL,
+    error_message TEXT,
     state ENUM('new', 'in_progress', 'failed', 'finished', 'retried') NOT NULL DEFAULT 'new',
     task_type VARCHAR(255) NOT NULL DEFAULT 'common', -- TEXT type can not have default value, stupid MySQL policy
     uniq_hash VARCHAR(64),

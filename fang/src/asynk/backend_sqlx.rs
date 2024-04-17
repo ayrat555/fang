@@ -160,6 +160,7 @@ where
     for<'r> i32: Encode<'r, DB> + Type<DB>,
     for<'r> DateTime<Utc>: Encode<'r, DB> + Type<DB>,
     for<'r> &'r Uuid: Encode<'r, DB> + Type<DB>,
+    for<'r> &'r serde_json::Value: Encode<'r, DB> + Type<DB>,
     for<'r> &'r Pool<DB>: Executor<'r, Database = DB>,
     for<'r> <DB as HasArguments<'r>>::Arguments: IntoArguments<'r, DB>,
     <DB as Database>::QueryResult: Into<AnyQueryResult>,
@@ -258,7 +259,7 @@ where
 
         let task: Task = sqlx::query_as(query)
             .bind(&uuid)
-            .bind(metadata_str)
+            .bind(metadata)
             .bind(task_type)
             .bind(uniq_hash)
             .bind(scheduled_at)
@@ -276,12 +277,12 @@ where
 
         let scheduled_at = params.scheduled_at.unwrap();
 
-        let metadata_str = params.metadata.unwrap().to_string();
+        let metadata = params.metadata.unwrap();
         let task_type = params.task_type.unwrap();
 
         let task: Task = sqlx::query_as(query)
             .bind(&uuid)
-            .bind(metadata_str)
+            .bind(metadata)
             .bind(task_type)
             .bind(scheduled_at)
             .fetch_one(pool)

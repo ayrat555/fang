@@ -44,11 +44,8 @@ impl<'a> FromRow<'a, PgRow> for Task {
     fn from_row(row: &'a PgRow) -> Result<Self, sqlx::Error> {
         let id: Uuid = row.get("id");
 
-        let raw: &str = row.get("metadata"); // will work if database cast json to string
-        let raw = raw.replace('\\', "");
-
-        // -- SELECT metadata->>'type' FROM fang_tasks ; this works because jsonb casting
-        let metadata: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        // -- SELECT metadata->>'type' FROM fang_tasks ;
+        let metadata: serde_json::Value = row.get("metadata");
 
         // Be careful with this if we update sqlx, https://github.com/launchbadge/sqlx/issues/2416
         let error_message: Option<String> = row.get("error_message");
