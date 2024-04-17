@@ -350,41 +350,6 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
 
         Ok(task)
     }
-
-    async fn fetch_task_type(
-        query: &str,
-        pool: &Pool<MySql>,
-        params: QueryParams<'_>,
-    ) -> Result<Task, AsyncQueueError> {
-        // Unwraps by QueryParams are safe because the responsibility is of the caller
-        // and the caller is the library itself
-        let task_type = params.task_type.unwrap();
-
-        let now = Utc::now();
-
-        let task: Task = sqlx::query_as(query)
-            .bind(task_type)
-            .bind(now)
-            .fetch_one(pool)
-            .await?;
-
-        Ok(task)
-    }
-
-    async fn remove_all_scheduled_tasks(
-        query: &str,
-        pool: &Pool<MySql>,
-    ) -> Result<u64, AsyncQueueError> {
-        let now = Utc::now();
-
-        // This converts <DB>QueryResult to AnyQueryResult and then to u64
-        // do not delete into() method and do not delete Into<AnyQueryResult> trait bound
-
-        Ok(
-            Into::<MySqlQueryResult>::into(sqlx::query(query).bind(now).execute(pool).await?)
-                .rows_affected(),
-        )
-    }
 }
 
 impl BackendSqlXMySQL {

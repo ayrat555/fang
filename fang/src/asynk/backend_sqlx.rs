@@ -158,7 +158,7 @@ where
     for<'r> std::string::String: Encode<'r, DB> + Type<DB>,
     for<'r> &'r str: Encode<'r, DB> + Type<DB>,
     for<'r> i32: Encode<'r, DB> + Type<DB>,
-    for<'r> i64: Encode<'r, DB> + Type<DB>,
+    for<'r> DateTime<Utc>: Encode<'r, DB> + Type<DB>,
     for<'r> &'r Uuid: Encode<'r, DB> + Type<DB>,
     for<'r> &'r Pool<DB>: Executor<'r, Database = DB>,
     for<'r> <DB as HasArguments<'r>>::Arguments: IntoArguments<'r, DB>,
@@ -173,7 +173,7 @@ where
         // and the caller is the library itself
         let task_type = params.task_type.unwrap();
 
-        let now = Utc::now().timestamp();
+        let now = Utc::now();
 
         let task: Task = sqlx::query_as(query)
             .bind(task_type)
@@ -218,13 +218,9 @@ where
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
         let now = Utc::now();
-        let now_i64 = now.timestamp();
 
         let scheduled_at = now + Duration::seconds(params.backoff_seconds.unwrap() as i64);
 
-        // shadowing in order to not change a lot depending on types
-        let scheduled_at = scheduled_at.timestamp();
-        let now = now_i64;
         let task = params.task.unwrap();
         let retries = task.retries + 1;
 
@@ -254,7 +250,7 @@ where
         let metadata = params.metadata.unwrap();
 
         let metadata_str = metadata.to_string();
-        let scheduled_at = params.scheduled_at.unwrap().timestamp();
+        let scheduled_at = params.scheduled_at.unwrap();
 
         let task_type = params.task_type.unwrap();
 
@@ -278,7 +274,7 @@ where
     ) -> Result<Task, AsyncQueueError> {
         let uuid = Uuid::new_v4();
 
-        let scheduled_at_i64 = params.scheduled_at.unwrap().timestamp();
+        let scheduled_at = params.scheduled_at.unwrap();
 
         let metadata_str = params.metadata.unwrap().to_string();
         let task_type = params.task_type.unwrap();
@@ -287,7 +283,7 @@ where
             .bind(&uuid)
             .bind(metadata_str)
             .bind(task_type)
-            .bind(scheduled_at_i64)
+            .bind(scheduled_at)
             .fetch_one(pool)
             .await?;
 
@@ -299,7 +295,7 @@ where
         pool: &Pool<DB>,
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
-        let updated_at = Utc::now().timestamp();
+        let updated_at = Utc::now();
 
         let state_str: &str = params.state.unwrap().into();
 
@@ -320,7 +316,7 @@ where
         pool: &Pool<DB>,
         params: QueryParams<'_>,
     ) -> Result<Task, AsyncQueueError> {
-        let updated_at = Utc::now().timestamp();
+        let updated_at = Utc::now();
 
         let uuid = params.task.unwrap().id;
 
@@ -351,7 +347,7 @@ where
         query: &str,
         pool: &Pool<DB>,
     ) -> Result<u64, AsyncQueueError> {
-        let now = Utc::now().timestamp();
+        let now = Utc::now();
 
         // This converts <DB>QueryResult to AnyQueryResult and then to u64
         // do not delete into() method and do not delete Into<AnyQueryResult> trait bound
