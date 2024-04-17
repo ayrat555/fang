@@ -93,7 +93,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
 
         let affected_rows = Into::<MySqlQueryResult>::into(
             sqlx::query(query)
-                .bind(&uuid)
+                .bind(uuid)
                 .bind(metadata_str)
                 .bind(task_type)
                 .bind(scheduled_at)
@@ -136,7 +136,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
             sqlx::query(query)
                 .bind(state_str)
                 .bind(updated_at)
-                .bind(&uuid)
+                .bind(uuid)
                 .execute(pool)
                 .await?,
         )
@@ -180,7 +180,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
 
         let affected_rows = Into::<MySqlQueryResult>::into(
             sqlx::query(query)
-                .bind(&uuid)
+                .bind(uuid)
                 .bind(metadata_str)
                 .bind(task_type)
                 .bind(uniq_hash)
@@ -225,7 +225,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
                 .bind(<&str>::from(FangTaskState::Failed))
                 .bind(error_message)
                 .bind(updated_at)
-                .bind(&id)
+                .bind(id)
                 .execute(pool)
                 .await?,
         )
@@ -271,7 +271,7 @@ impl FangQueryable<MySql> for BackendSqlXMySQL {
                 .bind(retries)
                 .bind(scheduled_at)
                 .bind(now)
-                .bind(&uuid)
+                .bind(uuid)
                 .execute(pool)
                 .await?,
         )
