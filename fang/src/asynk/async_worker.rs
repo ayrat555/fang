@@ -29,7 +29,7 @@ impl<AQueue> AsyncWorker<AQueue>
 where
     AQueue: AsyncQueueable + Clone + Sync + 'static,
 {
-    async fn run(&mut self, task: &Task, runnable: &dyn AsyncRunnable) -> Result<(), FangError> {
+    async fn run(&self, task: &Task, runnable: &dyn AsyncRunnable) -> Result<(), FangError> {
         let result = runnable.run(&self.queue).await;
 
         match result {
@@ -52,7 +52,7 @@ where
     }
 
     async fn finalize_task(
-        &mut self,
+        &self,
         task: &Task,
         result: &Result<(), FangError>,
     ) -> Result<(), FangError> {
@@ -143,11 +143,7 @@ pub struct AsyncWorkerTest<'a> {
 
 #[cfg(test)]
 impl<'a> AsyncWorkerTest<'a> {
-    pub async fn run(
-        &mut self,
-        task: &Task,
-        runnable: &dyn AsyncRunnable,
-    ) -> Result<(), FangError> {
+    pub async fn run(&self, task: &Task, runnable: &dyn AsyncRunnable) -> Result<(), FangError> {
         let result = runnable.run(self.queue).await;
 
         match result {
@@ -170,7 +166,7 @@ impl<'a> AsyncWorkerTest<'a> {
     }
 
     async fn finalize_task(
-        &mut self,
+        &self,
         task: &Task,
         result: &Result<(), FangError>,
     ) -> Result<(), FangError> {
@@ -393,7 +389,7 @@ mod async_worker_tests {
         let task = insert_task(&mut test, &actual_task).await;
         let id = task.id;
 
-        let mut worker = AsyncWorkerTest::builder()
+        let worker = AsyncWorkerTest::builder()
             .queue(&mut test as &mut dyn AsyncQueueable)
             .retention_mode(RetentionMode::KeepAll)
             .build();
@@ -484,7 +480,7 @@ mod async_worker_tests {
         let task = insert_task(&mut test, &failed_task).await;
         let id = task.id;
 
-        let mut worker = AsyncWorkerTest::builder()
+        let worker = AsyncWorkerTest::builder()
             .queue(&mut test as &mut dyn AsyncQueueable)
             .retention_mode(RetentionMode::KeepAll)
             .build();
