@@ -30,7 +30,7 @@ where
     AQueue: AsyncQueueable + Clone + Sync + 'static,
 {
     async fn run(&mut self, task: &Task, runnable: &dyn AsyncRunnable) -> Result<(), FangError> {
-        let result = runnable.run(&mut self.queue).await;
+        let result = runnable.run(&self.queue).await;
 
         match result {
             Ok(_) => self.finalize_task(task, &result).await?,
@@ -272,7 +272,7 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for WorkerAsyncTask {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+        async fn run(&self, _queueable: &dyn AsyncQueueable) -> Result<(), FangError> {
             Ok(())
         }
     }
@@ -285,7 +285,7 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for WorkerAsyncTaskSchedule {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+        async fn run(&self, _queueable: &dyn AsyncQueueable) -> Result<(), FangError> {
             Ok(())
         }
         fn cron(&self) -> Option<Scheduled> {
@@ -299,7 +299,7 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for WorkerAsyncTaskScheduled {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+        async fn run(&self, _queueable: &dyn AsyncQueueable) -> Result<(), FangError> {
             log::info!("WorkerAsyncTaskScheduled has been run");
             tokio::time::sleep(std::time::Duration::from_millis(2050)).await;
             Ok(())
@@ -322,7 +322,7 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for AsyncFailedTask {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+        async fn run(&self, _queueable: &dyn AsyncQueueable) -> Result<(), FangError> {
             let message = format!("number {} is wrong :(", self.number);
 
             Err(FangError {
@@ -341,7 +341,7 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for AsyncRetryTask {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+        async fn run(&self, _queueable: &dyn AsyncQueueable) -> Result<(), FangError> {
             let message = "Failed".to_string();
 
             Err(FangError {
@@ -360,7 +360,7 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for AsyncTaskType1 {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+        async fn run(&self, _queueable: &dyn AsyncQueueable) -> Result<(), FangError> {
             Ok(())
         }
 
@@ -375,7 +375,7 @@ mod async_worker_tests {
     #[typetag::serde]
     #[async_trait]
     impl AsyncRunnable for AsyncTaskType2 {
-        async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+        async fn run(&self, _queueable: &dyn AsyncQueueable) -> Result<(), FangError> {
             Ok(())
         }
 

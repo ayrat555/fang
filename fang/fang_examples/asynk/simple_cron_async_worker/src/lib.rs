@@ -13,7 +13,7 @@ pub struct MyCronTask {}
 #[async_trait]
 #[typetag::serde]
 impl AsyncRunnable for MyCronTask {
-    async fn run(&self, _queue: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+    async fn run(&self, _queue: &dyn AsyncQueueable) -> Result<(), FangError> {
         log::info!("CRON!!!!!!!!!!!!!!!",);
 
         Ok(())

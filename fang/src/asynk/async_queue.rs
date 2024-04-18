@@ -79,61 +79,57 @@ impl From<cron::error::Error> for AsyncQueueError {
 /// This is implemented by the `AsyncQueue` struct which uses internally a `AnyPool` of `sqlx` to connect to the database.
 
 #[async_trait]
-pub trait AsyncQueueable: Send {
+pub trait AsyncQueueable: Send + Sync {
     /// This method should retrieve one task of the `task_type` type. If `task_type` is `None` it will try to
     /// fetch a task of the type `common`. After fetching it should update the state of the task to
     /// `FangTaskState::InProgress`.
     ///
     async fn fetch_and_touch_task(
-        &mut self,
+        &self,
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError>;
 
     /// Enqueue a task to the queue, The task will be executed as soon as possible by the worker of the same type
     /// created by an AsyncWorkerPool.
-    async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
+    async fn insert_task(&self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
 
     /// The method will remove all tasks from the queue
-    async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError>;
+    async fn remove_all_tasks(&self) -> Result<u64, AsyncQueueError>;
 
     /// Remove all tasks that are scheduled in the future.
-    async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError>;
+    async fn remove_all_scheduled_tasks(&self) -> Result<u64, AsyncQueueError>;
 
     /// Remove a task by its id.
-    async fn remove_task(&mut self, id: &Uuid) -> Result<u64, AsyncQueueError>;
+    async fn remove_task(&self, id: &Uuid) -> Result<u64, AsyncQueueError>;
 
     /// Remove a task by its metadata (struct fields values)
     async fn remove_task_by_metadata(
-        &mut self,
+        &self,
         task: &dyn AsyncRunnable,
     ) -> Result<u64, AsyncQueueError>;
 
     /// Removes all tasks that have the specified `task_type`.
-    async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError>;
+    async fn remove_tasks_type(&self, task_type: &str) -> Result<u64, AsyncQueueError>;
 
     /// Retrieve a task from storage by its `id`.
-    async fn find_task_by_id(&mut self, id: &Uuid) -> Result<Task, AsyncQueueError>;
+    async fn find_task_by_id(&self, id: &Uuid) -> Result<Task, AsyncQueueError>;
 
     /// Update the state field of the specified task
     /// See the `FangTaskState` enum for possible states.
     async fn update_task_state(
-        &mut self,
+        &self,
         task: &Task,
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError>;
 
     /// Update the state of a task to `FangTaskState::Failed` and set an error_message.
-    async fn fail_task(
-        &mut self,
-        task: &Task,
-        error_message: &str,
-    ) -> Result<Task, AsyncQueueError>;
+    async fn fail_task(&self, task: &Task, error_message: &str) -> Result<Task, AsyncQueueError>;
 
     /// Schedule a task.
-    async fn schedule_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
+    async fn schedule_task(&self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError>;
 
     async fn schedule_retry(
-        &mut self,
+        &self,
         task: &Task,
         backoff_seconds: u32,
         error: &str,
@@ -424,7 +420,7 @@ impl AsyncQueue {
 
 #[async_trait]
 impl AsyncQueueable for AsyncQueue {
-    async fn find_task_by_id(&mut self, id: &Uuid) -> Result<Task, AsyncQueueError> {
+    async fn find_task_by_id(&self, id: &Uuid) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
         let pool = &self.pool;
 
@@ -441,7 +437,7 @@ impl AsyncQueueable for AsyncQueue {
     }
 
     async fn fetch_and_touch_task(
-        &mut self,
+        &self,
         task_type: Option<String>,
     ) -> Result<Option<Task>, AsyncQueueError> {
         self.check_if_connection()?;
@@ -455,7 +451,7 @@ impl AsyncQueueable for AsyncQueue {
         Ok(task)
     }
 
-    async fn insert_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
+    async fn insert_task(&self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
         // this unwrap is safe because we check if connection is established
         let pool = &self.pool;
@@ -480,7 +476,7 @@ impl AsyncQueueable for AsyncQueue {
         Ok(task)
     }
 
-    async fn schedule_task(&mut self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
+    async fn schedule_task(&self, task: &dyn AsyncRunnable) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
         // this unwrap is safe because we check if connection is established
         let pool = &self.pool;
@@ -491,7 +487,7 @@ impl AsyncQueueable for AsyncQueue {
         Ok(task)
     }
 
-    async fn remove_all_tasks(&mut self) -> Result<u64, AsyncQueueError> {
+    async fn remove_all_tasks(&self) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
         // this unwrap is safe because we check if connection is established
         let pool = &self.pool;
@@ -507,7 +503,7 @@ impl AsyncQueueable for AsyncQueue {
         Ok(result)
     }
 
-    async fn remove_all_scheduled_tasks(&mut self) -> Result<u64, AsyncQueueError> {
+    async fn remove_all_scheduled_tasks(&self) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
         // this unwrap is safe because we check if connection is established
         let pool = &self.pool;
@@ -524,7 +520,7 @@ impl AsyncQueueable for AsyncQueue {
         Ok(result)
     }
 
-    async fn remove_task(&mut self, id: &Uuid) -> Result<u64, AsyncQueueError> {
+    async fn remove_task(&self, id: &Uuid) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
         let pool = &self.pool;
         let backend = pool.backend()?;
@@ -540,7 +536,7 @@ impl AsyncQueueable for AsyncQueue {
     }
 
     async fn remove_task_by_metadata(
-        &mut self,
+        &self,
         task: &dyn AsyncRunnable,
     ) -> Result<u64, AsyncQueueError> {
         if task.uniq() {
@@ -561,7 +557,7 @@ impl AsyncQueueable for AsyncQueue {
         }
     }
 
-    async fn remove_tasks_type(&mut self, task_type: &str) -> Result<u64, AsyncQueueError> {
+    async fn remove_tasks_type(&self, task_type: &str) -> Result<u64, AsyncQueueError> {
         self.check_if_connection()?;
         let pool = &self.pool;
         let backend = pool.backend()?;
@@ -577,7 +573,7 @@ impl AsyncQueueable for AsyncQueue {
     }
 
     async fn update_task_state(
-        &mut self,
+        &self,
         task: &Task,
         state: FangTaskState,
     ) -> Result<Task, AsyncQueueError> {
@@ -595,11 +591,7 @@ impl AsyncQueueable for AsyncQueue {
         Ok(task)
     }
 
-    async fn fail_task(
-        &mut self,
-        task: &Task,
-        error_message: &str,
-    ) -> Result<Task, AsyncQueueError> {
+    async fn fail_task(&self, task: &Task, error_message: &str) -> Result<Task, AsyncQueueError> {
         self.check_if_connection()?;
         let pool = &self.pool;
         let backend = pool.backend()?;
@@ -618,7 +610,7 @@ impl AsyncQueueable for AsyncQueue {
     }
 
     async fn schedule_retry(
-        &mut self,
+        &self,
         task: &Task,
         backoff_seconds: u32,
         error: &str,
