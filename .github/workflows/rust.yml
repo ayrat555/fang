@@ -3,17 +3,116 @@ name: Test and Build Rust
 on:
   push:
   pull_request:
+    types: [opened, reopened]
   schedule:
     # Check if it works with current dependencies (weekly on Wednesday 2:32 UTC)
     - cron: '32 2 * * 3'
 
-env :
-  DATABASE_URL : postgres://postgres:postgres@localhost/fang
 
 jobs:
-  test:
-    name: Test
+  clippy:
+    name: Clippy
     runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+
+    steps:
+      - uses: actions/checkout@v4
+
+
+      - name: Setup Rust
+        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+
+
+      - name: Run clippy
+        run: cargo clippy --verbose --all-targets --all-features -- -D warnings
+
+  test_postgres_blocking:
+    name: Test blocking
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres
+        # Provide the password for postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        # Set health checks to wait until postgres has started
+
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+
+      - name: Install diesel-cli
+        run: cargo install diesel_cli --no-default-features --features postgres
+
+      - name: Setup Postgres db
+        working-directory: ./fang/postgres_migrations
+        run: diesel setup --database-url "postgres://postgres:postgres@localhost/fang"
+
+      - name: Run blocking tests
+        run: cargo test "blocking::queue::postgres" --verbose --features blocking --color always -- --nocapture
+
+      - name: Run blocking dirty tests
+        run: cargo test "blocking::worker" --verbose --features blocking -- --ignored
+
+  test_fang_derive_error:
+    name: Test fang_derive_error
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+
+      - name: Run fang derive error tests
+        run: cargo test "fang_derive_error" --verbose --color always -- --nocapture
+
+  test_postgres:
+    name: Test postgres
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost/fang
+      CARGO_TERM_COLOR: always
+
+    strategy:
+      matrix:
+        toolchain:
+          - stable
 
     services:
       # Label used to access the service container
@@ -36,66 +135,119 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          components: clippy
-          override: true
-          profile: minimal
-          toolchain: stable
-
-      - name: Run clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --verbose --all-targets --all-features -- -D warnings
+        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
 
       - name: Install diesel-cli
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: diesel_cli --no-default-features --features "postgres"
+        run: cargo install diesel_cli --no-default-features --features postgres
 
       - name: Setup Postgres db
         working-directory: ./fang/postgres_migrations
-        run: diesel setup
-
-      - name: Change working dir
-        working-directory: ./../..
-        run: pwd
+        run: diesel setup --database-url "postgres://postgres:postgres@localhost/fang"
 
       - name: Run tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --verbose --all-features
+        run: cargo test "asynk::async_queue::postgres" --verbose --features asynk-postgres --color always -- --nocapture
 
-      - name: Run dirty tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --verbose --all-features -- --ignored
+      - name: Run worker tests
+        run: cargo test "asynk::async_worker::async_worker_tests" --verbose --features asynk-postgres --color always -- --nocapture
+
+  test_sqlite:
+    name: Test sqlite
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+
+      - name: Install sqlite3
+        run: |
+          sudo apt install -y sqlite3
+          sqlite3 fang.db "VACUUM;"
+          mkdir tests_sqlite
+
+      - name: Install diesel-cli
+        run: cargo install diesel_cli --no-default-features --features sqlite
+
+      - name: Setup Sqlite db
+        working-directory: ./fang/sqlite_migrations
+        run: diesel setup --database-url "sqlite3://../../../fang.db"
+
+      - name: Run tests
+        run: cargo test "asynk::async_queue::sqlite" --verbose --features asynk-sqlite -- --nocapture
 
   release:
     name: Release x86_64-unknown-linux-gnu
     runs-on: ubuntu-latest
-    needs: test
+    env:
+      CARGO_TERM_COLOR: always
+
+    strategy:
+      matrix:
+        toolchain:
+          - stable
 
     steps:
-      - uses: actions/checkout@v3
-
+      - uses: actions/checkout@v4
       - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          override: true
-          profile: minimal
-          target: x86_64-unknown-linux-gnu
-          toolchain: stable
+        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
 
       - name: Build release
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --verbose --all-features --target x86_64-unknown-linux-gnu
+        run: cargo build --release --verbose --all-features --target x86_64-unknown-linux-gnu
+
+  test_mysql:
+    name: Test mysql
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: mysql://root:mysql@localhost/fang
+      CARGO_TERM_COLOR: always
+
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+
+    services:
+      # Label used to access the service container
+      mysql:
+        # Docker Hub image
+        image: mysql:8.1
+        # Provide the password for postgres
+        env:
+          MYSQL_ROOT_PASSWORD: mysql
+          MYSQL_DATABASE: fang
+        # here we should check if mysql is ready, but this does not work
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -u root -pmysql"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+        ports:
+          - 3306:3306
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+
+      - name: Install diesel-cli
+        run: cargo install diesel_cli --no-default-features --features mysql
+
+      - name: Setup MySQL db
+        working-directory: ./fang/mysql_migrations
+        run: diesel setup --database-url "mysql://root:mysql@127.0.0.1/fang"
+
+      - name: Run tests
+        run: cargo test "asynk::async_queue::mysql" --verbose --features asynk-mysql --color always -- --nocapture

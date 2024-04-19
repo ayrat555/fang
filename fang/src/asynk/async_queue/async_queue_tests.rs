@@ -15,7 +15,7 @@ pub(crate) struct AsyncTask {
 #[typetag::serde]
 #[async_trait]
 impl AsyncRunnable for AsyncTask {
-    async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+    async fn run(&self, _queueable: &dyn AsyncQueueable) -> Result<(), FangError> {
         Ok(())
     }
 }
@@ -28,7 +28,7 @@ pub(crate) struct AsyncUniqTask {
 #[typetag::serde]
 #[async_trait]
 impl AsyncRunnable for AsyncUniqTask {
-    async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+    async fn run(&self, _queueable: &dyn AsyncQueueable) -> Result<(), FangError> {
         Ok(())
     }
 
@@ -46,7 +46,7 @@ pub(crate) struct AsyncTaskSchedule {
 #[typetag::serde]
 #[async_trait]
 impl AsyncRunnable for AsyncTaskSchedule {
-    async fn run(&self, _queueable: &mut dyn AsyncQueueable) -> Result<(), FangError> {
+    async fn run(&self, _queueable: &dyn AsyncQueueable) -> Result<(), FangError> {
         Ok(())
     }
 
@@ -77,7 +77,7 @@ macro_rules! test_asynk_queue {
 
             #[tokio::test]
             async fn insert_task_creates_new_task() {
-                let mut test: $q = $e.await;
+                let test: $q = $e.await;
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
@@ -91,7 +91,7 @@ macro_rules! test_asynk_queue {
 
             #[tokio::test]
             async fn update_task_state_test() {
-                let mut test: $q = $e.await;
+                let test: $q = $e.await;
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
@@ -113,8 +113,8 @@ macro_rules! test_asynk_queue {
             }
 
             #[tokio::test]
-            async fn failed_task_query_test() {
-                let mut test: $q = $e.await;
+            async fn failed_task_test() {
+                let test: $q = $e.await;
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
@@ -135,7 +135,7 @@ macro_rules! test_asynk_queue {
 
             #[tokio::test]
             async fn remove_all_tasks_test() {
-                let mut test: $q = $e.await;
+                let test: $q = $e.await;
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
@@ -161,7 +161,7 @@ macro_rules! test_asynk_queue {
 
             #[tokio::test]
             async fn schedule_task_test() {
-                let mut test: $q = $e.await;
+                let test: $q = $e.await;
 
                 let datetime = (Utc::now() + Duration::seconds(7)).round_subsecs(0);
 
@@ -183,7 +183,7 @@ macro_rules! test_asynk_queue {
 
             #[tokio::test]
             async fn remove_all_scheduled_tasks_test() {
-                let mut test: $q = $e.await;
+                let test: $q = $e.await;
 
                 let datetime = (Utc::now() + Duration::seconds(7)).round_subsecs(0);
 
@@ -207,7 +207,7 @@ macro_rules! test_asynk_queue {
 
             #[tokio::test]
             async fn fetch_and_touch_test() {
-                let mut test: $q = $e.await;
+                let test: $q = $e.await;
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
@@ -247,7 +247,7 @@ macro_rules! test_asynk_queue {
 
             #[tokio::test]
             async fn remove_tasks_type_test() {
-                let mut test: $q = $e.await;
+                let test: $q = $e.await;
 
                 let task = test.insert_task(&AsyncTask { number: 1 }).await.unwrap();
 
@@ -261,6 +261,7 @@ macro_rules! test_asynk_queue {
                 let task = test.insert_task(&AsyncTask { number: 2 }).await.unwrap();
 
                 let metadata = task.metadata.as_object().unwrap();
+
                 let number = metadata["number"].as_u64();
                 let type_task = metadata["type"].as_str();
 
@@ -268,6 +269,7 @@ macro_rules! test_asynk_queue {
                 assert_eq!(Some("AsyncTask"), type_task);
 
                 let result = test.remove_tasks_type("mytype").await.unwrap();
+
                 assert_eq!(0, result);
 
                 let result = test.remove_tasks_type("common").await.unwrap();
@@ -276,7 +278,8 @@ macro_rules! test_asynk_queue {
 
             #[tokio::test]
             async fn remove_tasks_by_metadata() {
-                let mut test: $q = $e.await;
+                //console_subscriber::init();
+                let test: $q = $e.await;
 
                 let task = test
                     .insert_task(&AsyncUniqTask { number: 1 })

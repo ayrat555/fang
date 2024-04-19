@@ -15,9 +15,8 @@ diesel::table! {
         metadata -> Jsonb,
         error_message -> Nullable<Text>,
         state -> FangTaskState,
-        task_type -> Varchar,
-        #[max_length = 64]
-        uniq_hash -> Nullable<Bpchar>,
+        task_type -> Text,
+        uniq_hash -> Nullable<Text>,
         retries -> Int4,
         scheduled_at -> Timestamptz,
         created_at -> Timestamptz,

@@ -47,6 +47,7 @@ db_mysql:
 db_sqlite:
 	@echo -e $(BOLD)Setting up SQLite database...$(END_BOLD)
 	sqlite3 "$(SQLITE_FILE)" "VACUUM;"
+	mkdir -p "$(SQLITE_TESTS_DIR)"
 	$(MAKE) diesel_sqlite
 
 ensure_diesel:

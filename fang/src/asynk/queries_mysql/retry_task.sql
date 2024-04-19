@@ -1,0 +1,1 @@
+UPDATE fang_tasks SET state = 'retried' , error_message = ?, retries = ?, scheduled_at = ?, updated_at = ? WHERE id = ?;

@@ -7,7 +7,7 @@ pub enum MyAwesomeError {
     MyVariantErrorTwo(u32),
 }
 #[cfg(test)]
-mod tests {
+mod fang_derive_error_tests {
     use crate::MyAwesomeError;
     use fang::FangError;
 

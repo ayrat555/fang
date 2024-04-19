@@ -269,8 +269,8 @@ macro_rules! test_queue {
                 let result = queue.remove_all_tasks().unwrap();
 
                 assert_eq!(2, result);
-                assert_eq!(None, queue.find_task_by_id(task1.id));
-                assert_eq!(None, queue.find_task_by_id(task2.id));
+                assert_eq!(None, queue.find_task_by_id(&task1.id));
+                assert_eq!(None, queue.find_task_by_id(&task2.id));
             }
 
             #[test]
@@ -283,13 +283,13 @@ macro_rules! test_queue {
                 let task1 = queue.insert_task(&task1).unwrap();
                 let task2 = queue.insert_task(&task2).unwrap();
 
-                assert!(queue.find_task_by_id(task1.id).is_some());
-                assert!(queue.find_task_by_id(task2.id).is_some());
+                assert!(queue.find_task_by_id(&task1.id).is_some());
+                assert!(queue.find_task_by_id(&task2.id).is_some());
 
-                queue.remove_task(task1.id).unwrap();
+                queue.remove_task(&task1.id).unwrap();
 
-                assert!(queue.find_task_by_id(task1.id).is_none());
-                assert!(queue.find_task_by_id(task2.id).is_some());
+                assert!(queue.find_task_by_id(&task1.id).is_none());
+                assert!(queue.find_task_by_id(&task2.id).is_some());
             }
 
             #[test]
@@ -302,13 +302,13 @@ macro_rules! test_queue {
                 let task1 = queue.insert_task(&task1).unwrap();
                 let task2 = queue.insert_task(&task2).unwrap();
 
-                assert!(queue.find_task_by_id(task1.id).is_some());
-                assert!(queue.find_task_by_id(task2.id).is_some());
+                assert!(queue.find_task_by_id(&task1.id).is_some());
+                assert!(queue.find_task_by_id(&task2.id).is_some());
 
                 queue.remove_tasks_of_type("weirdo").unwrap();
 
-                assert!(queue.find_task_by_id(task1.id).is_some());
-                assert!(queue.find_task_by_id(task2.id).is_none());
+                assert!(queue.find_task_by_id(&task1.id).is_some());
+                assert!(queue.find_task_by_id(&task2.id).is_none());
             }
 
             #[test]
@@ -323,15 +323,15 @@ macro_rules! test_queue {
                 let task2 = queue.insert_task(&m_task2).unwrap();
                 let task3 = queue.insert_task(&m_task3).unwrap();
 
-                assert!(queue.find_task_by_id(task1.id).is_some());
-                assert!(queue.find_task_by_id(task2.id).is_some());
-                assert!(queue.find_task_by_id(task3.id).is_some());
+                assert!(queue.find_task_by_id(&task1.id).is_some());
+                assert!(queue.find_task_by_id(&task2.id).is_some());
+                assert!(queue.find_task_by_id(&task3.id).is_some());
 
                 queue.remove_task_by_metadata(&m_task1).unwrap();
 
-                assert!(queue.find_task_by_id(task1.id).is_none());
-                assert!(queue.find_task_by_id(task2.id).is_some());
-                assert!(queue.find_task_by_id(task3.id).is_some());
+                assert!(queue.find_task_by_id(&task1.id).is_none());
+                assert!(queue.find_task_by_id(&task2.id).is_some());
+                assert!(queue.find_task_by_id(&task3.id).is_some());
             }
         }
     };

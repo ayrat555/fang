@@ -3,24 +3,23 @@ name: Rust Code Formatting
 on:
   push:
   pull_request:
+    types: [opened, reopened]
 
 jobs:
   rustfmt:
     name: Rustfmt
     runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+    strategy:
+      matrix:
+        toolchain:
+          - stable
     steps:
       - uses: actions/checkout@v3
 
       - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          profile: minimal
-          components: rustfmt
+        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
 
       - name: Check format
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: -- --check --verbose
+        run: cargo fmt -- --check --verbose

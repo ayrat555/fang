@@ -11,8 +11,8 @@ diesel::table! {
     use super::sql_types::FangTasksStateEnum;
 
     fang_tasks (id) {
-        #[max_length = 36]
-        id -> Varchar,
+        #[max_length = 16]
+        id -> Binary,
         metadata -> Json,
         error_message -> Nullable<Text>,
         #[max_length = 11]
@@ -20,10 +20,10 @@ diesel::table! {
         #[max_length = 255]
         task_type -> Varchar,
         #[max_length = 64]
-        uniq_hash -> Nullable<Char>,
+        uniq_hash -> Nullable<Varchar>,
         retries -> Integer,
-        scheduled_at -> Timestamp,
-        created_at -> Timestamp,
-        updated_at -> Timestamp,
+        scheduled_at -> Datetime,
+        created_at -> Datetime,
+        updated_at -> Datetime,
     }
 }

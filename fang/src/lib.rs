@@ -6,11 +6,8 @@ use std::time::Duration;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
-
-#[cfg(feature = "asynk")]
-use postgres_types::{FromSql, ToSql};
-/// Represents a schedule for scheduled tasks.
 ///
+/// Represents a schedule for scheduled tasks.
 /// It's used in the [`AsyncRunnable::cron`] and [`Runnable::cron`]
 #[derive(Debug, Clone)]
 pub enum Scheduled {
@@ -104,37 +101,55 @@ pub struct FangError {
 /// Possible states of the task
 #[derive(Debug, Eq, PartialEq, Clone)]
 #[cfg_attr(feature = "blocking", derive(diesel_derive_enum::DbEnum))]
-#[cfg_attr(feature = "asynk", derive(ToSql, FromSql, Default))]
-#[cfg_attr(feature = "asynk", postgres(name = "fang_task_state"))]
 #[cfg_attr(
     feature = "blocking",
     ExistingTypePath = "crate::postgres_schema::sql_types::FangTaskState"
 )]
 pub enum FangTaskState {
     /// The task is ready to be executed
-    #[cfg_attr(feature = "asynk", postgres(name = "new"))]
-    #[cfg_attr(feature = "asynk", default)]
     New,
     /// The task is being executed.
     ///
     /// The task may stay in this state forever
     /// if an unexpected error happened
-    #[cfg_attr(feature = "asynk", postgres(name = "in_progress"))]
     InProgress,
     /// The task failed
-    #[cfg_attr(feature = "asynk", postgres(name = "failed"))]
     Failed,
     /// The task finished successfully
-    #[cfg_attr(feature = "asynk", postgres(name = "finished"))]
     Finished,
     /// The task is being retried. It means it failed but it's scheduled to be executed again
-    #[cfg_attr(feature = "asynk", postgres(name = "retried"))]
     Retried,
+}
+
+impl<S: AsRef<str>> From<S> for FangTaskState {
+    fn from(str: S) -> Self {
+        let str = str.as_ref();
+        match str {
+            "new" => FangTaskState::New,
+            "in_progress" => FangTaskState::InProgress,
+            "failed" => FangTaskState::Failed,
+            "finished" => FangTaskState::Finished,
+            "retried" => FangTaskState::Retried,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl From<FangTaskState> for &str {
+    fn from(state: FangTaskState) -> Self {
+        match state {
+            FangTaskState::New => "new",
+            FangTaskState::InProgress => "in_progress",
+            FangTaskState::Failed => "failed",
+            FangTaskState::Finished => "finished",
+            FangTaskState::Retried => "retried",
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, TypedBuilder)]
 #[cfg_attr(feature = "blocking", derive(Queryable, Identifiable))]
-#[cfg_attr(feature = "blocking",  diesel(table_name = fang_tasks))]
+#[diesel(table_name = fang_tasks)]
 pub struct Task {
     #[builder(setter(into))]
     pub id: Uuid,
@@ -197,10 +212,6 @@ pub use asynk::*;
 
 #[cfg(feature = "asynk")]
 #[doc(hidden)]
-pub use bb8_postgres::tokio_postgres::tls::NoTls;
-
-#[cfg(feature = "asynk")]
-#[doc(hidden)]
 pub use async_trait::async_trait;
 
 #[cfg(feature = "derive-error")]
@@ -212,14 +223,14 @@ use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 #[cfg(feature = "migrations")]
 use std::error::Error as SomeError;
 
-#[cfg(feature = "migrations_postgres")]
+#[cfg(feature = "migrations-postgres")]
 use diesel::pg::Pg;
 
-#[cfg(feature = "migrations_postgres")]
+#[cfg(feature = "migrations-postgres")]
 pub const MIGRATIONS_POSTGRES: EmbeddedMigrations =
     embed_migrations!("postgres_migrations/migrations");
 
-#[cfg(feature = "migrations_postgres")]
+#[cfg(feature = "migrations-postgres")]
 pub fn run_migrations_postgres(
     connection: &mut impl MigrationHarness<Pg>,
 ) -> Result<(), Box<dyn SomeError + Send + Sync + 'static>> {
@@ -228,13 +239,13 @@ pub fn run_migrations_postgres(
     Ok(())
 }
 
-#[cfg(feature = "migrations_mysql")]
+#[cfg(feature = "migrations-mysql")]
 use diesel::mysql::Mysql;
 
-#[cfg(feature = "migrations_mysql")]
+#[cfg(feature = "migrations-mysql")]
 pub const MIGRATIONS_MYSQL: EmbeddedMigrations = embed_migrations!("mysql_migrations/migrations");
 
-#[cfg(feature = "migrations_mysql")]
+#[cfg(feature = "migrations-mysql")]
 pub fn run_migrations_mysql(
     connection: &mut impl MigrationHarness<Mysql>,
 ) -> Result<(), Box<dyn SomeError + Send + Sync + 'static>> {
@@ -243,13 +254,13 @@ pub fn run_migrations_mysql(
     Ok(())
 }
 
-#[cfg(feature = "migrations_sqlite")]
+#[cfg(feature = "migrations-sqlite")]
 use diesel::sqlite::Sqlite;
 
-#[cfg(feature = "migrations_sqlite")]
+#[cfg(feature = "migrations-sqlite")]
 pub const MIGRATIONS_SQLITE: EmbeddedMigrations = embed_migrations!("sqlite_migrations/migrations");
 
-#[cfg(feature = "migrations_sqlite")]
+#[cfg(feature = "migrations-sqlite")]
 pub fn run_migrations_sqlite(
     connection: &mut impl MigrationHarness<Sqlite>,
 ) -> Result<(), Box<dyn SomeError + Send + Sync + 'static>> {

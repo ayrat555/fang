@@ -4,7 +4,7 @@
 
 # Fang
 
-Background task processing library for Rust. It uses Postgres DB as a task queue.
+Background task processing library for Rust. It can use PostgreSQL, SQLite or MySQL as an asyncronous task queue.
 
 ## Key Features
 
@@ -31,32 +31,62 @@ Here are some of the fang's key features:
 
 ```toml
 [dependencies]
-fang = { version = "0.10.4" , features = ["blocking"], default-features = false }
+fang = { version = "0.11.0-rc0" , features = ["blocking"], default-features = false }
 ```
 
 #### the Asynk feature
 
+- PostgreSQL as a queue
+
 ```toml
 [dependencies]
-fang = { version = "0.10.4" , features = ["asynk"], default-features = false }
+fang = { version = "0.11.0-rc0" , features = ["asynk-postgres"], default-features = false }
+```
+
+- SQLite as a queue
+
+```toml
+[dependencies]
+fang = { version = "0.11.0-rc0" , features = ["asynk-sqlite"], default-features = false }
+```
+
+- MySQL as a queue
+
+```toml
+[dependencies]
+fang = { version = "0.11.0-rc0" , features = ["asynk-mysql"], default-features = false }
 ```
 
 #### the Asynk feature with derive macro
 
+Substitute `database` with your desired backend.
+
 ```toml
 [dependencies]
-fang = { version = "0.10.4" , features = ["asynk", "derive-error" ], default-features = false }
+fang = { version = "0.11.0-rc0" , features = ["asynk-{database}", "derive-error" ], default-features = false }
 ```
 
 #### All features
 
 ```toml
-fang = { version = "0.10.4" }
+fang = { version = "0.11.0-rc0" }
 ```
 
-_Supports rustc 1.62+_
+_Supports rustc 1.77+_
 
-2. Create the `fang_tasks` table in the Postgres database. The migration can be found in [the migrations directory](https://github.com/ayrat555/fang/blob/master/fang/postgres_migrations/migrations/2022-08-20-151615_create_fang_tasks/up.sql).
+1. Create the `fang_tasks` table in the database. The migration of each database can be found in `fang/{database}-migrations` where `database` is `postgres`, `mysql` or `sqlite`.
+
+Migrations can be also run as code, importing the feature `migrations-{database}` being the `database` the backend queue you want to use.
+
+```toml
+[dependencies]
+fang = { version = "0.11.0-rc0" , features = ["asynk-postgres", "migrations-postgres" ], default-features = false }
+```
+
+```rust
+use fang::run_migrations_postgres;
+run_migrations_postgres(&mut connection).unwrap();
+```
 
 ## Usage
 
@@ -247,7 +277,6 @@ For Postgres backend:
 
 ```rust
 use fang::asynk::async_queue::AsyncQueue;
-use fang::NoTls;
 use fang::AsyncRunnable;
 
 // Create an AsyncQueue
@@ -261,10 +290,10 @@ let mut queue = AsyncQueue::builder()
     .build();
 
 // Always connect first in order to perform any operation
-queue.connect(NoTls).await.unwrap();
+queue.connect().await.unwrap();
 ```
 
-As an easy example, we are using NoTls type. If for some reason you would like to encrypt Postgres requests, you can use [openssl](https://docs.rs/postgres-openssl/latest/postgres_openssl/) or [native-tls](https://docs.rs/postgres-native-tls/latest/postgres_native_tls/).
+Encryption is always used with crate `rustls`. We plan to add the possibility of disabling it in the future.
 
 ```rust
 // AsyncTask from the first example
@@ -310,7 +339,7 @@ use fang::asynk::async_worker_pool::AsyncWorkerPool;
 // Need to create a queue
 // Also insert some tasks
 
-let mut pool: AsyncWorkerPool<AsyncQueue<NoTls>> = AsyncWorkerPool::builder()
+let mut pool: AsyncWorkerPool<AsyncQueue> = AsyncWorkerPool::builder()
         .number_of_workers(max_pool_size)
         .queue(queue.clone())
         // if you want to run tasks of the specific kind

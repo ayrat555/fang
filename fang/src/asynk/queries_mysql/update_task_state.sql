@@ -1,0 +1,1 @@
+UPDATE fang_tasks SET state = ? , updated_at = ? WHERE id = ?;
