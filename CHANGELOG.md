@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.11.0-rc0 (2024-04-19) - [#141]
+## 0.11.0-rc0 (2024-04-19) - [#141](https://github.com/ayrat555/fang/pull/141)
 - `AsyncQueue` Postgres backend reimplemented in sqlx
 - `AsyncQueue` Sqlite backend implemented in sqlx
 - `AsyncQueue` MySQL backend implemented in sqlx
