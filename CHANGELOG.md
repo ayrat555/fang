@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.0-rc0 (2024-04-19) - [#141]
+- `AsyncQueue` Postgres backend reimplemented in sqlx
+- `AsyncQueue` Sqlite backend implemented in sqlx
+- `AsyncQueue` MySQL backend implemented in sqlx
+- reorganize features
+- reorganize workflow to test all features
+
 ## 0.10.4 (2023-08-12) - [#125](https://github.com/ayrat555/fang/pull/125)
 
 - reorganize repo in two crates `fang` and `fang-derive-error`
