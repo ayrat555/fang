@@ -1,9 +1,16 @@
 mod error;
+
+#[cfg(feature = "blocking-mysql")]
 pub mod mysql_schema;
+
+#[cfg(feature = "blocking-sqlite")]
+pub mod sqlite_schema;
+
+#[cfg(feature = "blocking-postgres")]
 pub mod postgres_schema;
+
 pub mod queue;
 pub mod runnable;
-pub mod sqlite_schema;
 pub mod worker;
 pub mod worker_pool;
 
