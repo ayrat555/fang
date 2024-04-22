@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0-rc1 (2024-04-22)
+
+- Fix blocking features - [#151](https://github.com/ayrat555/fang/pull/151)
+
 ## 0.11.0-rc0 (2024-04-19) - [#141](https://github.com/ayrat555/fang/pull/141)
 - `AsyncQueue` Postgres backend reimplemented in sqlx
 - `AsyncQueue` Sqlite backend implemented in sqlx
