@@ -149,7 +149,7 @@ impl From<FangTaskState> for &str {
 
 #[derive(Debug, Eq, PartialEq, Clone, TypedBuilder)]
 #[cfg_attr(feature = "blocking", derive(Queryable, Identifiable))]
-#[diesel(table_name = fang_tasks)]
+#[cfg_attr(feature = "blocking", diesel(table_name = fang_tasks))]
 pub struct Task {
     #[builder(setter(into))]
     pub id: Uuid,
