@@ -351,10 +351,10 @@ pool.start().await;
 
 Check out:
 
-- [Simple Worker Example](https://github.com/ayrat555/fang/tree/master/fang_examples/blocking/simple_worker) - simple worker example
-- [Simple Cron Worker Example](https://github.com/ayrat555/fang/tree/master/fang_examples/blocking/simple_cron_worker) - simple worker example
-- [Simple Async Worker Example](https://github.com/ayrat555/fang/tree/master/fang_examples/asynk/simple_async_worker) - simple async worker example
-- [Simple Cron Async Worker Example](https://github.com/ayrat555/fang/tree/master/fang_examples/asynk/simple_cron_async_worker) - simple async worker example
+- [Simple Worker Example](https://github.com/ayrat555/fang/tree/master/fang/fang_examples/blocking/simple_worker) - simple worker example
+- [Simple Cron Worker Example](https://github.com/ayrat555/fang/tree/master/fang/fang_examples/blocking/simple_cron_worker) - simple worker example
+- [Simple Async Worker Example](https://github.com/ayrat555/fang/tree/master/fang/fang_examples/asynk/simple_async_worker) - simple async worker example
+- [Simple Cron Async Worker Example](https://github.com/ayrat555/fang/tree/master/fang/fang_examples/asynk/simple_cron_async_worker) - simple async worker example
 - [El Monitorro](https://github.com/ayrat555/el_monitorro) - telegram feed reader. It uses the Fang's blocking module to synchronize feeds and deliver updates to users.
 - [weather_bot_rust](https://github.com/pxp9/weather_bot_rust) - A bot that provides weather info. It uses the Fang's asynk module to process updates from Telegram users and schedule weather info.
 
