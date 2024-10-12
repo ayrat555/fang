@@ -1,15 +1,17 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use sha2::Digest;
 use sha2::Sha256;
-use sqlx::any::AnyQueryResult;
-use sqlx::database::HasArguments;
-use sqlx::Database;
-use sqlx::Encode;
-use sqlx::Executor;
-use sqlx::FromRow;
-use sqlx::IntoArguments;
-use sqlx::Pool;
-use sqlx::Type;
+
+#[cfg(all(
+    feature = "asynk-postgres",
+    feature = "asynk-sqlite",
+    feature = "asynk-mysql"
+))]
+use {
+    chrono::Duration, sqlx::any::AnyQueryResult, sqlx::database::HasArguments, sqlx::Database,
+    sqlx::Encode, sqlx::Executor, sqlx::FromRow, sqlx::IntoArguments, sqlx::Pool, sqlx::Type,
+};
+
 use std::fmt::Debug;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
@@ -151,6 +153,11 @@ pub(crate) fn calculate_hash(json: &str) -> String {
     hex::encode(result)
 }
 
+#[cfg(all(
+    feature = "asynk-postgres",
+    feature = "asynk-sqlite",
+    feature = "asynk-mysql"
+))]
 trait FangQueryable<DB>
 where
     DB: Database,
