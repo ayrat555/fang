@@ -1,12 +1,6 @@
 use chrono::{DateTime, Utc};
 use sha2::Digest;
 use sha2::Sha256;
-
-#[cfg(all(
-    feature = "asynk-postgres",
-    feature = "asynk-sqlite",
-    feature = "asynk-mysql"
-))]
 use {
     chrono::Duration, sqlx::any::AnyQueryResult, sqlx::database::HasArguments, sqlx::Database,
     sqlx::Encode, sqlx::Executor, sqlx::FromRow, sqlx::IntoArguments, sqlx::Pool, sqlx::Type,
@@ -42,7 +36,6 @@ pub(crate) enum BackendSqlX {
     MySql,
 }
 
-#[allow(dead_code)]
 #[derive(TypedBuilder, Clone)]
 pub(crate) struct QueryParams<'a> {
     #[builder(default, setter(strip_option))]
@@ -65,7 +58,6 @@ pub(crate) struct QueryParams<'a> {
     task: Option<&'a Task>,
 }
 
-#[allow(dead_code)]
 pub(crate) enum Res {
     Bigint(u64),
     Task(Task),
@@ -145,7 +137,6 @@ use crate::FangTaskState;
 use crate::InternalPool;
 use crate::Task;
 
-#[allow(dead_code)]
 pub(crate) fn calculate_hash(json: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(json.as_bytes());
@@ -153,11 +144,6 @@ pub(crate) fn calculate_hash(json: &str) -> String {
     hex::encode(result)
 }
 
-#[cfg(all(
-    feature = "asynk-postgres",
-    feature = "asynk-sqlite",
-    feature = "asynk-mysql"
-))]
 trait FangQueryable<DB>
 where
     DB: Database,
