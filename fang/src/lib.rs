@@ -149,7 +149,7 @@ impl From<FangTaskState> for &str {
 
 #[derive(Debug, Eq, PartialEq, Clone, TypedBuilder)]
 #[cfg_attr(feature = "blocking", derive(Queryable, Identifiable))]
-#[diesel(table_name = fang_tasks)]
+#[cfg_attr(feature = "blocking", diesel(table_name = fang_tasks))]
 pub struct Task {
     #[builder(setter(into))]
     pub id: Uuid,
@@ -204,9 +204,18 @@ pub mod blocking;
 #[cfg(feature = "blocking")]
 pub use blocking::*;
 
-#[cfg(feature = "asynk")]
+#[cfg(any(
+    feature = "asynk-postgres",
+    feature = "asynk-mysql",
+    feature = "asynk-sqlite"
+))]
 pub mod asynk;
 
+#[cfg(any(
+    feature = "asynk-postgres",
+    feature = "asynk-mysql",
+    feature = "asynk-sqlite"
+))]
 #[cfg(feature = "asynk")]
 pub use asynk::*;
 
@@ -218,10 +227,10 @@ pub use async_trait::async_trait;
 pub use fang_derive_error::ToFangError;
 
 #[cfg(feature = "migrations")]
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-
-#[cfg(feature = "migrations")]
-use std::error::Error as SomeError;
+use {
+    diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness},
+    std::error::Error as SomeError,
+};
 
 #[cfg(feature = "migrations-postgres")]
 use diesel::pg::Pg;

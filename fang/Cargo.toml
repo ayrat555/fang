@@ -26,10 +26,10 @@ blocking = ["dep:diesel", "dep:diesel-derive-enum", "dep:dotenvy", "diesel?/chro
 blocking-postgres = [ "blocking", "diesel?/postgres"]
 blocking-sqlite = ["blocking", "diesel?/sqlite" ]
 blocking-mysql = [ "blocking", "diesel?/mysql"]
-migrations-postgres = ["migrations"]
-migrations-sqlite = ["migrations"]
-migrations-mysql = ["migrations"]
-migrations = ["dep:diesel_migrations"]
+migrations-postgres = ["migrations", "diesel?/postgres"]
+migrations-sqlite = ["migrations", "diesel?/sqlite"]
+migrations-mysql = ["migrations", "diesel?/mysql"]
+migrations = ["dep:diesel_migrations", "dep:diesel"]
 
 
 [dev-dependencies]
