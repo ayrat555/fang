@@ -13,15 +13,17 @@ use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use cron::Schedule;
-use sqlx::any::AnyConnectOptions;
-use sqlx::any::AnyKind;
+use sqlx::any::install_default_drivers;
+use sqlx::any::Any;
+use sqlx::any::AnyTypeInfo;
 #[cfg(any(
     feature = "asynk-postgres",
     feature = "asynk-mysql",
     feature = "asynk-sqlite"
 ))]
 use sqlx::pool::PoolOptions;
-//use sqlx::any::install_default_drivers; // this is supported in sqlx 0.7
+use sqlx::Encode;
+use sqlx::TypeInfo;
 use std::str::FromStr;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
@@ -238,13 +240,13 @@ use std::env;
 use super::backend_sqlx::BackendSqlX;
 
 async fn get_pool(
-    kind: AnyKind,
+    kind: &str,
     _uri: &str,
     _max_connections: u32,
 ) -> Result<InternalPool, AsyncQueueError> {
     match kind {
         #[cfg(feature = "asynk-postgres")]
-        AnyKind::Postgres => {
+        "PostgreSQL" => {
             let pool = PoolOptions::<Postgres>::new()
                 .max_connections(_max_connections)
                 .connect(_uri)
@@ -252,23 +254,23 @@ async fn get_pool(
 
             Ok(InternalPool::Pg(pool))
         }
-        #[cfg(feature = "asynk-mysql")]
-        AnyKind::MySql => {
-            let pool = PoolOptions::<MySql>::new()
-                .max_connections(_max_connections)
-                .connect(_uri)
-                .await?;
-
-            Ok(InternalPool::MySql(pool))
-        }
         #[cfg(feature = "asynk-sqlite")]
-        AnyKind::Sqlite => {
+        "SQLite" => {
             let pool = PoolOptions::<Sqlite>::new()
                 .max_connections(_max_connections)
                 .connect(_uri)
                 .await?;
 
             Ok(InternalPool::Sqlite(pool))
+        }
+        #[cfg(feature = "asynk-mysql")]
+        "MySql" => {
+            let pool = PoolOptions::<MySql>::new()
+                .max_connections(_max_connections)
+                .connect(_uri)
+                .await?;
+
+            Ok(InternalPool::MySql(pool))
         }
         #[allow(unreachable_patterns)]
         _ => Err(AsyncQueueError::ConnectionError),
@@ -287,9 +289,11 @@ impl AsyncQueue {
 
     /// Connect to the db if not connected
     pub async fn connect(&mut self) -> Result<(), AsyncQueueError> {
-        //install_default_drivers();
+        install_default_drivers();
 
-        let kind: AnyKind = self.uri.parse::<AnyConnectOptions>()?.kind();
+        let any_type_info: AnyTypeInfo = sqlx::Encode::<Any>::produces(&self.uri).unwrap();
+
+        let kind: &str = any_type_info.name();
 
         let pool = get_pool(kind, &self.uri, self.max_pool_size).await?;
 
