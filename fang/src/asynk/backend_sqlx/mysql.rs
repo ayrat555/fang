@@ -448,7 +448,7 @@ impl BackendSqlXMySQL {
         }
     }
 
-    pub(super) fn name() -> &'static str {
+    pub(super) fn _name() -> &'static str {
         "MySQL"
     }
 }

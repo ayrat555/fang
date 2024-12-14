@@ -7,7 +7,6 @@ use {
 };
 
 use std::fmt::Debug;
-use std::str::FromStr;
 use typed_builder::TypedBuilder;
 use uuid::Uuid;
 
@@ -103,14 +102,14 @@ impl BackendSqlX {
         }
     }
 
-    pub(crate) fn name(&self) -> &str {
+    pub(crate) fn _name(&self) -> &str {
         match *self {
             #[cfg(feature = "asynk-postgres")]
-            BackendSqlX::Pg => BackendSqlXPg::name(),
+            BackendSqlX::Pg => BackendSqlXPg::_name(),
             #[cfg(feature = "asynk-sqlite")]
-            BackendSqlX::Sqlite => BackendSqlXSQLite::name(),
+            BackendSqlX::Sqlite => BackendSqlXSQLite::_name(),
             #[cfg(feature = "asynk-mysql")]
-            BackendSqlX::MySql => BackendSqlXMySQL::name(),
+            BackendSqlX::MySql => BackendSqlXMySQL::_name(),
         }
     }
 }

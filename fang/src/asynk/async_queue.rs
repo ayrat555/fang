@@ -14,19 +14,17 @@ use chrono::DateTime;
 use chrono::Utc;
 use cron::Schedule;
 use sqlx::any::install_default_drivers;
-use sqlx::any::Any;
-use sqlx::any::AnyTypeInfo;
+
 #[cfg(any(
     feature = "asynk-postgres",
     feature = "asynk-mysql",
     feature = "asynk-sqlite"
 ))]
 use sqlx::pool::PoolOptions;
-use sqlx::Encode;
-use sqlx::TypeInfo;
 use std::str::FromStr;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
+use url::Url;
 use uuid::Uuid;
 
 #[cfg(feature = "asynk-postgres")]
@@ -55,6 +53,8 @@ pub enum AsyncQueueError {
     SqlXError(#[from] sqlx::Error),
     #[error(transparent)]
     SerdeError(#[from] serde_json::Error),
+    #[error(transparent)]
+    UrlError(#[from] url::ParseError),
     #[error(transparent)]
     CronError(#[from] CronError),
     #[error("returned invalid result (expected {expected:?}, found {found:?})")]
@@ -246,7 +246,7 @@ async fn get_pool(
 ) -> Result<InternalPool, AsyncQueueError> {
     match kind {
         #[cfg(feature = "asynk-postgres")]
-        "PostgreSQL" => {
+        "postgres" => {
             let pool = PoolOptions::<Postgres>::new()
                 .max_connections(_max_connections)
                 .connect(_uri)
@@ -255,7 +255,7 @@ async fn get_pool(
             Ok(InternalPool::Pg(pool))
         }
         #[cfg(feature = "asynk-sqlite")]
-        "SQLite" => {
+        "sqlite" => {
             let pool = PoolOptions::<Sqlite>::new()
                 .max_connections(_max_connections)
                 .connect(_uri)
@@ -264,7 +264,7 @@ async fn get_pool(
             Ok(InternalPool::Sqlite(pool))
         }
         #[cfg(feature = "asynk-mysql")]
-        "MySql" => {
+        "mysql" => {
             let pool = PoolOptions::<MySql>::new()
                 .max_connections(_max_connections)
                 .connect(_uri)
@@ -291,9 +291,9 @@ impl AsyncQueue {
     pub async fn connect(&mut self) -> Result<(), AsyncQueueError> {
         install_default_drivers();
 
-        let any_type_info: AnyTypeInfo = sqlx::Encode::<Any>::produces(&self.uri).unwrap();
+        let kind = Url::parse(&self.uri)?;
 
-        let kind: &str = any_type_info.name();
+        let kind = kind.scheme();
 
         let pool = get_pool(kind, &self.uri, self.max_pool_size).await?;
 
