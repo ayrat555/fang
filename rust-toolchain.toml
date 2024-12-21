@@ -1,5 +1,5 @@
 [toolchain]
-versioned = "1.82"
+versioned = "1.83"
 channel = "stable-x86_64-unknown-linux-gnu"
 components = ["rustfmt", "rustc-dev", "clippy"]
 targets = ["x86_64-unknown-linux-gnu"]
