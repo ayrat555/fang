@@ -58,13 +58,12 @@ pub trait AsyncRunnable: Send + Sync {
     ///
     /**
     ```rust
-     fn cron(&self) -> Option<Scheduled> {
-         let expression = "0/20 * * * Aug-Sep * 2022/1";
-         Some(Scheduled::CronPattern(expression.to_string()))
-     }
+    fn cron(&self) -> Option<Scheduled> {
+        let expression = "0/20 * * * Aug-Sep * 2022/1";
+        Some(Scheduled::CronPattern(expression.to_string()))
+    }
     ```
     */
-
     /// In order to schedule  a task once, use the `Scheduled::ScheduleOnce` enum variant.
     fn cron(&self) -> Option<Scheduled> {
         None

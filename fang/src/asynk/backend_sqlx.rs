@@ -2,8 +2,8 @@ use chrono::{DateTime, Utc};
 use sha2::Digest;
 use sha2::Sha256;
 use {
-    chrono::Duration, sqlx::any::AnyQueryResult, sqlx::database::HasArguments, sqlx::Database,
-    sqlx::Encode, sqlx::Executor, sqlx::FromRow, sqlx::IntoArguments, sqlx::Pool, sqlx::Type,
+    chrono::Duration, sqlx::any::AnyQueryResult, sqlx::Database, sqlx::Encode, sqlx::Executor,
+    sqlx::FromRow, sqlx::IntoArguments, sqlx::Pool, sqlx::Type,
 };
 
 use std::fmt::Debug;
@@ -102,7 +102,6 @@ impl BackendSqlX {
         }
     }
 
-    // I think it is useful to have this method, although it is not used
     pub(crate) fn _name(&self) -> &str {
         match *self {
             #[cfg(feature = "asynk-postgres")]
@@ -155,7 +154,7 @@ where
     for<'r> &'r Uuid: Encode<'r, DB> + Type<DB>,
     for<'r> &'r serde_json::Value: Encode<'r, DB> + Type<DB>,
     for<'r> &'r Pool<DB>: Executor<'r, Database = DB>,
-    for<'r> <DB as HasArguments<'r>>::Arguments: IntoArguments<'r, DB>,
+    for<'r> <DB as Database>::Arguments<'r>: IntoArguments<'r, DB>,
     <DB as Database>::QueryResult: Into<AnyQueryResult>,
 {
     async fn fetch_task_type(
