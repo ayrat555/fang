@@ -141,15 +141,12 @@ pub trait AsyncQueueable: Send + Sync {
 /// To connect an `AsyncQueue` to PostgreSQL database call the `connect` method.
 /// A Queue can be created with the TypedBuilder.
 ///
-///    ```rust
-///         let mut queue = AsyncQueue::builder()
-///             .uri("postgres://postgres:postgres@localhost/fang")
-///             .max_pool_size(max_pool_size)
-///             .build();
-///     ```
-///
-///
-
+/// ```
+/// let mut queue = AsyncQueue::builder()
+///   .uri("postgres://postgres:postgres@localhost/fang")
+///   .max_pool_size(max_pool_size)
+///   .build();
+/// ```
 #[derive(Debug, Clone)]
 pub(crate) enum InternalPool {
     #[cfg(feature = "asynk-postgres")]

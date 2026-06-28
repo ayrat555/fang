@@ -117,21 +117,19 @@ pub trait Queueable {
 /// To connect a `Queue` to the PostgreSQL database call the `get_connection` method.
 /// A Queue can be created with the TypedBuilder.
 ///
-///    ```rust
-///         // Set DATABASE_URL enviroment variable if you would like to try this function.
-///         pub fn connection_pool(pool_size: u32) -> r2d2::Pool<r2d2::ConnectionManager<PgConnection>> {
-///             let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+/// ```rust
+/// // Set DATABASE_URL enviroment variable if you would like to try this function.
+/// pub fn connection_pool(pool_size: u32) -> r2d2::Pool<r2d2::ConnectionManager<PgConnection>> {
+///   let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+///   let manager = r2d2::ConnectionManager::<PgConnection>::new(database_url);
+///   r2d2::Pool::builder()
+///     .max_size(pool_size)
+///     .build(manager)
+///     .unwrap()
+/// }
 ///
-///             let manager = r2d2::ConnectionManager::<PgConnection>::new(database_url);
-///
-///             r2d2::Pool::builder()
-///             .max_size(pool_size)
-///             .build(manager)
-///             .unwrap()
-///         }
-///
-///         let queue = Queue::builder().connection_pool(connection_pool(3)).build();
-///     ```
+/// let queue = Queue::builder().connection_pool(connection_pool(3)).build();
+/// ```
 ///
 #[derive(Clone, TypedBuilder)]
 pub struct Queue {

@@ -26,14 +26,14 @@ pub trait Runnable {
     /// This method defines if a task is periodic or it should be executed once in the future.
     ///
     /// Be careful it works only with the UTC timezone.
-    /**
-    ```rust
-      fn cron(&self) -> Option<Scheduled> {
-          let expression = "0/20 * * * Aug-Sep * 2022/1";
-          Some(Scheduled::CronPattern(expression.to_string()))
-      }
-     ```
-     */
+    ///
+    /// ```
+    /// fn cron(&self) -> Option<Scheduled> {
+    ///   let expression = "0/20 * * * Aug-Sep * 2022/1";
+    ///   Some(Scheduled::CronPattern(expression.to_string()))
+    /// }
+    /// ```
+    ///
     /// In order to schedule  a task once, use the `Scheduled::ScheduleOnce` enum variant.
     fn cron(&self) -> Option<Scheduled> {
         None

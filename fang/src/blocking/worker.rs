@@ -435,7 +435,6 @@ mod worker_tests {
 
     #[test]
     #[ignore]
-
     fn no_schedule_until_run() {
         let task = TaskScheduled {};
 
