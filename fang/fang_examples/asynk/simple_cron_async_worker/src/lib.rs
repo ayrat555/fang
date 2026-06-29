@@ -31,3 +31,28 @@ impl AsyncRunnable for MyCronTask {
         true
     }
 }
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "fang::serde")]
+pub struct MyEveryNSecsCronTask {
+    pub every_n_secs: u32,
+}
+
+#[async_trait]
+#[typetag::serde]
+impl AsyncRunnable for MyEveryNSecsCronTask {
+    async fn run(&self, _queue: &dyn AsyncQueueable) -> Result<(), FangError> {
+        log::info!("CRON!!!!!!!!!!!!!!!",);
+
+        Ok(())
+    }
+
+    fn cron(&self) -> Option<Scheduled> {
+        let expression = format!("0/{} * * * * * *", self.every_n_secs);
+        Some(Scheduled::CronPattern(expression))
+    }
+
+    fn uniq(&self) -> bool {
+        true
+    }
+}

@@ -3,7 +3,7 @@ use fang::asynk::async_queue::AsyncQueue;
 use fang::asynk::async_queue::AsyncQueueable;
 use fang::asynk::async_worker_pool::AsyncWorkerPool;
 use fang::AsyncRunnable;
-use simple_cron_async_worker::MyCronTask;
+use simple_cron_async_worker::{MyCronTask, MyEveryNSecsCronTask};
 use std::env;
 use std::time::Duration;
 
@@ -39,6 +39,18 @@ async fn main() {
         .schedule_task(&task as &dyn AsyncRunnable)
         .await
         .unwrap();
+
+    let task = MyEveryNSecsCronTask { every_n_secs: 30 };
+
+    queue
+        .schedule_task(&task as &dyn AsyncRunnable)
+        .await
+        .unwrap();
+
+    log::info!(
+        "Every {} seconds task scheduled from main ...",
+        task.every_n_secs
+    );
 
     tokio::time::sleep(Duration::from_secs(100)).await;
 }
