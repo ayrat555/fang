@@ -251,3 +251,25 @@ jobs:
 
       - name: Run tests
         run: cargo test "asynk::async_queue::mysql" --verbose --features asynk-mysql --color always -- --nocapture
+
+  # check that we can build using the minimal rust
+  # version (MSRV) that is specified by this crate
+  msrv:
+      runs-on: ubuntu-latest
+      strategy:
+        matrix:
+          # home@0.5.12 (which is sqlx dependency) requires rustc 1.88
+          msrv: ["1.88.0"]
+      name: ubuntu / ${{ matrix.msrv }}
+      steps:
+        - uses: actions/checkout@v7
+        - name: Install ${{ matrix.msrv }}
+          uses: dtolnay/rust-toolchain@master
+          with:
+            toolchain: ${{ matrix.msrv }}
+        # Note how we are not passing `--all-targets` here unlike other places in he linting
+        # and testing workflows. This is because the whole point of the MSRV cecking is to
+        # ensure that the crate "can be built" with a Rust version equal to the specified MSRV.
+        # There is no obligation to ensure this for such targets as tests and examples.
+        - name: cargo +${{ matrix.msrv }} check --all-features
+          run: cargo check --all-features
