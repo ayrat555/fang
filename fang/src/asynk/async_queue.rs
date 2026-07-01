@@ -13,18 +13,17 @@ use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use cron::Schedule;
-use sqlx::any::AnyConnectOptions;
-use sqlx::any::AnyKind;
+use sqlx::any::install_default_drivers;
 #[cfg(any(
     feature = "asynk-postgres",
     feature = "asynk-mysql",
     feature = "asynk-sqlite"
 ))]
 use sqlx::pool::PoolOptions;
-//use sqlx::any::install_default_drivers; // this is supported in sqlx 0.7
 use std::str::FromStr;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
+use url::Url;
 use uuid::Uuid;
 
 #[cfg(feature = "asynk-postgres")]
@@ -53,6 +52,8 @@ pub enum AsyncQueueError {
     SqlXError(#[from] sqlx::Error),
     #[error(transparent)]
     SerdeError(#[from] serde_json::Error),
+    #[error(transparent)]
+    DatabaseUrlParseError(#[from] url::ParseError),
     #[error(transparent)]
     CronError(#[from] CronError),
     #[error("returned invalid result (expected {expected:?}, found {found:?})")]
@@ -234,40 +235,37 @@ use std::env;
 
 use super::backend_sqlx::BackendSqlX;
 
-async fn get_pool(
-    kind: AnyKind,
-    _uri: &str,
-    _max_connections: u32,
-) -> Result<InternalPool, AsyncQueueError> {
-    match kind {
+async fn get_pool(uri: &Url, max_connections: u32) -> Result<InternalPool, AsyncQueueError> {
+    match uri.scheme() {
+        // https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS
         #[cfg(feature = "asynk-postgres")]
-        AnyKind::Postgres => {
+        "postgres" | "postgresql" => {
             let pool = PoolOptions::<Postgres>::new()
-                .max_connections(_max_connections)
-                .connect(_uri)
+                .max_connections(max_connections)
+                .connect(uri.as_str())
                 .await?;
 
             Ok(InternalPool::Pg(pool))
         }
         #[cfg(feature = "asynk-mysql")]
-        AnyKind::MySql => {
+        // https://dev.mysql.com/doc/refman/9.7/en/connecting-using-uri-or-key-value-pairs.html
+        "mysql" | "mysqlx" => {
             let pool = PoolOptions::<MySql>::new()
-                .max_connections(_max_connections)
-                .connect(_uri)
+                .max_connections(max_connections)
+                .connect(uri.as_str())
                 .await?;
 
             Ok(InternalPool::MySql(pool))
         }
         #[cfg(feature = "asynk-sqlite")]
-        AnyKind::Sqlite => {
+        "sqlite" => {
             let pool = PoolOptions::<Sqlite>::new()
-                .max_connections(_max_connections)
-                .connect(_uri)
+                .max_connections(max_connections)
+                .connect(uri.as_str())
                 .await?;
 
             Ok(InternalPool::Sqlite(pool))
         }
-        #[allow(unreachable_patterns)]
         _ => Err(AsyncQueueError::ConnectionError),
     }
 }
@@ -284,11 +282,11 @@ impl AsyncQueue {
 
     /// Connect to the db if not connected
     pub async fn connect(&mut self) -> Result<(), AsyncQueueError> {
-        //install_default_drivers();
+        install_default_drivers();
 
-        let kind: AnyKind = self.uri.parse::<AnyConnectOptions>()?.kind();
+        let database_url = Url::parse(&self.uri).map_err(AsyncQueueError::DatabaseUrlParseError)?;
 
-        let pool = get_pool(kind, &self.uri, self.max_pool_size).await?;
+        let pool = get_pool(&database_url, self.max_pool_size).await?;
 
         self.pool = pool;
         self.connected = true;
