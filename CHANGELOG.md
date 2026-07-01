@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.11.0-rc2 - unreleased
+
+- add `msrv` job to CI, pin `1.88` as MSRV - [#162]
+- update `sqlx` from `0.6` to `0.8` - [#162]
+- update `cron` from `0.12` to `1.17` - [#161]
+- update `sha` from `0.10` to `0.11` - [#161]
+- update `thiserror` from `1` to `2` - [#161]
+- update `typed-builder` from `0.14` to `0.23` - [#161]
+
+[#161]: https://github.com/ayrat555/fang/pull/161
+[#162]: https://github.com/ayrat555/fang/pull/162
 ## 0.11.0-rc1 (2024-04-22)
 
 - Fix blocking features - [#151](https://github.com/ayrat555/fang/pull/151)
